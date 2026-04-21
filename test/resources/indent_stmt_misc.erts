@@ -173,7 +173,7 @@ contains
          &                    fsim2
 
       procedure(simulator_ifc) :: &
-         &                        fsim
+         &   fsim
 
       call sim_init(set, &
          &          out)
@@ -276,7 +276,7 @@ contains
   &                           fsim2
 
       procedure(simulator_ifc) :: &
-  &                               fsim
+  &          fsim
 
       call sim_init(set, &
   &                 out)
