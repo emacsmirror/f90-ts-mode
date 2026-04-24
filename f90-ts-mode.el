@@ -2151,10 +2151,11 @@ Resolves delta via the anchor's cache entry:
   delta = delta-at-anchor-line + OFFSET"
   (unless f90-ts--align-continued-variant-tab
     (let* ((anchor-line (line-number-at-pos anchor))
+           (anchor-col (f90-ts--column-number-at-pos anchor))
            (anchor-entry (cdr (assq anchor-line f90-ts--continued-line-cache)))
            (anchor-delta (if anchor-entry (cadr anchor-entry) 0))
            (bol-current  (f90-ts--indentation-at-pos bol))
-           (bol-new (f90-ts--column-number-at-pos (+ anchor anchor-delta offset)))
+           (bol-new (+ anchor-col anchor-delta offset))
            (delta (- bol-new bol-current))
            (line (line-number-at-pos bol)))
       (push (cons line (list bol-current delta))
