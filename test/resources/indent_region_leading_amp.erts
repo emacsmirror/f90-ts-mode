@@ -190,12 +190,12 @@ end subroutine arr1
 subroutine arr1()
      ! list context alignment of numbers in array
      integer, dimension(1:3,1:4), parameter:: &
-        &                                     facet_ix = reshape(&
-        &                                                        [2,3,4, &
-        &                                                         1,4,3, &
-        &                                                         1,2,4, &
-        &                                                         1,3,2 &
-        &                                                           ], [3,4])
+        &   facet_ix = reshape(&
+        &          [2,3,4, &
+        &           1,4,3, &
+        &           1,2,4, &
+        &           1,3,2 &
+        &             ], [3,4])
 end subroutine arr1
 =-=-=
 
@@ -230,11 +230,36 @@ subroutine arr3()
           
                                          ! comment
           
-        &                                rgb = &
+        &   rgb = &
         &                                (/ &
         &                                  'red  ', &
         &                                  'green', &
         &                                  'blue ' /), &
-        &                                alpha = 'trnsp'
+        &   alpha = 'trnsp'
 end subroutine arr3
+=-=-=
+
+Name: align array literal 4
+=-=
+subroutine arr4()
+     character(len=5), dimension(1:3) :: & ! comment
+          ! comment
+                                  rgb = &
+              [ &
+              'red  ', &
+              'green', &
+              'blue ' ], &
+           alpha = 'trnsp'
+end
+=-=
+subroutine arr4()
+     character(len=5), dimension(1:3) :: & ! comment
+                                         ! comment
+        &   rgb = &
+        &   [ &
+        &    'red  ', &
+        &    'green', &
+        &    'blue ' ], &
+        &   alpha = 'trnsp'
+end subroutine arr4
 =-=-=

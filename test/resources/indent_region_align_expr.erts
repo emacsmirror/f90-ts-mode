@@ -125,11 +125,11 @@ subroutine sub8()
                       p2) &
        .or. condition2(q1, q2, &
                                q3) &
-           .and. (  condition3(a1,a2,a3&
+           .and. (condition3(a1,a2,a3&
                             )&
                   .or. condition4(&
                                  fun1(x,y), &
-                                  fun2(u,v)) &
+                                   fun2(u,v)) &
 .eqv. condition5(&
               fun1(x,y), &
              fun2(u,v)) &
@@ -145,19 +145,19 @@ subroutine sub8()
                     p2) &
         .or. condition2(q1, q2, &
                         q3) &
-        .and. (  condition3(a1,a2,a3&
-                              )&
+        .and. (condition3(a1,a2,a3&
+                            )&
                .or. condition4(&
-                               fun1(x,y), &
-                               fun2(u,v)) &
+                      fun1(x,y), &
+                      fun2(u,v)) &
                .eqv. condition5(&
-                                fun1(x,y), &
-                                fun2(u,v)) &
+                      fun1(x,y), &
+                      fun2(u,v)) &
                  )&
         .neqv. condition6(&
-                          fun1(x,y), &
-                          fun2(u,v) &
-                            )
+               fun1(x,y), &
+               fun2(u,v) &
+               )
 end subroutine sub8
 =-=-=
 
@@ -226,6 +226,23 @@ end subroutine sub
 Name: align unary expression 2
 =-=
 subroutine sub()
+     my_result = &
+-value1 + &
+   -7 * &
+       -value2
+end subroutine sub
+=-=
+subroutine sub()
+     my_result = &
+            -value1 + &
+            -7 * &
+            -value2
+end subroutine sub
+=-=-=
+
+Name: align unary expression 3
+=-=
+subroutine sub()
 my_result = -value1 + &
 -7 * &
 -value2 * fun(.not. A, &
@@ -276,11 +293,11 @@ end subroutine sub
 =-=
 subroutine sub()
      my_result = (&
-                  -value1 + (&
-                             (a+b)+c) / &
-                  -7 * &
-                  -value2 &
-                    )
+            -value1 + (&
+                   (a+b)+c) / &
+            -7 * &
+            -value2 &
+            )
 end subroutine sub
 =-=-=
 
@@ -324,14 +341,14 @@ subroutine sub()
      integer, parameter :: cos_phi &
             = cos(&
                   3.14159265/180.0 * (&
-                                      phi_1 + &
-                                      phi_2) &
+                         phi_1 + &
+                         phi_2) &
                     ), &
                            cos_psi &
             = cos(&
                   3.14159265/180.0 * (&
-                                      -psi_1 - &
-                                       psi_2) &
+                         -psi_1 - &
+                          psi_2) &
                     )
 end subroutine sub
 =-=-=

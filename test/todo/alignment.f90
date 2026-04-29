@@ -1,3 +1,52 @@
+! primary of -0.03333 is not good (due to leading minus sign which becomes a unary operator,
+! but aligning 0.03333 without minus to 1.0 is difficult)
+subroutine arr2()
+     real, dimension(1:10), parameter :: &
+            bernoulli = (/ 1.0, -0.5, 0.16667, 0.0, &
+                                -0.03333, 0.0, &
+                           0.0238, 0.0 &
+                            /)
+end subroutine arr2
+
+
+
+
+! there is no proper context node for "! comment 2", but "! comment 1"
+! would be a proper primary or secondary choice, besides default indentation shown below
+! in both cases: add assignment_statement as list context and extract part after "="
+subroutine math()
+     integer, parameter :: x = 5 + 6
+     x1234567890 = & ! comment 1
+            ! comment 2
+            5 + 6
+end subroutine math
+
+! y is not a math-expression, just an identifier,
+! should identifier be added?
+! (in order to get column after = as suggestion)
+subroutine math()
+     x1234567890 = &
+            y
+     z = &
+            y
+end subroutine math
+
+
+
+! we need to include init_declarator context to indent
+! "[ & ..." after "=" relative to "rgb =" ...
+subroutine arr3()
+     character(len=5), dimension(1:3) :: & ! comment
+                                         ! comment
+        &   rgb = &
+        &   [ &
+        &    'red  ', &
+        &    'green', &
+        &    'blue ' ], &
+        &   alpha = 'trnsp'
+end subroutine arr3
+
+
 ! list context for case range
 subroutine select_case()
      select_variant: select case (variant)
@@ -112,21 +161,6 @@ program int23
       int3 = int3 + z(i)
  end do integrate
 end program int23
-
-
-! alignment of import statement
-module mod
- abstract interface
-      subroutine sub_ifc(x, y, z)
-           import some_t, some_s, &
-                other_r
-           class(some_t), intent(inout) :: x
-           type(some_s), intent(in) :: y
-           class(other_r), pointer, intent(out) :: z
-      end subroutine sub_ifc
- end interface
-end module mod
-
 
 
 ! align result below predicate_ifc?
