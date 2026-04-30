@@ -73,7 +73,7 @@ Code:
 
 Point-Char: |
 
-Name: comments 1
+Name: comments 2
 =-=
 subroutine compute(arg1, &
                    ! comment1
