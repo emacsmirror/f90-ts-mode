@@ -71,6 +71,7 @@
 (require 'cl-lib)
 (require 'treesit)
 (require 'xref)
+(require 'transient)
 
 ;; hl-line is used for the navigation buffer
 (require 'hl-line)
@@ -548,34 +549,7 @@ seem to make much sense."
 
 
 ;;;-----------------------------------------------------------------------------
-;;; keymap and syntax table
-
-(defvar f90-ts-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-<tab>") #'f90-ts-indent-and-complete-stmt)
-    ; <tab> is bound to indent-for-tab-command by default
-    (define-key map (kbd "<backtab>")         #'f90-ts-indent-for-tab-command-2) ; S-<tab>
-    (define-key map (kbd "C-S-<iso-lefttab>") #'f90-ts-indent-for-tab-command-3) ; Linux
-    (define-key map (kbd "C-<backtab>")       #'f90-ts-indent-for-tab-command-3) ; Windows?
-
-    (define-key map (kbd "A-<return>") 'f90-ts-break-line)
-    (define-key map (kbd "A-<backspace>") #'f90-ts-join-line-prev)
-    (define-key map (kbd "A-<delete>") #'f90-ts-join-line-next)
-    (define-key map (kbd "A-\\") #'f90-ts-enlarge-region)
-    (define-key map (kbd "A-0") #'f90-ts-child0-region)
-    (define-key map (kbd "A-[") #'f90-ts-prev-region)
-    (define-key map (kbd "A-]") #'f90-ts-next-region)
-
-    (define-key map (kbd "C-A-a") #'f90-ts-thing-beginning-of-procedure)
-    (define-key map (kbd "C-A-e") #'f90-ts-thing-end-of-procedure)
-    (define-key map (kbd "C-A-p") #'f90-ts-thing-prev-procedure)
-    (define-key map (kbd "C-A-n") #'f90-ts-thing-next-procedure)
-
-    (define-key map (kbd "C-c C-t") #'f90-ts-nav-buffer-open)
-    (define-key map (kbd "C-c C-f") #'f90-ts-nav-buffer-focus)
-    map)
-  "Keymap for `f90-ts-mode'.")
-
+;;; syntax table
 
 (defvar f90-ts-mode-syntax-table
   (let ((table (make-syntax-table)))
@@ -615,6 +589,130 @@ seem to make much sense."
 
     table)
   "Syntax table for `f90-ts-mode'.")
+
+
+;;;-----------------------------------------------------------------------------
+;;; keymap
+
+
+;; transient is used instead (but keep it for a while)
+;;
+;; (define-prefix-command 'f90-ts-prefix-map)
+;; ;; indentation
+;; (define-key f90-ts-prefix-map (kbd "<tab>") #'f90-ts-indent-and-complete-line)
+;; (define-key f90-ts-prefix-map (kbd "s")     #'f90-ts-indent-and-complete-stmt)
+;; (define-key f90-ts-prefix-map (kbd "I")     #'f90-ts-indent-and-complete-region)
+;; (define-key f90-ts-prefix-map (kbd "E")     #'f90-ts-complete-smart-end-region)
+
+;; ;; line editing
+;; (define-key f90-ts-prefix-map (kbd "RET") #'f90-ts-break-line)
+;; (define-key f90-ts-prefix-map (kbd "j")   #'f90-ts-join-line-prev)
+;; (define-key f90-ts-prefix-map (kbd "J")   #'f90-ts-join-line-next)
+
+;; ;; comment region
+;; (define-key f90-ts-prefix-map (kbd "c") #'f90-ts-comment-region-default)
+;; (define-key f90-ts-prefix-map (kbd "C") #'f90-ts-comment-region-custom)
+
+;; ;; navigation
+;; ;; procedure
+;; (define-key f90-ts-prefix-map (kbd "a") #'f90-ts-thing-beginning-of-procedure)
+;; (define-key f90-ts-prefix-map (kbd "e") #'f90-ts-thing-end-of-procedure)
+;; (define-key f90-ts-prefix-map (kbd "p") #'f90-ts-thing-prev-procedure)
+;; (define-key f90-ts-prefix-map (kbd "n") #'f90-ts-thing-next-procedure)
+
+;; ;; type
+;; (define-key f90-ts-prefix-map (kbd "M-a") #'f90-ts-thing-beginning-of-type)
+;; (define-key f90-ts-prefix-map (kbd "M-e") #'f90-ts-thing-end-of-type)
+;; (define-key f90-ts-prefix-map (kbd "M-p") #'f90-ts-thing-prev-type)
+;; (define-key f90-ts-prefix-map (kbd "M-n") #'f90-ts-thing-next-type)
+
+;; ;; interface
+;; (define-key f90-ts-prefix-map (kbd "C-M-a") #'f90-ts-thing-beginning-of-interface)
+;; (define-key f90-ts-prefix-map (kbd "C-M-e") #'f90-ts-thing-end-of-interface)
+;; (define-key f90-ts-prefix-map (kbd "C-M-p") #'f90-ts-thing-prev-interface)
+;; (define-key f90-ts-prefix-map (kbd "C-M-n") #'f90-ts-thing-next-interface)
+
+;; ;; region
+;; (define-key f90-ts-prefix-map (kbd "r") #'f90-ts-enlarge-region)
+;; (define-key f90-ts-prefix-map (kbd "0") #'f90-ts-child0-region)
+;; (define-key f90-ts-prefix-map (kbd "[") #'f90-ts-prev-region)
+;; (define-key f90-ts-prefix-map (kbd "]") #'f90-ts-next-region)
+
+;; ;; xref
+;; (define-key f90-ts-prefix-map (kbd ".") #'xref-find-definitions)
+;; (define-key f90-ts-prefix-map (kbd ",") #'xref-find-references)
+;; (define-key f90-ts-prefix-map (kbd "/") #'xref-find-apropos)
+
+;; ;; navigation side panel
+;; (define-key f90-ts-prefix-map (kbd "b")   #'f90-ts-nav-buffer-open)
+;; (define-key f90-ts-prefix-map (kbd "f")   #'f90-ts-nav-buffer-focus)
+
+;; ;; transient popup itself (? or C-c C-f C-f / SPC to open)
+;; (define-key f90-ts-prefix-map (kbd "?")   #'f90-ts-transient)
+;; (define-key f90-ts-prefix-map (kbd "SPC") #'f90-ts-transient)
+
+
+(defvar f90-ts-mode-map
+  (let ((map (make-sparse-keymap)))
+    ;; TAB commands
+    (define-key map (kbd "C-<tab>")           #'f90-ts-indent-and-complete-stmt)
+    (define-key map (kbd "<backtab>")         #'f90-ts-indent-for-tab-command-2) ; S-<tab>
+    (define-key map (kbd "C-S-<iso-lefttab>") #'f90-ts-indent-for-tab-command-3) ; Linux
+    (define-key map (kbd "C-<backtab>")       #'f90-ts-indent-for-tab-command-3) ; Windows?
+
+    ;; other keybindings inspired by f90-mode
+    (define-key map (kbd "C-<return>") #'f90-ts-break-line)
+    (define-key map (kbd "C-c ;")      #'f90-ts-comment-region-default)
+    (define-key map (kbd "C-c '")      #'f90-ts-comment-region-custom)
+
+    ;; C-c C-f prefix for the transient menu
+    (define-key map (kbd "C-c C-f") #'f90-ts-transient)
+    map)
+  "Keymap for `f90-ts-mode'.")
+
+
+(transient-define-prefix f90-ts-transient ()
+  "F90 Tree-sitter Mode"
+  [["Indentation"
+    ("TAB" "Indent line"                       f90-ts-indent-and-complete-line)
+    ("s"   "Indent & complete statement"       f90-ts-indent-and-complete-stmt)
+    ("I"   "Indent & complete region"          f90-ts-indent-and-complete-region)
+    ("E"   "Complete end statements"           f90-ts-complete-smart-end-region)]
+   ["Line & comments"
+    ("RET" "Break line"                        f90-ts-break-line)
+    ("j"   "Join with previous line"           f90-ts-join-line-prev)
+    ("J"   "Join with next line"               f90-ts-join-line-next)
+    ("c"   "Comment region (default)"          f90-ts-comment-region-default)
+    ("C"   "Comment region (custom)"           f90-ts-comment-region-custom)]
+   ["Region"
+    ("r"   "Enlarge region"                    f90-ts-enlarge-region)
+    ("0"   "Child-0 region"                    f90-ts-child0-region)
+    ("["   "Previous region"                   f90-ts-prev-region)
+    ("]"   "Next region"                       f90-ts-next-region)]]
+  [["Procedure navigation"
+    ("a"   "Beginning"                         f90-ts-thing-beginning-of-procedure)
+    ("e"   "End"                               f90-ts-thing-end-of-procedure)
+    ("p"   "Previous"                          f90-ts-thing-prev-procedure)
+    ("n"   "Next"                              f90-ts-thing-next-procedure)]
+   ["Type navigation"
+    ("M-a" "Beginning"                         f90-ts-thing-beginning-of-type)
+    ("M-e" "End"                               f90-ts-thing-end-of-type)
+    ("M-p" "Previous"                          f90-ts-thing-prev-type)
+    ("M-n" "Next"                              f90-ts-thing-next-type)]
+   ["Interface navigation"
+    ("C-M-a" "Beginning"                       f90-ts-thing-beginning-of-interface)
+    ("C-M-e" "End"                             f90-ts-thing-end-of-interface)
+    ("C-M-p" "Previous"                        f90-ts-thing-prev-interface)
+    ("C-M-n" "Next"                            f90-ts-thing-next-interface)]
+   ["Xref"
+    ("."   "Find definition"                   xref-find-definitions)
+    (","   "Find references"                   xref-find-references)
+    ("/"   "Find apropos"                      xref-find-apropos)
+    ("<"   "Go back"                           xref-go-back)
+    (">"   "Go forward"                        xref-go-forward)]
+   ["Navigation panel"
+    ("b"   "Open nav buffer"                   f90-ts-nav-buffer-open)
+    ("f"   "Focus nav buffer"                  f90-ts-nav-buffer-focus)]])
 
 
 ;;;-----------------------------------------------------------------------------
