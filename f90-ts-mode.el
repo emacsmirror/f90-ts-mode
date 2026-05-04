@@ -373,6 +373,14 @@ Special comments such as separators are determined by rules in
 (defcustom f90-ts-nav-buffer-idle-delay 1.0
   "Seconds of idle time before the nav buffer is automatically refreshed."
   :type 'number
+  :safe (lambda (x) (and (numberp x) (> x 0)))
+  :group 'f90-ts-nav)
+
+
+(defcustom f90-ts-nav-buffer-width 40
+  "Width of navigation buffer."
+  :type 'integer
+  :safe (lambda (x) (and (integerp x) (> x 0)))
   :group 'f90-ts-nav)
 
 
@@ -5880,6 +5888,13 @@ and itself SPARSE-NODES."
 ;;;-----------------------------------------------------------------------------
 ;;; Navigation buffer: based on navigation tree
 
+;; TODO:
+;; * open a file: nav buffer not switched
+;; * mouse actions
+;; * show/hide variables
+;; * use shortcuts (mod, submod, prog, subr, fun, var, type ifc)
+;; * move point (e.g. by helm-projectile-grep and other actions) does not always sync the buffer
+
 (defvar f90-ts--nav-buffer-name "*F90-TS Navigate*"
   "Buffer name for the f90-ts navigation buffer.")
 
@@ -6187,11 +6202,15 @@ This is done for the current f90-ts source buffer."
         (f90-ts-nav-mode))
       (setq f90-ts--nav-buffer-source src-buf)
       (f90-ts--nav-buffer-render tree-nodes))
-
-    (display-buffer nav-buf
-                    '(display-buffer-in-side-window
-                      (side . left)
-                      (window-width . 35)))
+    (let ((win (display-buffer
+                nav-buf
+                '(display-buffer-in-side-window
+                  (side . left)))))
+      (when (window-live-p win)
+        (window-resize win
+                       (- f90-ts-nav-buffer-width
+                          (window-total-width win))
+                       t)))
     (with-selected-window (get-buffer-window nav-buf)
       (hl-line-highlight))
     (f90-ts--nav-buffer-add-hooks)
@@ -6592,10 +6611,10 @@ by CATEGORY and a time stamp."
 
 
 (define-derived-mode f90-ts-log-mode special-mode "F90-TS-Log"
-  "Major mode for the f90-tree-sitter log buffer."
-  (setq-local truncate-lines t)      ; keep logs on one line per entry
-  (setq-local buffer-read-only t)    ; ensure it stays read-only
-  (buffer-disable-undo)              ; improve performace, no undo required
+  "Major mode for the f90-ts log buffer."
+  (setq-local truncate-lines t)
+  (setq-local buffer-read-only t)
+  (buffer-disable-undo)
 )
 
 
