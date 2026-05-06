@@ -4480,20 +4480,25 @@ continued statement plus the configured offset."
   "Handle a leading ampersand on the current line before indentation.
 If point is at an ampersand after moving to the indentation column,
 temporarily replace it with a space so that `treesit-indent' sees
-the first proper node on that line.  Returns non-nil if an ampersand was
-found (and replaced), nil otherwise."
+the first proper node on that line.  Returns blanked text if an
+ampersand was found (and replaced), nil otherwise."
   (unless (f90-ts--point-on-empty-line-p)
     (save-excursion
       (back-to-indentation)
-      (let ((node (treesit-node-at (point))))
-        (cl-assert (= (f90-ts--node-line node)
-                      (line-number-at-pos (point)))
-                   nil
-                   "internal error (f90-ts--indent-blank-leading-ampersand-line): node not on current line")
-        (when (f90-ts--node-type-p node "&")
-          (delete-char 1)
-          (insert " ")
-          t)))))
+      (let ((c (char-after (point))))
+        ;; pre-check: only consider lines starting with ampersand
+        ;; later on: (and (>= c ?0) (<= c ?9)) for including statement labels
+        (when (and c (eq c ?&))
+          (let ((node (treesit-node-at (point))))
+            ;; a continued string has a leading ampersand, but the node starts on
+            ;; a previous line, these ampersands need to be excluding and must not be blanked
+            (when (and node
+                       (= (point) (treesit-node-start node)))
+              (when (f90-ts--node-type-p node "&")
+                (let ((text (treesit-node-text node)))
+                  (delete-char 1)
+                  (insert " ")
+                  text)))))))))
 
 
 (defun f90-ts--indent-restore-leading-ampersand-line ()
