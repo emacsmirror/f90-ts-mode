@@ -1,7 +1,7 @@
 # f90-ts-mode User Manual
 
 This manual provides a comprehensive overview and technical documentation for **f90-ts-mode**,
-a major mode for editing **Fortran 90 / Fortran 2003** (and newer) based on Emacs’s built-in **Tree-sitter** support.
+a major mode for editing **Fortran 90 / Fortran 2003** (and newer) based on Emacs's built-in **Tree-sitter** support.
 
 The mode is still under **development**. The [Roadmap](READEME.md#roadmap) lists missing or incomplete feature planned
 for implementation.
@@ -162,20 +162,48 @@ placed somewhere in `init.el` (or elsewhere).
 
 ### Keybindings
 
-The mode sets the following default mode local keybindings:
-```elisp
-(define-key f90-ts-mode-map (kbd "C-<tab>") #'f90-ts-indent-and-complete-stmt)
-(define-key f90-ts-mode-map (kbd "<backtab>")         #'f90-ts-indent-for-tab-command-2) ; S-<tab>
-(define-key f90-ts-mode-map (kbd "C-S-<iso-lefttab>") #'f90-ts-indent-for-tab-command-3) ; Linux
-(define-key f90-ts-mode-map (kbd "C-<backtab>")       #'f90-ts-indent-for-tab-command-3) ; Windows?
+The mode sets the following default mode-local keybindings:
 
-(define-key f90-ts-mode-map (kbd "A-<return>") 'f90-ts-break-line)
-(define-key f90-ts-mode-map (kbd "A-<backspace>") #'f90-ts-join-line-prev)
-(define-key f90-ts-mode-map (kbd "A-<delete>") #'f90-ts-join-line-next)
-(define-key f90-ts-mode-map (kbd "A-\\") #'f90-ts-enlarge-region)
-(define-key f90-ts-mode-map (kbd "A-0") #'f90-ts-child0-region)
-(define-key f90-ts-mode-map (kbd "A-[") #'f90-ts-prev-region)
-(define-key f90-ts-mode-map (kbd "A-]") #'f90-ts-next-region)
+```elisp
+;; TAB family
+(define-key map (kbd "C-<tab>")           #'f90-ts-indent-and-complete-stmt)
+(define-key map (kbd "<backtab>")         #'f90-ts-indent-for-tab-command-2) ; S-<tab>
+(define-key map (kbd "C-S-<iso-lefttab>") #'f90-ts-indent-for-tab-command-3) ; Linux
+(define-key map (kbd "C-<backtab>")       #'f90-ts-indent-for-tab-command-3) ; Windows?
+
+;; other keybindings inspired by f90-mode
+(define-key map (kbd "C-<return>")        #'f90-ts-break-line)
+(define-key f90-ts-mode-map (kbd "C-c ;") #'f90-ts-comment-region-default)
+(define-key f90-ts-mode-map (kbd "C-c '") #'f90-ts-comment-region-custom)
+
+;; C-c C-f — transient popup (see below)
+(define-key map (kbd "C-c C-f") #'f90-ts-transient)
+```
+
+#### Transient popup (`C-c C-f`)
+
+Pressing `C-c C-f` opens a transient keymap window. listing all major
+commands grouped by category.
+
+The popup is defined as `f90-ts-transient` and covers:
+
+| Section                   | Keys                            | Commands                                        |
+|---------------------------|---------------------------------|-------------------------------------------------|
+| **Indentation**           | `TAB` `s` `I` `E`               | Indent line / statement / region / smart end    |
+| **Line editing**          | `RET` `j` `J`                   | Break line, join with prev/next                 |
+| **Comment region**        | `c` `C`                         | Default and custom prefix                       |
+| **Structural navigation** | `a` `e` `p` `n`                 | Procedure (beginning, end, prev, next)          |
+|                           | `M-a` `M-e` `M-p` `M-n`         | Type (beginning, end, prev, next)               |
+|                           | `C-M-a` `C-M-e` `C-M-p` `C-M-n` | Interface (beginning, end, prev, next)          |
+| **Region**                | `r` `0` `[` `]`                 | Enlarge, child-0, prev, next                    |
+| **Xref**                  | `.` `,` `/` `<` `>`             | Definitions, references, apropos, back, forward |
+| **Navigation side panel** | `b` `f`                         | Open and focus nav buffer                       |
+
+The entire popup can be bound to a different prefix by:
+
+```elisp
+(define-key f90-ts-mode-map "..." #'f90-ts-transient)
+(keymap-unset f90-ts-mode-map "C-c C-f") ; remove default
 ```
 
 
@@ -304,7 +332,7 @@ alignment columns, always include the continued line position among the set of c
 Behaviour of indentation of a region and of a line are controlled by `f90-ts-indent-list-region`
 and `f90-ts-indent-list-line`, respectively.
 There are also variants `f90-ts-indent-list-line-2` and `f90-ts-indent-list-line-3`, which are
-used by functions bound to Shift+TAB and Control+Shift+TAB by default.
+used by functions bound to `<backtab>` (S-`TAB`) and `C-S-<iso-lefttab>` / `C-<backtab>` by default.
 
 Also check out [Continued statements and blocks](#indentation-of-continued-statements-and-blocks).
 
@@ -378,7 +406,7 @@ For incomplete statements on continued lines or incomplete structure blocks,
 indentation is sometimes not correct, due to an incomplete AST produced by the parser.
 
 Indentation of continued statements from begin of statement to line at point is done by
-`f90-ts-indent-and-complete-stmt`, which is bound to `C-<tab>`.
+`f90-ts-indent-and-complete-stmt`, which is bound to `C-<tab>` and to `s` in the transient popup.
 
 This same function also indents a whole block if executed at its `end struct` line.
 
@@ -386,14 +414,16 @@ This same function also indents a whole block if executed at its `end struct` li
 ### Xref
 
 The mode provides a minimal buffer local implementation of xref functions. In particular, the following
-functions can be used to find definitions and references of symbols (keybindings are the default ones):
+functions can be used to find definitions and references of symbols. Default Emacs xref keybindings
+apply, and all are also accessible via the transient popup (`C-c C-f`):
 
-| Function: keybinding           | Description                          |
-|--------------------------------|--------------------------------------|
-| `xref-find-definitions`: `M-.` | Jump to definition                   |
-| `xref-find-references`: `M-?`  | Find all references                  |
-| `xref-find-apropos`: `C-M-.`   | Find symbols matching regexp pattern |
-| `xref-go-back`: `M-,`          | Pop back                             |
+| Function                | Default | Popup | Description                  |
+|-------------------------|---------|-------|------------------------------|
+| `xref-find-definitions` | `M-.`   | `.`   | Jump to definition           |
+| `xref-find-references`  | `M-?`   | `,`   | Find all references          |
+| `xref-find-apropos`     | `C-M-.` | `/`   | Find symbols matching regexp |
+| `xref-go-back`          | `M-,`   | `<`   | Pop back                     |
+| `xref-go-forward`       | `C-M-,` | `>`   | Go forward                   |
 
 
 ### Imenu
@@ -414,7 +444,8 @@ with submenus for structures that contain other items.
 
 The navigation buffer provides a persistent side panel showing the structure of the current
 Fortran source buffer. It is based on the same tree as offered in the [Navigation menu](#navigation-menu).
-It can be opened with `f90-ts-nav-buffer-open` and focused with `f90-ts-nav-buffer-focus`.
+It can be opened with `f90-ts-nav-buffer-open` (`b` in the transient popup) and focused with
+`f90-ts-nav-buffer-focus` (`f` in the transient popup).
 
 The panel prints the tree, reflecting the nesting of program units.
 Entries are colour-coded by kind using customizable faces:
@@ -449,8 +480,9 @@ Keybindings in the navigation buffer:
 
 Inspired by the legacy f90 mode as well. Continued lines can be created by breaking a line or reduced
 by joining two consecutive lines connected by continuation symbol `&`.
-Functions for break and join operations are bound to `A-<return>` (break),
-`A-<backspace>` (join with previous line) and `A-<delete>` (join with next line).
+The line break function is bound to `C-<return>`.
+All break and join functions are available via the transient popup (`C-c C-f`)
+under keys `RET`, `j` and `J`.
 
 
 #### Breaking lines
@@ -486,7 +518,10 @@ Joining of comment lines or openmp statements is not yet implemented as well.
 
 This is also a feature inspired by the legacy f90 mode, but with a number of extensions.
 The selected region is (un)commented with a default or with a selectable prefix from a customizable list.
-```
+Both functions are accessible via the transient popup (`C-c C-f`) under keys `c` and `C`, and also
+have legacy-style direct bindings:
+
+```elisp
 (define-key f90-ts-mode-map (kbd "C-c ;") #'f90-ts-comment-region-default)
 (define-key f90-ts-mode-map (kbd "C-c '") #'f90-ts-comment-region-custom)
 ```
@@ -507,21 +542,15 @@ any blanks to keep original indentation of commented code.
 
 ### Mark region based on tree-sitter nodes
 
-Regions can be selected, enlarged, shrunk or moved based on tree-sitter nodes:
-Available functions are:
+Regions can be selected, enlarged, shrunk or moved based on tree-sitter nodes.
+Key bindings are provided in the transient popup (`C-c C-f`) under the Region section:
 
-| Function                         | Description                                                                 |
-|----------------------------------|-----------------------------------------------------------------------------|
-| `f90-ts-enlarge-region`          | Find smallest parent node of existing region which is strictly larger       |
-| `f90-ts-child0-region`           | Reduce existing region to a first (grand)child which is strictly smaller    |
-| `f90-ts-prev-region`             | Move selected region to previous sibling                                    |
-| `f90-ts-next-region`             | Move selected region to next sibling                                        |
-
-Default Keybindings:
- * (define-key map (kbd "A-\\") #'f90-ts-enlarge-region)
- * (define-key map (kbd "A-0") #'f90-ts-child0-region)
- * (define-key map (kbd "A-[") #'f90-ts-prev-region)
- * (define-key map (kbd "A-]") #'f90-ts-next-region)
+| Function                         | Popup key | Description                                                              |
+|----------------------------------|-----------|--------------------------------------------------------------------------|
+| `f90-ts-enlarge-region`          | `r`       | Find smallest parent node of existing region which is strictly larger    |
+| `f90-ts-child0-region`           | `0`       | Reduce existing region to a first (grand)child which is strictly smaller |
+| `f90-ts-prev-region`             | `[`       | Move selected region to previous sibling                                 |
+| `f90-ts-next-region`             | `]`       | Move selected region to next sibling                                     |
 
 
 ## Testing with ERT

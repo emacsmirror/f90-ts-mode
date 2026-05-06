@@ -26,6 +26,25 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Navigation (defun, things, Xref, tree as submenu and as side panel buffer)
 
 
+## Keybindings
+
+The mode provides direct keybindings for the most frequent operations like indentation with `TAB`
+and a **transient popup** for discoverability of all commands:
+
+| Key                            | Description                      |
+|--------------------------------|----------------------------------|
+| `C-c C-f`                      | Open the transient command popup |
+| `C-<tab>`                      | Indent & complete line           |
+| `C-<return>`                   | Break line                       |
+| `C-c ;`                        | Comment region (default prefix)  |
+| `C-c '`                        | Comment region (custom prefix)   |
+
+Pressing `C-c C-f` opens a transient popup grouping all major commands by category.
+
+For the full keybinding reference see the
+[Keybindings section in the manual](MANUAL.md#keybindings).
+
+
 ## Installation
 
 This mode requires **Emacs 30+** and a compatible Tree-sitter Fortran grammar.
