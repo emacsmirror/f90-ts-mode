@@ -3843,16 +3843,7 @@ The main purpose is to fill the indentation cache for a new run.")
    ;; it is easy to see whether we are on a continued line (not the first line
    ;; of a multiline statement, only subsequent lines), but handling specific
    ;; cases is not possible with just some simple n-p-gp pattern,
-   ;;
-   ;; moreover, using previous line indentation for all but the first continued line
-   ;; does not work in conjunction with list alignment, if a statement has continued
-   ;; lines after a list part, for example:
-   ;;
-   ;; function fun(aa, x1, x2,&
-   ;;                  x3, x4, x5) &
-   ;;      result(val)
-   ;; by how much should result be indented? x3 is not a good anchor!
-   (continued-subsequent-line-is f90-ts--continued-line-anchor f90-ts--cached-offset))
+   (continued-subsequent-line-is f90-ts--continued-line-anchor cached-offset))
   "Indentation rules for continued lines.")
 
 
@@ -3861,8 +3852,8 @@ The main purpose is to fill the indentation cache for a new run.")
    ;; contains statements in modules, programs, subroutines or functions,
    ;; no indentation for contains
    ((node-is    "internal_procedures")         parent 0)
-   ((parent-is  "internal_procedures")         parent f90-ts--toplevel-offset)
-   ((n-p-gp nil "ERROR" "internal_procedures") parent f90-ts--toplevel-offset))
+   ((parent-is  "internal_procedures")         parent toplevel-offset)
+   ((n-p-gp nil "ERROR" "internal_procedures") parent toplevel-offset))
   "Indentation rules for internal_proc node.
 This node occurs in conjunction with \"contain\" statements.")
 
@@ -3873,18 +3864,18 @@ This node occurs in conjunction with \"contain\" statements.")
    ;; in all cases: first match node with end_xyz_statement, and then only
    ;; whether parent is xyz, as parent is xyz in both cases
    ((node-is    "end_program_statement")        parent 0)
-   ((parent-is      "program\\(_statement\\)?") parent f90-ts--toplevel-offset)
-   ((n-p-pstmtk nil "ERROR" "program")          parent f90-ts--toplevel-offset)
+   ((parent-is      "program\\(_statement\\)?") parent toplevel-offset)
+   ((n-p-pstmtk nil "ERROR" "program")          parent toplevel-offset)
 
    ;; parent-is uses regexp matching, thus use "^module" to avoid that it
    ;; matches "submodule"
    ((node-is        "end_module_statement")      parent 0)
-   ((parent-is      "^module\\(_statement\\)?$") parent f90-ts--toplevel-offset)
-   ((n-p-pstmtk nil "ERROR" "^module$")          parent f90-ts--toplevel-offset)
+   ((parent-is      "^module\\(_statement\\)?$") parent toplevel-offset)
+   ((n-p-pstmtk nil "ERROR" "^module$")          parent toplevel-offset)
 
    ((node-is        "end_submodule_statement")      parent 0)
-   ((parent-is      "^submodule\\(_statement\\)?$") parent f90-ts--toplevel-offset)
-   ((n-p-pstmtk nil "ERROR" "^submodule$")          parent f90-ts--toplevel-offset))
+   ((parent-is      "^submodule\\(_statement\\)?$") parent toplevel-offset)
+   ((n-p-pstmtk nil "ERROR" "^submodule$")          parent toplevel-offset))
   "Indentation rules for program and module nodes.")
 
 
