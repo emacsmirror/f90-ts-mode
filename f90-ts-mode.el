@@ -4085,8 +4085,7 @@ These are do loops, block statements, associate construct and forall statements.
 
    ((n-p-gp     "end_coarray_team_statement" "coarray_team_statement" nil)        parent 0)
    ((n-p-pstmtk nil                          "coarray_team_statement" "change") parent f90-ts-indent-block)
-   ((n-p-pstmtk nil                          "ERROR"                  "change") previous-stmt-anchor f90-ts-indent-block)
-   )
+   ((n-p-pstmtk nil                          "ERROR"                  "change") previous-stmt-anchor f90-ts-indent-block))
   "Indentation rules for coarray statements.")
 
 
@@ -4153,8 +4152,7 @@ might call a region based operation, but not the other way around.")
     "end_enum_statement"
     "end_enumeration_type_statement"
     "end_coarray_team_statement"
-    "end_coarray_critical_statement"
-    )
+    "end_coarray_critical_statement")
     "List of type names used for end struct statements.
 The parent of such a node represents the structure itself.
 This list is used to find nodes elligible for smart end completion.
@@ -6620,8 +6618,7 @@ by CATEGORY and a time stamp."
   "Major mode for the f90-ts log buffer."
   (setq-local truncate-lines t)
   (setq-local buffer-read-only t)
-  (buffer-disable-undo)
-)
+  (buffer-disable-undo))
 
 
 ;;;-----------------------------------------------------------------------------
