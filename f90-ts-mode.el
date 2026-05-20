@@ -740,6 +740,12 @@ seem to make much sense."
 
 
 ;;;-----------------------------------------------------------------------------
+
+;; defined in simple.el
+(defvar blink-matching-delay)
+
+
+;;;-----------------------------------------------------------------------------
 ;;; tree-sitter workaround
 
 ;; For virtual zero-length nodes, `treesit-node-parent' fails. For
