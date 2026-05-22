@@ -819,23 +819,46 @@ siblings with the correct parent.  So walking is just one step in general."
 
 (defun f90-ts-log-msg (_category _fmt &rest _args)
   "Logging stub.
-Load f90-ts-log.el to enable.  This function is replaced by the real
-implementation when `f90-ts-log' is loaded."
-  (error "Function f90-ts-log-msg not available: load f90-ts-log.el first"))
+Load f90-ts-log.el to enable logging.  This function is replaced by the real
+implementation when the logging package is loaded.
+
+Set `f90-ts-allow-log' to allow log instruction as no-op without `f90-ts-log'.
+This is used by the Makefile to run ert tests during development."
+  (unless (bound-and-true-p f90-ts-allow-log)
+  (error "Function f90-ts-log-msg not available: load f90-ts-log.el first")))
+
+
+(defun f90-ts-log-line (_category _msg &optional _pos)
+  "Logging stub.
+Load f90-ts-log.el to enable logging.  This function is replaced by the real
+implementation when the logging package is loaded.
+
+Set `f90-ts-allow-log' to allow log instruction as no-op without `f90-ts-log'.
+This is used by the Makefile to run ert tests during development."
+  (unless (bound-and-true-p f90-ts-allow-log)
+    (error "Function f90-ts-log-line not available: load f90-ts-log.el first")))
 
 
 (defun f90-ts-log-inspect-node (_category _node _info)
   "Node inspection stub.
-Load f90-ts-log.el to enable.  This function is replaced by the real
-implementation when `f90-ts-log' is loaded."
-  (error "Function f90-ts-log-inspect-node not available: load f90-ts-log.el first"))
+Load f90-ts-log.el to enable logging.  This function is replaced by the real
+implementation when the logging package is loaded.
+
+Set `f90-ts-allow-log' to allow log instruction as no-op without `f90-ts-log'.
+This is used by the Makefile to run ert tests during development."
+  (unless (bound-and-true-p f90-ts-allow-log)
+    (error "Function f90-ts-log-inspect-node not available: load f90-ts-log.el first")))
 
 
 (defun f90-ts-log-indent-print-state (_msg)
   "Debug indent rule stub.
-Load f90-ts-log.el to enable.  This function is replaced by the real
-implementation when `f90-ts-log' is loaded."
-  (error "Function f90-ts-log-indent-print-state not available: load f90-ts-log.el first"))
+Load f90-ts-log.el to enable logging.  This function is replaced by the real
+implementation when the logging package is loaded.
+
+Set `f90-ts-allow-log' to allow log instruction as no-op without `f90-ts-log'.
+This is used by the Makefile to run ert tests during development."
+  (unless (bound-and-true-p f90-ts-allow-log)
+    (error "Function f90-ts-log-indent-print-state not available: load f90-ts-log.el first")))
 
 
 ;;;-----------------------------------------------------------------------------
@@ -4520,13 +4543,17 @@ blanked."
         (cond
          ;; leading ampersand
          ((and c (eq c ?&))
-          (let ((node (treesit-node-at (point))))
-            (when (and node
-                       (= (point) (treesit-node-start node))
-                       (f90-ts--node-type-p node "&"))
-              (delete-char 1)
-              (insert " ")
-              '(amp))))
+          ;; if this line contains a single ampersand and optionally some comment,
+          ;; then we should considers this to be a trailing ampersand and keep it as is
+          (unless (looking-at  "&\\s-*\\(?:!\\|$\\)")
+            (let ((node (treesit-node-at (point))))
+              ;; this excludes string literals
+              (when (and node
+                         (= (point) (treesit-node-start node))
+                         (f90-ts--node-type-p node "&"))
+                (delete-char 1)
+                (insert " ")
+                '(amp)))))
          ;; statement label
          ((and c (>= c ?0) (<= c ?9))
           (let ((node (treesit-node-at (point))))
@@ -4621,8 +4648,7 @@ Returns a vector (one entry per line) of values as returned by
        do (progn
             (cl-assert (= (line-number-at-pos (point)) line)
                        nil
-                       "f90-ts--indent-blank-leading-amp-or-label-region: \
-line mismatch at index %d: expected %d, got %d"
+                       "line mismatch at index %d: expected %d, got %d"
                        ix line (line-number-at-pos (point)))
             (aset vec ix (f90-ts--indent-blank-leading-amp-or-label-line))
             (forward-line 1)))
@@ -4666,10 +4692,7 @@ column determined by `f90-ts-leading-ampersand-style'."
     ;; (ampersand if there was already one or if f90-ts-leading-ampersand
     ;; is non-nil)
     (save-excursion
-      (f90-ts--indent-restore-leading-amp-or-label-line amp-or-label))
-    ;; if at beginning of line and ampersand after point, we need to skip to
-    ;; indentation after save-excursion
-    (skip-chars-forward "& \t")))
+      (f90-ts--indent-restore-leading-amp-or-label-line amp-or-label))))
 
 
 (defun f90-ts--indent-and-complete-line-aux (variant indent-struct)
@@ -4939,9 +4962,11 @@ The variant to be used can be customized.  Intended for use in key bindings."
 
    (t
     (delete-horizontal-space)
+    ;; note that a leading ampersand (depend on f90-ts-leading-ampersand)
+    ;; is inserted by the indentation function, and thus does not need to
+    ;; be added here
     (f90-ts--break-line-insert-amp-at-end)
-    (newline 1)
-    (if f90-ts-leading-ampersand (insert "&"))))
+    (newline 1)))
   ;; finally indent the new line after insertion of the newline
   (indent-according-to-mode))
 
