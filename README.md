@@ -112,7 +112,7 @@ It will automatically be loaded when opening a file with extension `.f90`.
          ("A-<backspace>" . #'f90-ts-join-line-prev)
          ("A-<delete>"    . #'f90-ts-join-line-next)
          ("A-\\"          . #'f90-ts-enlarge-region)
-         ("A-0"           . #'f90-ts-child0-region)
+         ("A-0"           . #'f90-ts-shrink-region-child0)
          ("A-["           . #'f90-ts-prev-region)
          ("A-]"           . #'f90-ts-next-region)))
 ```

@@ -130,7 +130,7 @@ end subroutine sub_ext_2
 Code:
   (lambda ()
     (f90-ts-mode)
-    (f90-ts-mode-test--modify-region #'f90-ts-child0-region))
+    (f90-ts-mode-test--modify-region #'f90-ts-shrink-region-child0))
 
 Name: mark child0 region 1
 =-=

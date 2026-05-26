@@ -142,7 +142,7 @@ placed somewhere in `init.el` (or elsewhere).
          ("A-<backspace>" . #'f90-ts-join-line-prev)
          ("A-<delete>"    . #'f90-ts-join-line-next)
          ("A-\\"          . #'f90-ts-enlarge-region)
-         ("A-0"           . #'f90-ts-child0-region)
+         ("A-0"           . #'f90-ts-shrink-region-child0)
          ("A-["           . #'f90-ts-prev-region)
          ("A-]"           . #'f90-ts-next-region)))
 ```
@@ -178,7 +178,7 @@ First clone the repository of `f90-ts-mode` as mentioned above.
          ("A-<backspace>" . #'f90-ts-join-line-prev)
          ("A-<delete>"    . #'f90-ts-join-line-next)
          ("A-\\"          . #'f90-ts-enlarge-region)
-         ("A-0"           . #'f90-ts-child0-region)
+         ("A-0"           . #'f90-ts-shrink-region-child0)
          ("A-["           . #'f90-ts-prev-region)
          ("A-]"           . #'f90-ts-next-region)))
 ```
@@ -614,12 +614,12 @@ comment region operations.
 
 Key bindings are provided in the transient popup (`C-c C-f`) under the Region section:
 
-| Function                         | Popup key | Description                                                              |
-|----------------------------------|-----------|--------------------------------------------------------------------------|
-| `f90-ts-enlarge-region`          | `r`       | Find smallest parent node of existing region which is strictly larger    |
-| `f90-ts-child0-region`           | `0`       | Reduce existing region to a first (grand)child which is strictly smaller |
-| `f90-ts-prev-region`             | `[`       | Move selected region to previous sibling                                 |
-| `f90-ts-next-region`             | `]`       | Move selected region to next sibling                                     |
+| Function                      | Popup key | Description                                                              |
+|-------------------------------|-----------|--------------------------------------------------------------------------|
+| `f90-ts-enlarge-region`       | `r`       | Find smallest parent node of existing region which is strictly larger    |
+| `f90-ts-shrink-region-child0` | `0`       | Shrink region to a first (grand)child which is strictly smaller          |
+| `f90-ts-prev-region`          | `[`       | Move selected region to previous sibling                                 |
+| `f90-ts-next-region`          | `]`       | Move selected region to next sibling                                     |
 
 
 ## Development and Testing

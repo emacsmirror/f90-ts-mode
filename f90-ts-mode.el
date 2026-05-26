@@ -677,7 +677,7 @@ seem to make much sense."
 
 ;; ;; region
 ;; (define-key f90-ts-prefix-map (kbd "r") #'f90-ts-enlarge-region)
-;; (define-key f90-ts-prefix-map (kbd "0") #'f90-ts-child0-region)
+;; (define-key f90-ts-prefix-map (kbd "0") #'f90-ts-shrink-region-child0)
 ;; (define-key f90-ts-prefix-map (kbd "[") #'f90-ts-prev-region)
 ;; (define-key f90-ts-prefix-map (kbd "]") #'f90-ts-next-region)
 
@@ -729,7 +729,7 @@ seem to make much sense."
     ("C"   "Comment region (custom)"           f90-ts-comment-region-custom)]
    ["Region"
     ("r"   "Enlarge region"                    f90-ts-enlarge-region)
-    ("0"   "Child-0 region"                    f90-ts-child0-region)
+    ("0"   "Child-0 region"                    f90-ts-shrink-region-child0)
     ("["   "Previous region"                   f90-ts-prev-region)
     ("]"   "Next region"                       f90-ts-next-region)]]
   [["Procedure navigation"
@@ -5477,7 +5477,7 @@ The comment prefix is matched by `f90-ts-openmp-prefix-regexp' and
     (f90-ts-enlarge-region-initial)))
 
 
-(defun f90-ts-child0-region ()
+(defun f90-ts-shrink-region-child0 ()
   "Find smallest node covering region.
 Then reduce region to its first child.  If there are further first child with
 same region, return the smallest of these grandchildren."
@@ -6586,10 +6586,10 @@ and keyword are sometimes equal.  But we only want the structure node."
      ["Comment/uncomment region (default prefix)" f90-ts-comment-region-default :active (region-active-p)]
      ["Comment/uncomment region (custom prefix)"  f90-ts-comment-region-custom  :active (region-active-p)])
     ("Region"
-     ["Enlarge region"  f90-ts-enlarge-region :active t]
-     ["Child-0 region"  f90-ts-child0-region  :active (region-active-p)]
-     ["Previous region" f90-ts-prev-region    :active (region-active-p)]
-     ["Next region"     f90-ts-next-region    :active (region-active-p)])
+     ["Enlarge region"          f90-ts-enlarge-region       :active t]
+     ["Shrink region [child-0]" f90-ts-shrink-region-child0 :active (region-active-p)]
+     ["Previous region"         f90-ts-prev-region          :active (region-active-p)]
+     ["Next region"             f90-ts-next-region          :active (region-active-p)])
     "---"
     ("Defun & Thing"
      ["Beginning of defun" beginning-of-defun :active t]
