@@ -132,6 +132,4 @@ The following list provides features planned for implementation (somewhat ordere
 - Enlarge and shrink region operations:
    * Handle comment regions with same prefix as virtual nodes. This helps with comment region operations.
    * Add other child selection options (select last child, search child, etc.)
-- `undo-boundary` to group internal changes to blocks of changes for undo.
-  This mainly concerns complex indentation operations (like indentation of statements or region).
 - Electric insert similar to `f90-electric-insert`.
