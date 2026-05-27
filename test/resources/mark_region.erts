@@ -174,6 +174,54 @@ subroutine sub_child0_2()
 end subroutine sub_child0_2
 =-=-=
 
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--modify-region #'f90-ts-mark-region-shrink-child-last))
+
+Name: mark child9 region 1
+=-=
+subroutine sub_child9_1()
+   |if (cond) then
+      do i = 1,10
+      end do
+   end if@
+end subroutine sub_child9_1
+=-=
+subroutine sub_child9_1()
+   if (cond) then
+      do i = 1,10
+      end do
+   @end if|
+end subroutine sub_child9_1
+=-=-=
+
+Name: mark child9 region 2
+=-=
+subroutine sub_child9_2()
+   i = 6
+   ! comment
+   @!!$ i = i + m1
+   !!$ i = i + m2
+   !!$ i = i + m3
+   !!$ i = i + m4|
+   ! comment
+   j = 5
+end subroutine sub_child9_2
+=-=
+subroutine sub_child9_2()
+   i = 6
+   ! comment
+   !!$ i = i + m1
+   !!$ i = i + m2
+   !!$ i = i + m3
+   @!!$ i = i + m4|
+   ! comment
+   j = 5
+end subroutine sub_child9_2
+=-=-=
+
 Code:
   (lambda ()
     (f90-ts-mode)
