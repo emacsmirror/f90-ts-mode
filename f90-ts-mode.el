@@ -672,6 +672,7 @@ seem to make much sense."
    ["Mark region"
     ("r"   "Enlarge"                      f90-ts-mark-region-enlarge)
     ("0"   "First child"                  f90-ts-mark-region-shrink-child-first)
+    ("9"   "Last child"                   f90-ts-mark-region-shrink-child-last)
     ("["   "Previous sibling"             f90-ts-mark-region-prev-sibling)
     ("]"   "Next sibling"                 f90-ts-mark-region-next-sibling)]]
   [["Procedure navigation"
@@ -5231,13 +5232,18 @@ is at end of region."
     (f90-ts--mark-region beg end reversed)))
 
 
-(defun f90-ts--smallest-child0-same-span (node)
-  "Find the smallest child0 of NODE which spans the same region."
-  (cl-loop for current = node then child
-           for child = (treesit-node-child current 0 t)
-           while (and child
-                      (f90-ts--node-same-span-p child current))
-           finally return current))
+(defun f90-ts--smallest-node-same-span (node)
+  "Find the smallest named descendant of NODE which spans the same region."
+  (let* ((beg (treesit-node-start node))
+         (end (treesit-node-end node))
+         (sparse (treesit-induce-sparse-tree
+                  node
+                  (lambda (n) (and (treesit-node-check n 'named)
+                                   (f90-ts--node-has-span-p n beg end))))))
+    ;; get the first leaf, descend the first child until a leaf is reached
+    (cl-loop for current = sparse then (car (cdr current))
+             while (cdr current)
+             finally return (car current))))
 
 
 (defun f90-ts--largest-node-same-span (node)
@@ -5419,25 +5425,47 @@ The comment prefix is matched by `f90-ts-openmp-prefix-regexp' and
     (f90-ts-mark-region-enlarge-initial)))
 
 
-(defun f90-ts-mark-region-shrink-child-first ()
-  "Find smallest node covering region.
-Then reduce region to its first child.  If there are further first child with
-same region, return the smallest of these grandchildren."
-  (interactive)
+(defun f90-ts--mark-region-shrink-child (comment-selector child-index child-name)
+  "Core routine for shrinking region to a child node.
+Find smallest node covering region.  Then reduce region to its child determined
+by CHILD-INDEX.  If there are further grand-children with the same span, return
+the smallest grandchild in the tree.
+COMMENT-SELECTOR is `car' or `cdr', selecting from a cons of (first . last)
+comment nodes.  CHILD-INDEX is passed to `treesit-node-child'
+(0 for first, -1 for last).  CHILD-NAME is a name like \"first\" or \"last\"
+which is used for an error message if the child is not found."
   (if (use-region-p)
       (let* ((beg (region-beginning))
              (end (region-end))
              (comment-kind (f90-ts--comment-block-region beg end)))
-        (cl-destructuring-bind (&optional ck first _) comment-kind
+        (cl-destructuring-bind (&optional ck first last) comment-kind
           (if (eq ck 'block)
-              ;; full block: shrink to first comment node
-              (f90-ts--mark-region-node first f90-ts-mark-region-reversed)
+              (f90-ts--mark-region-node (funcall comment-selector (cons first last))
+                                        f90-ts-mark-region-reversed)
             (if-let* ((node-on (treesit-node-on beg end))
-                      (node    (f90-ts--smallest-child0-same-span node-on))
-                      (child0  (treesit-node-child node 0 t)))
-                (f90-ts--mark-region-node child0 f90-ts-mark-region-reversed)
-              (message "no tree-sitter child0 found for current region")))))
+                      (node    (f90-ts--smallest-node-same-span node-on))
+                      (child   (treesit-node-child node child-index t)))
+                (f90-ts--mark-region-node child f90-ts-mark-region-reversed)
+              (message "no tree-sitter %S child found for current region" child-name)))))
     (message "no active region")))
+
+
+(defun f90-ts-mark-region-shrink-child-first ()
+  "Core routine for shrinking region to a child node.
+Find smallest node covering region.  Then reduce region to its first child.
+If there are further grand-children with the same span, return the smallest
+grandchild in the tree."
+  (interactive)
+  (f90-ts--mark-region-shrink-child #'car 0 "no tree-sitter child0 found for current region"))
+
+
+(defun f90-ts-mark-region-shrink-child-last ()
+  "Core routine for shrinking region to a child node.
+Find smallest node covering region.  Then reduce region to its last child.
+If there are further grand-children with the same span, return the smallest
+grandchild in the tree."
+  (interactive)
+  (f90-ts--mark-region-shrink-child #'cdr -1 "no tree-sitter child9 found for current region"))
 
 
 (defun f90-ts-mark-region-prev-sibling ()
@@ -6530,6 +6558,7 @@ and keyword are sometimes equal.  But we only want the structure node."
     ("Mark region"
      ["Enlarge"               f90-ts-mark-region-enlarge            :active t]
      ["Shrink to first child" f90-ts-mark-region-shrink-child-first :active (region-active-p)]
+     ["Shrink to last child"  f90-ts-mark-region-shrink-child-last  :active (region-active-p)]
      ["Previous sibling"      f90-ts-mark-region-prev-sibling       :active (region-active-p)]
      ["Next sibling"          f90-ts-mark-region-next-sibling       :active (region-active-p)])
     "---"

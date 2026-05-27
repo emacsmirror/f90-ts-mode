@@ -105,14 +105,15 @@ It will automatically be loaded when opening a file with extension `.f90`.
 
   :bind (;; mode-specific bindings, adjust to your needs
          :map f90-ts-mode-map
-         ;; transient popup
+         ;; transient popup (additional shorter binding to "C-c C-f")
          ("A-<up>"        . #'f90-ts-transient)
-         ;; shortcuts
+         ;; shortcuts (just some examples)
          ("A-<return>"    . #'f90-ts-break-line)
          ("A-<backspace>" . #'f90-ts-join-line-prev)
          ("A-<delete>"    . #'f90-ts-join-line-next)
          ("A-\\"          . #'f90-ts-mark-region-enlarge)
          ("A-0"           . #'f90-ts-mark-region-shrink-child-first)
+         ("A-9"           . #'f90-ts-mark-region-shrink-child-last)
          ("A-["           . #'f90-ts-mark-region-prev-sibling)
          ("A-]"           . #'f90-ts-mark-region-next-sibling)))
 ```
