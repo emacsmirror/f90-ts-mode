@@ -5234,6 +5234,17 @@ is at end of region."
     (f90-ts--mark-region beg end reversed)))
 
 
+(defun f90-ts--mark-region-node-or-extent (node-or-extent &optional reversed)
+  "Mark region given by NODE-OR-EXTENT.
+It is either a single NODE or a pair (FIRST . LAST).
+If it is a pair, mark the whole region from start of FIRST to end of LAST."
+  (if (consp node-or-extent)
+      (f90-ts--mark-region (treesit-node-start (car node-or-extent))
+                           (treesit-node-end   (cdr node-or-extent))
+                           reversed)
+    (f90-ts--mark-region-node node-or-extent reversed)))
+
+
 (defun f90-ts--smallest-node-same-span (node)
   "Find the smallest named descendant of NODE which spans the same region."
   (let* ((beg (treesit-node-start node))
@@ -5388,6 +5399,16 @@ Returns a list:
           (list 'partial node-beg node-end)))))))
 
 
+(defun f90-ts--group-block-eq (group1 group2)
+  "Determine whether two groups GROUP1 and GROUP2 of nodes are equal.
+Note that equality of the two first nodes is equivalent to the
+equality of the two last nodes.
+If at least one group is nil, return value is nil as well."
+  (and group1
+       group2
+       (treesit-node-eq (car group1) (car group2))))
+
+
 (defun f90-ts-mark-region-enlarge-active ()
   "Expand active region to next larger node."
   (cl-assert (use-region-p)
@@ -5491,22 +5512,52 @@ grandchild in the tree."
   (f90-ts--mark-region-shrink-child #'cdr -1 "no tree-sitter child9 found for current region"))
 
 
-(defun f90-ts--mark-region-relative (get-relative)
+(defun f90-ts--mark-region-relative (get-relative direction)
   "Mark relative of node determined by current active region and GET-RELATIVE.
+DIRECTION is `backward' or `forward', used to resolve the anchor node when the
+region spans a full group block.
+For `backward' the first node of the group is used as anchor for GET-RELATIVE.
+For `forward' the last node of the group is used as anchor for GET-RELATIVE.
+
 First find smallest node covering currently active region.
 If the node spans the current region, then mark its relative determined
-by GET-RELATIVE.
+by GET-RELATIVE.  GET-RELATIVE may return a node or a cons (FIRST . LAST).
 Otherwise mark the region spanned by the node itself (like enlarge-region)."
+  (f90-ts-log-msg :mark "mrel: %s" direction)
+
   (if (use-region-p)
       (if-let* ((beg (region-beginning))
                 (end (region-end))
                 (node-on (treesit-node-on beg end))
                 (node (f90-ts--largest-node-same-span node-on))
-                (node-mark (if (f90-ts--node-has-span-p node beg end)
-                               (funcall get-relative node)
+                (group (f90-ts--group-block-region beg end))
+                (_ (progn (f90-ts-log-msg :mark "node: %s" node)
+                          (f90-ts-log-msg :mark "group: %s" group)
+                          t))
+                (node-mark (if-let* ((anchor (cond
+                                              ((member (car group) '(block partial))
+                                               (if (eq direction 'prev)
+                                                   (cadr group)
+                                                 (caddr group)))
+                                              ((eq (car group) 'single)
+                                               ;; (f90-ts--node-has-span-p node beg end)
+                                               node)
+                                              (t
+                                               nil)))
+                                     (relative (funcall get-relative anchor))
+                                     (group-anchor (f90-ts--group-block-extent anchor))
+                                     (group-relative (f90-ts--group-block-extent relative)))
+                               (progn
+                                 (f90-ts-log-msg :mark "anchor: %s" anchor)
+                                 (f90-ts-log-msg :mark "ganc: %s" group-anchor)
+                                 (f90-ts-log-msg :mark "grel: %s" group-relative)
+                                 (if (f90-ts--group-block-eq group-anchor group-relative)
+                                     relative
+                                   group-relative))
                              node)))
-          (f90-ts--mark-region-node node-mark
-                                    f90-ts-mark-region-reversed)
+          (progn
+            (f90-ts-log-msg :mark "mark: %s" node-mark)
+            (f90-ts--mark-region-node-or-extent node-mark f90-ts-mark-region-reversed))
         (message "tree-sitter relative not found for current region"))
     (message "no active region")))
 
@@ -5519,7 +5570,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (f90-ts--mark-region-relative
    (lambda (node)
      (when-let ((parent (treesit-node-parent node)))
-       (treesit-node-child parent 0 t)))))
+       (treesit-node-child parent 0 t)))
+   'prev))
 
 
 (defun f90-ts-mark-region-prev-sibling ()
@@ -5529,7 +5581,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (interactive)
   (f90-ts--mark-region-relative
    (lambda (node)
-     (treesit-node-prev-sibling node t))))
+     (treesit-node-prev-sibling node t))
+   'prev))
 
 
 (defun f90-ts-mark-region-next-sibling ()
@@ -5539,7 +5592,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (interactive)
   (f90-ts--mark-region-relative
    (lambda (node)
-     (treesit-node-next-sibling node t))))
+     (treesit-node-next-sibling node t))
+   'next))
 
 
 (defun f90-ts-mark-region-last-sibling ()
@@ -5550,7 +5604,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (f90-ts--mark-region-relative
    (lambda (node)
      (when-let ((parent (treesit-node-parent node)))
-       (treesit-node-child parent -1 t)))))
+       (treesit-node-child parent -1 t)))
+   'next))
 
 
 ;;;-----------------------------------------------------------------------------
