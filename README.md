@@ -126,12 +126,14 @@ It will automatically be loaded when opening a file with extension `.f90`.
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
-- Complement alignment options for strings on continued lines.
-  (Also allow comments within continued strings. This is not yet supported by the fortran grammar.)
+- Complement alignment options for strings on continued lines. Refine font locking for string, using
+  different faces for quotes, continuation symbols and the string itself.
+  Allow comments within continued strings.
+  This all requires extension of the grammar itself.
+  See issue [Continued strings](https://github.com/stadelmanma/tree-sitter-fortran/issues/193).
 - Fill operations similar to `f90-fill-region` and `f90-fill-paragraph`.
 - Support for (context-aware) `completion-at-point-function` (capf).
-- More list contexts. There is a number of list like contexts, which are not yet supported,
-  but for which proper alignment would be nice.
-- Enlarge and shrink region operations:
-   * Add other child selection options (select last child, search child, etc.)
+- More list contexts for alignment in continued lines.
+  There are a number of list like contexts, which are not yet supported, but for which proper
+  alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.

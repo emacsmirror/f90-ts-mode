@@ -267,6 +267,214 @@ subroutine sub_prev_1()
 end subroutine sub_prev_1
 =-=-=
 
+Name: mark prev region group 1
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   @! x = 5|
+   x = 6
+end subroutine sub
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x = 3
+   !: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region group 2
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x = 3
+   !: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   @x = 1|
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region group 3
+=-=
+! single comment within a group, ignore group
+subroutine sub()
+   x = 1
+   !: x = 2
+   @!: x = 3|
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! single comment within a group, ignore group
+subroutine sub()
+   x = 1
+   @!: x = 2|
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region group 4
+=-=
+! last comment within a group, ignore group
+subroutine sub()
+   x = 1
+   @!: x = 2|
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! last comment within a group, ignore group
+subroutine sub()
+   @x = 1|
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region group 5
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   !: x = 2
+   @!: x = 3
+   !: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   @!: x = 2|
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region group 6
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x = 3|
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   @x = 1|
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region partial 1
+=-=
+! neither single commit nor whole group
+subro@utine su|b()
+   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+@subroutine sub()
+|   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark prev region partial 2
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   !: @x =| 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   @x = 1|
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+
+Name: mark prev region partial 3
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x |= 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   @x = 1|
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
 Code:
   (lambda ()
     (f90-ts-mode)
@@ -287,6 +495,208 @@ subroutine sub_next_1()
       end do|
    end if
 end subroutine sub_next_1
+=-=-=
+
+Name: mark next region group 1
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   @x = 1|
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x = 3
+   !: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region group 2
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x = 3
+   !: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! recognise comment block as virtual node
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   @! x = 5|
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region group 3
+=-=
+! single comment within a group, ignore group
+subroutine sub()
+   x = 1
+   @!: x = 2|
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! single comment within a group, ignore group
+subroutine sub()
+   x = 1
+   !: x = 2
+   @!: x = 3|
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region group 4
+=-=
+! last comment within a group, ignore group
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   @!: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! last comment within a group, ignore group
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   @! x = 5|
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region group 5
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x = 3|
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   @!: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region group 6
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   !: x = 2
+   @!: x = 3
+   !: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+! neither single commit nor whole group
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   @! x = 5|
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region partial 1
+=-=
+subro@utine su|b()
+   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+@subroutine sub()
+|   x = 1
+   !: x = 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+Name: mark next region partial 2
+=-=
+subroutine sub()
+   x = 1
+   !: @x =| 2
+   !: x = 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+subroutine sub()
+   x = 1
+   !: x = 2
+   @!: x = 3|
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=-=
+
+
+Name: mark next region partial 3
+=-=
+subroutine sub()
+   x = 1
+   @!: x = 2
+   !: x |= 3
+   !: x = 4
+   ! x = 5
+   x = 6
+end subroutine sub
+=-=
+subroutine sub()
+   x = 1
+   !: x = 2
+   !: x = 3
+   @!: x = 4|
+   ! x = 5
+   x = 6
+end subroutine sub
 =-=-=
 
 Code:

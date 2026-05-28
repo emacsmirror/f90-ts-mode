@@ -612,11 +612,15 @@ any blanks to keep original indentation of commented code.
 
 ### Mark region based on tree-sitter nodes
 
-Regions can be selected, enlarged, shrunk or moved based on tree-sitter nodes.
-Blocks of comments with the same comment prefix are identified and dealt with like
-the block would be represented by a node (which they are not).
-This is particularly useful in conjunction with comment prefixes and
-comment region operations.
+Marked regions can be selected, enlarged, shrunk or moved based on the tree-sitter node structure.
+
+Blocks of nodes of the same kind are grouped and and dealt with like
+the block would be represented by a node in the tree (which they are not).
+Currently comments with the same comment prefix extracted by `f90-ts-comment-prefix-regexp`
+are recognised. (Other groups like use statements or public statements could be added in the future.)
+
+Identifying comments with the same comment prefix and including those in mark region operations
+is particularly useful in conjunction with comment region operations.
 
 Key bindings are provided in the transient popup (`C-c C-f`) under the Region section:
 

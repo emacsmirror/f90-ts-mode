@@ -672,7 +672,8 @@ seem to make much sense."
    ["Mark region"
     ("r"   "Enlarge"                      f90-ts-mark-region-enlarge)
     ("0"   "First child"                  f90-ts-mark-region-shrink-child-first)
-    ("9"   "Last child"                   f90-ts-mark-region-shrink-child-last)
+    ("9"   "Last child"                   f90-ts-mark-region-shrink-child-last)]
+   [""
     ("{"   "First sibling"                f90-ts-mark-region-first-sibling)
     ("["   "Previous sibling"             f90-ts-mark-region-prev-sibling)
     ("]"   "Next sibling"                 f90-ts-mark-region-next-sibling)
@@ -5234,6 +5235,20 @@ is at end of region."
     (f90-ts--mark-region beg end reversed)))
 
 
+(defun f90-ts--mark-region-node-or-extent (node-or-extent &optional reversed)
+  "Mark region given by NODE-OR-EXTENT.
+It is either a single NODE or a pair (FIRST . LAST).
+If it is a pair, mark the whole region from start of FIRST to end of LAST.
+
+If REVERSED is non-nil, then put point at start of region, otherwise point
+is at end of region."
+  (if (consp node-or-extent)
+      (f90-ts--mark-region (treesit-node-start (car node-or-extent))
+                           (treesit-node-end   (cdr node-or-extent))
+                           reversed)
+    (f90-ts--mark-region-node node-or-extent reversed)))
+
+
 (defun f90-ts--smallest-node-same-span (node)
   "Find the smallest named descendant of NODE which spans the same region."
   (let* ((beg (treesit-node-start node))
@@ -5337,55 +5352,92 @@ Currently this predicate groups comment nodes sharing the same comment prefix."
     (cons first last)))
 
 
-(defun f90-ts--named-node-aligned-at-beg (beg end)
-  "Return the largest named node starting exactly at BEG and ending before END."
-  (when-let* ((node (f90-ts--node-on-pos beg 'named)))
+(defun f90-ts--node-aligned-at-beg (beg end named)
+  "Return the largest node starting exactly at BEG and ending before END.
+If NAMED is non-nil, consider only named nodes."
+  (when-let* ((node (f90-ts--node-on-pos beg named)))
     (treesit-parent-while
      node
      (lambda (n) (and (=  beg (treesit-node-start n))
                       (<= (treesit-node-end n) end))))))
 
 
-(defun f90-ts--named-node-aligned-at-end (beg end)
-  "Return the largest named node ending exactly at END and starting after END."
-  (when-let* ((node (f90-ts--node-on-pos end 'named)))
+(defun f90-ts--node-aligned-at-end (beg end named)
+  "Return the largest node ending exactly at END and starting after BEG.
+If NAMED is non-nil, consider only named nodes."
+  (when-let* ((node (f90-ts--node-on-pos end named)))
     (treesit-parent-while
      node
      (lambda (n) (and (<= beg (treesit-node-start n))
                       (= (treesit-node-end n) end))))))
 
 
+(defun f90-ts--group-block-p (node-beg node-end)
+  "Check whether NODE-BEG and NODE-END are within a node group.
+This is the case if both are sibling (have the same parent),
+belong to the same group, and all sibling in between the two
+nodes also belong to the same group."
+  (and node-beg
+       node-end
+       (treesit-node-eq (treesit-node-parent node-beg)
+                        (treesit-node-parent node-end))
+       (f90-ts--node-same-group-p node-beg node-end)
+       (cl-loop for cur = node-beg then (treesit-node-next-sibling cur t)
+                while (and cur (not (treesit-node-eq cur node-end)))
+                always (f90-ts--node-same-group-p cur node-beg))))
+
+
+(defun f90-ts--group-block-region-classify (beg end node-beg node-end)
+  "Classify BEG..END within a confirmed group from NODE-BEG to NODE-END."
+  (let* ((extent     (f90-ts--group-block-extent node-beg))
+         (node-first (car extent))
+         (node-last  (cdr extent))
+         (first-beg  (treesit-node-start node-first))
+         (last-end   (treesit-node-end   node-last)))
+    (cond
+     ((and (treesit-node-eq node-beg node-end)
+           (= beg first-beg)
+           (= end last-end))
+      (list 'single node-beg))
+     ((and (= beg first-beg) (= end last-end))
+      (list 'block node-first node-last))
+     (t
+      (list 'partial node-beg node-end)))))
+
+
 (defun f90-ts--group-block-region (beg end)
   "Classify type of region BEG..END with respect to groups of nodes.
+
+If nodes at BEG and END exists but do not form a group, return them marked
+as disparate, as these nodes are still useful for further operations.
+
 Returns a list:
-  ('single NODE)   region is exactly one node
-  ('block  FN LN)  region is exactly the full group from FN to LN
-  ('partial FN LN) region is within group but neither single nor full
-  nil              not within a uniform group"
-  (let* ((node-beg (f90-ts--named-node-aligned-at-beg beg end))
-         (node-end (f90-ts--named-node-aligned-at-end beg end)))
-    (when (and node-beg
-               node-end
-               (treesit-node-eq (treesit-node-parent node-beg)
-                                (treesit-node-parent node-end))
-               (f90-ts--node-same-group-p node-beg node-end)
-               (cl-loop for cur = node-beg then (treesit-node-next-sibling cur t)
-                        while (and cur (not (treesit-node-eq cur node-end)))
-                        always (f90-ts--node-same-group-p cur node-beg)))
-      (let* ((extent     (f90-ts--group-block-extent node-beg))
-             (node-first (car extent))
-             (node-last  (cdr extent))
-             (first-beg  (treesit-node-start node-first))
-             (last-end   (treesit-node-end   node-last)))
-        (cond
-         ((and (treesit-node-eq node-beg node-end)
-               (= beg first-beg)
-               (= end last-end))
-          (list 'single node-beg))
-         ((and (= beg first-beg) (= end last-end))
-          (list 'block node-first node-last))
-         (t
-          (list 'partial node-beg node-end)))))))
+  ('single    NODE)  region is exactly one node
+  ('block     FN LN) region is exactly the full group from FN to LN
+  ('partial   FN LN) region is within group but neither single nor full
+  ('disparate FN LN) not a group, region starts and ends with disparate nodes
+  nil                node at beg or end could not be determined"
+  (let* ((node-beg (or (f90-ts--node-aligned-at-beg beg end 'named)
+                       (f90-ts--node-on-pos beg 'named)))
+         (node-end (or (f90-ts--node-aligned-at-end beg end 'named)
+                       (f90-ts--node-on-pos end 'named))))
+    (cond
+     ((f90-ts--group-block-p node-beg node-end)
+      (f90-ts--group-block-region-classify beg end node-beg node-end))
+     ((and node-beg node-end)
+      (list 'disparate node-beg node-end))
+     (t
+      nil))))
+
+
+(defun f90-ts--group-block-eq (group1 group2)
+  "Determine whether two groups GROUP1 and GROUP2 of nodes are equal.
+Note that equality of the two first nodes is equivalent to the
+equality of the two last nodes.
+If at least one group is nil, return value is nil as well."
+  (and group1
+       group2
+       (treesit-node-eq (car group1) (car group2))))
 
 
 (defun f90-ts-mark-region-enlarge-active ()
@@ -5454,8 +5506,8 @@ Find smallest node covering region.  Then reduce region to its child determined
 by CHILD-INDEX.  If there are further grand-children with the same span, return
 the smallest grandchild in the tree.
 COMMENT-SELECTOR is `car' or `cdr', selecting from a cons of (first . last)
-comment nodes.  CHILD-INDEX is passed to `treesit-node-child'
-(0 for first, -1 for last).  CHILD-NAME is a name like \"first\" or \"last\"
+comment nodes.  CHILD-INDEX is passed to `treesit-node-child' (0 for first
+and -1 for last).  CHILD-NAME is a name like \"first\" or \"last\"
 which is used for an error message if the child is not found."
   (if (use-region-p)
       (let* ((beg (region-beginning))
@@ -5491,22 +5543,62 @@ grandchild in the tree."
   (f90-ts--mark-region-shrink-child #'cdr -1 "no tree-sitter child9 found for current region"))
 
 
-(defun f90-ts--mark-region-relative (get-relative)
+(defun f90-ts--group-block-anchor (group direction)
+  "Return the anchor node from GROUP classification for DIRECTION.
+DIRECTION is `backward' or `forward'.
+GROUP is a list as returned by `f90-ts--group-block-region'."
+  (cond
+   ((member (car group) '(block partial disparate))
+    (if (eq direction 'backward)
+        (cadr group)
+      (caddr group)))
+   ((eq (car group) 'single)
+    (cadr group))
+   (t
+    nil)))
+
+
+(defun f90-ts--relative-or-group (anchor get-relative)
+  "Return the relative of ANCHOR via GET-RELATIVE and group handling.
+If the relative returned by GET-RELATIVE is in the same group as ANCHOR,
+return the relative node itself, and do not extent to their group.
+Otherwise return the full group extent of the relative.
+
+Note that each node always forms a \"group\" on its own if it does not
+belong to any proper block."
+  (when-let* ((relative      (funcall get-relative anchor))
+              (group-anchor   (f90-ts--group-block-extent anchor))
+              (group-relative (f90-ts--group-block-extent relative)))
+    (if (f90-ts--group-block-eq group-anchor group-relative)
+        relative
+      group-relative)))
+
+
+(defun f90-ts--mark-region-relative (get-relative direction)
   "Mark relative of node determined by current active region and GET-RELATIVE.
+DIRECTION is `backward' or `forward', used to resolve the anchor node when the
+region spans a full group block.
+For `backward' the first node of the group is used as anchor for GET-RELATIVE.
+For `forward' the last node of the group is used as anchor for GET-RELATIVE.
+
 First find smallest node covering currently active region.
 If the node spans the current region, then mark its relative determined
-by GET-RELATIVE.
+by GET-RELATIVE.  GET-RELATIVE may return a node or a cons (FIRST . LAST).
 Otherwise mark the region spanned by the node itself (like enlarge-region)."
+  (cl-assert (member direction '(backward forward))
+             nil "direction is not backward or forward")
   (if (use-region-p)
-      (if-let* ((beg (region-beginning))
-                (end (region-end))
-                (node-on (treesit-node-on beg end))
-                (node (f90-ts--largest-node-same-span node-on))
-                (node-mark (if (f90-ts--node-has-span-p node beg end)
-                               (funcall get-relative node)
+      (if-let* ((beg       (region-beginning))
+                (end       (region-end))
+                (node-on   (treesit-node-on beg end))
+                (node      (f90-ts--largest-node-same-span node-on))
+                (group     (f90-ts--group-block-region beg end))
+                (anchor    (f90-ts--group-block-anchor group direction)))
+          (let ((node-mark (if anchor
+                               (or (f90-ts--relative-or-group anchor get-relative)
+                                   node)
                              node)))
-          (f90-ts--mark-region-node node-mark
-                                    f90-ts-mark-region-reversed)
+            (f90-ts--mark-region-node-or-extent node-mark f90-ts-mark-region-reversed))
         (message "tree-sitter relative not found for current region"))
     (message "no active region")))
 
@@ -5519,7 +5611,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (f90-ts--mark-region-relative
    (lambda (node)
      (when-let ((parent (treesit-node-parent node)))
-       (treesit-node-child parent 0 t)))))
+       (treesit-node-child parent 0 t)))
+   'backward))
 
 
 (defun f90-ts-mark-region-prev-sibling ()
@@ -5529,7 +5622,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (interactive)
   (f90-ts--mark-region-relative
    (lambda (node)
-     (treesit-node-prev-sibling node t))))
+     (treesit-node-prev-sibling node t))
+   'backward))
 
 
 (defun f90-ts-mark-region-next-sibling ()
@@ -5539,7 +5633,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (interactive)
   (f90-ts--mark-region-relative
    (lambda (node)
-     (treesit-node-next-sibling node t))))
+     (treesit-node-next-sibling node t))
+   'forward))
 
 
 (defun f90-ts-mark-region-last-sibling ()
@@ -5550,7 +5645,8 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
   (f90-ts--mark-region-relative
    (lambda (node)
      (when-let ((parent (treesit-node-parent node)))
-       (treesit-node-child parent -1 t)))))
+       (treesit-node-child parent -1 t)))
+   'forward))
 
 
 ;;;-----------------------------------------------------------------------------
