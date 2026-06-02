@@ -32,17 +32,23 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Features:
+;;   - Almost all statements up to F2023
 ;;   - Syntax highlighting
-;;   - Indentation
-;;   - Alignment for multiline statements where applicable
+;;   - Indentation of lines, regions, multiline statements and structure blocks
+;;   - Alignment for multiline statements with rotation and other options
 ;;   - Smart end completion
+;;   - Configurable leading ampersand and statement label positions
 ;;   - Breaking and joining continued lines
-;;   - (Un)commenting regions with configurable prefixes
+;;   - (Un)commenting regions with configurable prefixes and indentation rules
+;;   - Special comments like doc strings and separators
+;;     (syntax highlighting and indentation options)
+;;   - Keyword highlighting in comments (like TODO, Remark etc.)
 ;;   - OpenMP and preprocessor directives
+;;   - Coarray keywords and statements
 ;;   - Region selection based on tree-sitter nodes
 ;;   - Xref (buffer local)
-;;   - Imenu
-;;   - Fortran menu and transient keybindings
+;;   - Imenu and a Fortran menu in the menu bar
+;;   - Navigation (defun, things, Xref, tree as submenu and as side panel buffer)
 ;;
 ;; Features can be found by the fortran menu or a transient popup bound
 ;; to the key C-c C-f.
@@ -154,7 +160,7 @@ associate ...) etc."
   :group 'f90-ts-indent)
 
 
-(defconst f90-ts-indent-list-options
+(defconst f90-ts--indent-options-alist
   '(("keep if aligned or align to primary column" . keep-or-primary)
     ("keep if aligned or rotate to next column" . keep-or-rotate)
     ("align with primary column" . primary)
@@ -163,17 +169,35 @@ associate ...) etc."
   "Options for indentation of list like structures on continued lines.")
 
 
-(defconst f90-ts--indent-list-radio
+(defconst f90-ts--indent-region-options-alist
+  (cl-remove-if (lambda (x)
+                  (memq (cdr x) '(rotate keep-or-rotate)))
+                f90-ts--indent-options-alist)
+  "Options for region indentation (excludes rotation).")
+
+
+(defconst f90-ts--indent-values
+  (mapcar #'cdr f90-ts--indent-options-alist)
+  "List of valid symbols for single-line indentation.")
+
+
+(defconst f90-ts--indent-region-values
+  (mapcar #'cdr f90-ts--indent-region-options-alist)
+  "List of valid symbols for region indentation (excludes rotation).")
+
+
+(defun f90-ts--indent-make-radio-type (options)
+  "Generate a customize radio type from an alist of indent OPTIONS."
   `(radio ,@(mapcar (lambda (x)
                       `(const :tag ,(car x) ,(cdr x)))
-                    f90-ts-indent-list-options))
-  "Prepared options list for defcustoms.")
+                    options)))
 
 
 (defcustom f90-ts-indent-list-region 'keep-or-primary
   "Select indentation column for continued lines in list-like context.
 Used as default setting in `indent-region' and similar operations."
-  :type  f90-ts--indent-list-radio
+  :type (f90-ts--indent-make-radio-type f90-ts--indent-region-options-alist)
+  :safe (lambda (val) (memq val f90-ts--indent-region-values))
   :group 'f90-ts-indent)
 
 
@@ -181,7 +205,8 @@ Used as default setting in `indent-region' and similar operations."
   "Select indentation column for continued lines in list-like context.
 Used as default setting in `indent-for-tab-command' and similar
 operations (indentation of a single line)."
-  :type  f90-ts--indent-list-radio
+  :type (f90-ts--indent-make-radio-type f90-ts--indent-options-alist)
+  :safe (lambda (val) (memq val f90-ts--indent-values))
   :group 'f90-ts-indent)
 
 
@@ -189,7 +214,8 @@ operations (indentation of a single line)."
   "Select indentation column for continued lines in list-like context.
 Used as secondary setting in `indent-for-tab-command'.  Can be be bound
 to <backtab> (S-<tab>), A-<tab>, C-S-<tab> or other."
-  :type  f90-ts--indent-list-radio
+  :type (f90-ts--indent-make-radio-type f90-ts--indent-options-alist)
+  :safe (lambda (val) (memq val f90-ts--indent-values))
   :group 'f90-ts-indent)
 
 
@@ -197,13 +223,14 @@ to <backtab> (S-<tab>), A-<tab>, C-S-<tab> or other."
   "Select indentation column for continued lines in list-like context.
 Used as ternary setting in `indent-for-tab-command'.  Can be be bound
 to <backtab> (S-<tab>), A-<tab>, C-S-<tab> or other."
-  :type  f90-ts--indent-list-radio
+  :type (f90-ts--indent-make-radio-type f90-ts--indent-options-alist)
+  :safe (lambda (val) (memq val f90-ts--indent-values))
   :group 'f90-ts-indent)
 
 
 (defcustom f90-ts-indent-paren-default 1
   "Additional offset applied for alignment with opening parenthesis.
-The default is for all items except the closing parenthesis.
+The default is used for all items except the closing parenthesis.
 
 Example:
    call sub(       arg1, &
@@ -4904,16 +4931,18 @@ determined by `f90-ts-leading-ampersand-style'."
 
 (defun f90-ts-indent-and-complete-stmt ()
   "Perform indentation and smart end completion for a whole statement.
-In general, this just calls `f90-ts--indent-and-complete-line-aux'
-with non-nil for argument `indent-struct' to trigger indentation of a
-whole structure if at end of some structure.
+In most cases, this just behaves like `f90-ts--indent-and-complete-line'.
+However, in two cases this indents and complete a region associated with
+the statement or block at point.
 
-However, if within a continued line region, it determines the first line of
-the current statement and performs indent region from this first line up to
-and including the current line.  If indentation of current line has not
-changed, then it indents the current line by invoking
-`f90-ts--indent-and-complete' to apply rules like rotation of list context
-items.  Otherwise it indents with default line choice.
+If point is on an \"end\" statement of some structure like a \"subroutine\",
+a \"do\" or an \"if\" block, then the whole structure is indented as a region.
+
+If point is on a line within a continued statement, it first indents the
+statement starting at its first up to the current line as a region.
+If the operation has not changed anything, then and only then it indents
+the current line by invoking `f90-ts--indent-and-complete' to apply rules
+like rotation of list context items.
 
 If a region is active, then just invoke `f90-ts-indent-and-complete-region'"
   (interactive)
