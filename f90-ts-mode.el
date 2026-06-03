@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Package-Requires: ((emacs "30.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -46,9 +46,8 @@
 ;;   - OpenMP and preprocessor directives
 ;;   - Coarray keywords and statements
 ;;   - Region selection based on tree-sitter nodes
-;;   - Xref (buffer local)
 ;;   - Imenu and a Fortran menu in the menu bar
-;;   - Navigation (defun, things, Xref, tree as submenu and as side panel buffer)
+;;   - Navigation (defun, things, Xref, side panel tree)
 ;;
 ;; Features can be found by the fortran menu or a transient popup bound
 ;; to the key C-c C-f.
@@ -67,9 +66,6 @@
 ;; Bugs and features:
 ;;   https://github.com/mscfd/emacs-f90-ts-mode/issues
 ;;
-;; Questions and discussions:
-;;   https://fortran-lang.discourse.group/t/tree-sitter-based-f90-mode-for-emacs/10746
-;;
 ;; Note: Emacs must be linked against tree-sitter 0.25.x at runtime.
 ;; Emacs does not yet support 0.26, though support is in development and this
 ;; restriction may soon be obsolete.
@@ -78,20 +74,7 @@
 ;; The pregenerated grammar files in the master branch of
 ;; https://github.com/mscfd/tree-sitter-fortran are built against 0.25.10
 ;; and ready to use, if there are problems with the official repository.
-;;
-;; To verify the setup:
-;;   M-: (treesit-library-abi-version)           ; should return 15
-;;   M-: (treesit-language-abi-version 'fortran) ; should return 15
-;;
-;;   in linux:
-;;   ldd "emacs" | grep libtree-sitter ; should show libtree-sitter.so.0.25
-;;
-;;   in macos:
-;;   otool -L "emacs" | grep tree-sitter
-;;   ; expecting something like: .../tree-sitter/lib/libtree-sitter.0.dylib
-;;                               (compatibility version 0.0.0, current version 0.25.0)
-;;
-;;   in windows: unknown how to check
+;; For details see MANUAL at https://github.com/mscfd/emacs-f90-ts-mode
 
 ;;; Code:
 

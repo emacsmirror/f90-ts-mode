@@ -29,9 +29,8 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - OpenMP and preprocessor directives
 - Coarray keywords and statements
 - Region selection based on tree-sitter nodes
-- Xref (buffer local)
 - Imenu and a Fortran menu in the menu bar
-- Navigation (defun, things, Xref, tree as submenu and as side panel buffer)
+- Navigation (defun, things, Xref, side panel tree)
 
 
 ## Keybindings
@@ -128,6 +127,19 @@ It will automatically be loaded when opening a file with extension `.f90`.
 ```
 
 
+## Customization
+
+All options can be found under `M-x customize-group RET f90-ts` and its subgroups.
+The group can also be reached via the Fortran menu added by the mode.
+
+
+## Contributing
+
+Contributions and feature requests are welcome. Please open an issue or pull request on GitHub.
+
+When reporting a bug, please include a small code snippet, showing the issue or desired behaviour.
+
+
 ## Roadmap
 
 There are a number of features still missing or incomplete.
@@ -137,7 +149,8 @@ The following list provides features planned for implementation (somewhat ordere
   different faces for quotes, continuation symbols and the string itself.
   Allow comments within continued strings.
   This all requires extension of the grammar itself.
-  See issue [Continued strings](https://github.com/stadelmanma/tree-sitter-fortran/issues/193).
+  See issues [Continued strings at grammar repo](https://github.com/stadelmanma/tree-sitter-fortran/issues/193)
+  and [Continued strings at mode repo](https://github.com/mscfd/emacs-f90-ts-mode/issues/127)
 - Fill operations similar to `f90-fill-region` and `f90-fill-paragraph`.
 - Support for (context-aware) `completion-at-point-function` (capf).
 - More list contexts for alignment in continued lines.
