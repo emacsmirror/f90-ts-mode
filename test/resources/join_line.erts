@@ -540,6 +540,28 @@ subroutine sub_1()
 end subroutine sub_1
 =-=-=
 
+Name: join next statement 14
+=-=
+! this failed as querying the single character node "5" before point
+! in f90-ts--node-on-pos failed, caused by the virtual zero-span
+! ampersand node right at start of the "5"
+subroutine sub()
+     x = 6 + &
+         5|
+     y = 7
+end subroutine sub
+=-=
+! this failed as querying the single character node "5" before point
+! in f90-ts--node-on-pos failed, caused by the virtual zero-span
+! ampersand node right at start of the "5"
+subroutine sub()
+     x = 6 + &
+         5|
+     y = 7
+end subroutine sub
+=-=-=
+
+
 Name: join next string 1
 =-=
 subroutine str1()
@@ -623,7 +645,7 @@ Code:
     (unless (= (point) (point-max))
       (insert (format "POINT-WRONG: at=%s, expected=%s\n" (point) (point-max)))))
 
-Name: join next statement 14
+Name: join next statement 15
 =-=
 subroutine sub_1()
 end s|ubroutine sub_1
