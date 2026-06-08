@@ -673,50 +673,52 @@ seem to make much sense."
 
 (transient-define-prefix f90-ts-transient ()
   "F90 Tree-sitter Mode."
-  [["Indentation"
-    ("TAB" "Indent line"                  f90-ts-indent-and-complete-line)
-    ("s"   "Indent & complete statement"  f90-ts-indent-and-complete-stmt)
-    ("I"   "Indent & complete region"     f90-ts-indent-and-complete-region)
-    ("E"   "Complete end statements"      f90-ts-complete-smart-end-region)]
-   ["Line & comments"
-    ("b"   "Break line"                   f90-ts-break-line)
-    ("j"   "Join with previous line"      f90-ts-join-line-prev)
-    ("J"   "Join with next line"          f90-ts-join-line-next)
-    ("c"   "Comment region (default)"     f90-ts-comment-region-default)
-    ("C"   "Comment region (custom)"      f90-ts-comment-region-custom)]
-   ["Mark region"
-    ("r"   "Enlarge"                      f90-ts-mark-region-enlarge)
-    ("0"   "First child"                  f90-ts-mark-region-shrink-child-first)
-    ("9"   "Last child"                   f90-ts-mark-region-shrink-child-last)]
-   [""
-    ("{"   "First sibling"                f90-ts-mark-region-first-sibling)
-    ("["   "Previous sibling"             f90-ts-mark-region-prev-sibling)
-    ("]"   "Next sibling"                 f90-ts-mark-region-next-sibling)
-    ("}"   "Last sibling"                 f90-ts-mark-region-last-sibling)]]
-  [["Procedure navigation"
-    ("a"   "Beginning"                    f90-ts-thing-beginning-of-procedure)
-    ("e"   "End"                          f90-ts-thing-end-of-procedure)
-    ("p"   "Previous"                     f90-ts-thing-prev-procedure)
-    ("n"   "Next"                         f90-ts-thing-next-procedure)]
-   ["Type navigation"
-    ("M-a" "Beginning"                    f90-ts-thing-beginning-of-type)
-    ("M-e" "End"                          f90-ts-thing-end-of-type)
-    ("M-p" "Previous"                     f90-ts-thing-prev-type)
-    ("M-n" "Next"                         f90-ts-thing-next-type)]
-   ["Interface navigation"
-    ("C-M-a" "Beginning"                  f90-ts-thing-beginning-of-interface)
-    ("C-M-e" "End"                        f90-ts-thing-end-of-interface)
-    ("C-M-p" "Previous"                   f90-ts-thing-prev-interface)
-    ("C-M-n" "Next"                       f90-ts-thing-next-interface)]
-   ["Xref"
-    ("."   "Find definition"              xref-find-definitions)
-    (","   "Find references"              xref-find-references)
-    ("/"   "Find apropos"                 xref-find-apropos)
-    ("<"   "Go back"                      xref-go-back)
-    (">"   "Go forward"                   xref-go-forward)]
-   ["Navigation panel"
-    ("b"   "Open nav buffer"              f90-ts-nav-buffer-open)
-    ("f"   "Focus nav buffer"             f90-ts-nav-buffer-focus)]])
+  ;; Modify
+  [["Indentation, break & join"
+    ("TAB" "Indent line"                f90-ts-indent-and-complete-line)
+    ("s"   "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
+    ("I"   "Indent & complete region"   f90-ts-indent-and-complete-region)
+    ("E"   "Smart end complete region"  f90-ts-complete-smart-end-region)
+    ("b"   "Break line"                 f90-ts-break-line)
+    ("j"   "Join with previous line"    f90-ts-join-line-prev)
+    ("J"   "Join with next line"        f90-ts-join-line-next)]
+   ["Mark and (un)comment region"
+    ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
+    ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
+    ("9"   "Shrink to last child"       f90-ts-mark-region-shrink-child-last)
+    ("{"   "First sibling"              f90-ts-mark-region-first-sibling)
+    ("["   "Previous sibling"           f90-ts-mark-region-prev-sibling)
+    ("]"   "Next sibling"               f90-ts-mark-region-next-sibling)
+    ("}"   "Last sibling"               f90-ts-mark-region-last-sibling)
+    ("c"   "Comment region (default)"   f90-ts-comment-region-default)
+    ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]]
+
+  ;; Navigate
+  [["Procedure"
+    ("a"   "Beginning"                  f90-ts-thing-beginning-of-procedure)
+    ("e"   "End"                        f90-ts-thing-end-of-procedure)
+    ("p"   "Previous"                   f90-ts-thing-prev-procedure)
+    ("n"   "Next"                       f90-ts-thing-next-procedure)]
+   ["Derived Type"
+    ("M-a" "Beginning"                  f90-ts-thing-beginning-of-type)
+    ("M-e" "End"                        f90-ts-thing-end-of-type)
+    ("M-p" "Previous"                   f90-ts-thing-prev-type)
+    ("M-n" "Next"                       f90-ts-thing-next-type)]
+  ["Interface"
+    ("C-M-a" "Beginning"                f90-ts-thing-beginning-of-interface)
+    ("C-M-e" "End"                      f90-ts-thing-end-of-interface)
+    ("C-M-p" "Previous"                 f90-ts-thing-prev-interface)
+    ("C-M-n" "Next"                     f90-ts-thing-next-interface)]]
+
+  [["Xref"
+    ("."   "Find definition"            xref-find-definitions)
+    (","   "Find references"            xref-find-references)
+    ("/"   "Find apropos"               xref-find-apropos)
+    ("<"   "Go back"                    xref-go-back)
+    (">"   "Go forward"                 xref-go-forward)]
+   ["Side panel (alpha!)"
+    ("B"   "Open nav buffer"            f90-ts-nav-buffer-open)
+    ("F"   "Focus nav buffer"           f90-ts-nav-buffer-focus)]])
 
 
 ;;;-----------------------------------------------------------------------------
