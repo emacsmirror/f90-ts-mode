@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Package-Requires: ((emacs "30.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -46,9 +46,8 @@
 ;;   - OpenMP and preprocessor directives
 ;;   - Coarray keywords and statements
 ;;   - Region selection based on tree-sitter nodes
-;;   - Xref (buffer local)
 ;;   - Imenu and a Fortran menu in the menu bar
-;;   - Navigation (defun, things, Xref, tree as submenu and as side panel buffer)
+;;   - Navigation (defun, things, Xref, side panel tree)
 ;;
 ;; Features can be found by the fortran menu or a transient popup bound
 ;; to the key C-c C-f.
@@ -67,9 +66,6 @@
 ;; Bugs and features:
 ;;   https://github.com/mscfd/emacs-f90-ts-mode/issues
 ;;
-;; Questions and discussions:
-;;   https://fortran-lang.discourse.group/t/tree-sitter-based-f90-mode-for-emacs/10746
-;;
 ;; Note: Emacs must be linked against tree-sitter 0.25.x at runtime.
 ;; Emacs does not yet support 0.26, though support is in development and this
 ;; restriction may soon be obsolete.
@@ -78,20 +74,7 @@
 ;; The pregenerated grammar files in the master branch of
 ;; https://github.com/mscfd/tree-sitter-fortran are built against 0.25.10
 ;; and ready to use, if there are problems with the official repository.
-;;
-;; To verify the setup:
-;;   M-: (treesit-library-abi-version)           ; should return 15
-;;   M-: (treesit-language-abi-version 'fortran) ; should return 15
-;;
-;;   in linux:
-;;   ldd "emacs" | grep libtree-sitter ; should show libtree-sitter.so.0.25
-;;
-;;   in macos:
-;;   otool -L "emacs" | grep tree-sitter
-;;   ; expecting something like: .../tree-sitter/lib/libtree-sitter.0.dylib
-;;                               (compatibility version 0.0.0, current version 0.25.0)
-;;
-;;   in windows: unknown how to check
+;; For details see MANUAL at https://github.com/mscfd/emacs-f90-ts-mode
 
 ;;; Code:
 
@@ -443,7 +426,7 @@ Value nil turns off smart end completion.
 
 Copied from prog mode `f90-mode'."
   :type  '(choice (const blink) (const no-blink) (const no-message) (const nil))
-  :safe  (lambda (value) (memq value '(blink no-blink complete nil)))
+  :safe  (lambda (value) (memq value '(blink no-blink no-message nil)))
   :group 'f90-ts)
 
 
@@ -1117,7 +1100,7 @@ NODE is assumed to be of type comment."
      f90-ts-special-comment-rules)))
 
 
-(defun f90-ts--node-on-pos (pos named)
+(defun f90-ts--node-on-pos (pos side &optional named)
   "Return the smallest node covering position POS.
 If NAMED is non-nil, consider only named nodes, otherwise include anonymous
 nodes as well.
@@ -1125,30 +1108,56 @@ nodes as well.
 Function `treesit-node-on' works on half-open regions.
 It returns a node spanning the half-open region [beg, end).
 If POS is at end position of node, then the region [POS,POS) is empty and
-`treesit-node-on' returns a larger node.
-This function queries at POS and at POS-1, and selects the smallest node
-containing POS in the closed interval logic.
+`treesit-node-on' returns some parent node properly including POS.
+Also note that if POS is not within the span of the root node, then
+`treesit-node-on' returns the root node, even so it does not cover POS.
+
+In contrast to `treesit-node-on', this function uses the closed interval logic
+and looks for nodes really covering [POS,POS].  If there is more than one such
+node (one ending at POS, another starting at POS), SIDE is is used to resolve
+the ambiguity.  SIDE is either `left' or `right'.  This selects the node which
+ends at POS and starts at POS, respectively.
+
 Example
 subroutine sub()
    if (cond) then
    end if|
 end subroutine sub
-If point is at |, then the smallest named no is the end_statement node
+
+If point is at |, then the smallest named node is the end_statement
 for \"end if\".  However, treesit-node-on returns the subroutine node.
-Querying at POS-1 gives the expected answer."
-  (let* ((nodes (delq nil
-                      (list (treesit-node-on pos   pos   nil named)
-                            (when (< (point-min) pos)
-                              (treesit-node-on (1- pos) (1- pos) nil named)))))
-         (filtered (seq-filter (lambda (n) (and (<= (treesit-node-start n) pos)
-                                                (<= pos (treesit-node-end n))))
-                               nodes))
-         (sorted (seq-sort (lambda (n1 n2) (< (- (treesit-node-end n1)
-                                                 (treesit-node-start n1))
-                                              (- (treesit-node-end n2)
-                                                 (treesit-node-start n2))))
-                           filtered)))
-    (car sorted)))
+Querying with [POS-1,POS) gives the expected answer."
+  (cl-assert (member side '(left right))
+             nil "invalid argument side, got %s" side)
+  (let* ((right-on (treesit-node-on pos pos nil named))
+         (left-on  (and (> pos (point-min))
+                        (treesit-node-on (1- pos) pos nil named)))
+         ;; filter nodes which do not cover POS
+         (right (when (and right-on
+                           (<= (treesit-node-start right-on) pos)
+                           (<= pos (treesit-node-end right-on)))
+                  right-on))
+         (left (when (and left-on
+                          (<= (treesit-node-start left-on) pos)
+                          (<= pos (treesit-node-end left-on)))
+                 left-on)))
+    (cond
+     ;; only one candidate
+     ((null left) right)
+     ((null right) left)
+
+     ;; ambiguity case
+     ((and (= (treesit-node-end left) pos)
+           (= pos (treesit-node-start right)))
+      (if (eq side 'left) left right))
+
+     ;; return node with smaller span (which should be a descendant of the large node)
+     (t
+      (let ((len-left (- (treesit-node-end left)
+                         (treesit-node-start left)))
+            (len-right (- (treesit-node-end right)
+                          (treesit-node-start right))))
+        (if (< len-left len-right) left right))))))
 
 
 (defun f90-ts--smallest-node-same-span (node)
@@ -3606,13 +3615,13 @@ Finally use VARIANT to select one pair to align with."
                                                       anoff-items-plist
                                                       context))
          ;; always add default continued offset position as anchor
-         (anoff-extra (f90-ts--align-list-pstmt1-anoff))
+         (anoff-continued (f90-ts--align-list-pstmt1-anoff))
          ;; anoff-primary is used as 'primary' in keep-or-primary, primary etc.
-         ;; if anoff-other is empty (should not happen), then use anoff-extra as fallback
+         ;; if anoff-other is empty (should not happen), then use anoff-continued as fallback
          (anoff-primary (or (car anoff-other)
-                            anoff-extra))
+                            anoff-continued))
          ;; final list of anchors (which are nodes or pairs (position offset))
-         (anoff-final (append (and anoff-extra (list anoff-extra))
+         (anoff-final (append (and anoff-continued (list anoff-continued))
                               anoff-other
                               anoff-items-sym)))
     ;;(f90-ts-log-msg :anoff "items-other = %s" anoff-other)
@@ -5185,8 +5194,8 @@ If previous line has comments (at end, next line etc.) joining is not done."
                    (beginning-of-line)
                    (skip-chars-forward "[ \t\n]")
                    (point)))
-           (first (f90-ts--node-on-pos pos1 nil))
-           (secnd (f90-ts--node-on-pos pos2 nil))
+           (first (f90-ts--node-on-pos pos1 'left))
+           (secnd (f90-ts--node-on-pos pos2 'right))
            (is-cont-str (and (f90-ts--node-type-p first "string_literal")
                              (f90-ts--node-type-p secnd "string_literal")
                              (treesit-node-eq first secnd))))
@@ -5248,8 +5257,8 @@ If continued line has comments (at end, next line etc.) joining is not done."
                    (end-of-line)
                    (skip-chars-forward "[ \t\n]")
                    (point)))
-           (first (f90-ts--node-on-pos pos1 nil))
-           (secnd (f90-ts--node-on-pos pos2 nil))
+           (first (f90-ts--node-on-pos pos1 'left))
+           (secnd (f90-ts--node-on-pos pos2 'right))
            (is-cont-str (and (f90-ts--node-type-p first "string_literal")
                              (f90-ts--node-type-p secnd "string_literal")
                              (treesit-node-eq first secnd))))
@@ -5385,7 +5394,7 @@ Currently this predicate groups comment nodes sharing the same comment prefix."
 (defun f90-ts--node-aligned-at-beg (beg end named)
   "Return the largest node starting exactly at BEG and ending before END.
 If NAMED is non-nil, consider only named nodes."
-  (when-let* ((node (f90-ts--node-on-pos beg named)))
+  (when-let* ((node (f90-ts--node-on-pos beg 'right named)))
     (treesit-parent-while
      node
      (lambda (n) (and (=  beg (f90-ts--node-start-trimmed n))
@@ -5395,7 +5404,7 @@ If NAMED is non-nil, consider only named nodes."
 (defun f90-ts--node-aligned-at-end (beg end named)
   "Return the largest node ending exactly at END and starting after BEG.
 If NAMED is non-nil, consider only named nodes."
-  (when-let* ((node (f90-ts--node-on-pos end named)))
+  (when-let* ((node (f90-ts--node-on-pos end 'left named)))
     (treesit-parent-while
      node
      (lambda (n) (and (<= beg (treesit-node-start n))
@@ -5448,9 +5457,9 @@ Returns a list:
   ('disparate FN LN) not a group, region starts and ends with disparate nodes
   nil                node at beg or end could not be determined"
   (let* ((node-beg (or (f90-ts--node-aligned-at-beg beg end 'named)
-                       (f90-ts--node-on-pos beg 'named)))
+                       (f90-ts--node-on-pos beg 'left 'named)))
          (node-end (or (f90-ts--node-aligned-at-end beg end 'named)
-                       (f90-ts--node-on-pos end 'named))))
+                       (f90-ts--node-on-pos end 'right 'named))))
     (cond
      ((f90-ts--group-block-p node-beg node-end)
       (f90-ts--group-block-region-classify beg end node-beg node-end))
@@ -5510,7 +5519,7 @@ This operation assumes that no region is active."
          (node-at (treesit-node-at pos)))
     (if (f90-ts--node-type-p node-at "comment")
         (f90-ts--mark-region-node node-at f90-ts-mark-region-order)
-      (if-let* ((node-on (f90-ts--node-on-pos pos 'named))
+      (if-let* ((node-on (f90-ts--node-on-pos pos 'right 'named))
                 (node    (f90-ts--largest-node-same-span node-on)))
           (f90-ts--mark-region-node node f90-ts-mark-region-order)
         (message "no tree-sitter node found at point")))))
