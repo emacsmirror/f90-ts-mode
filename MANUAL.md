@@ -253,16 +253,18 @@ The popup is defined as `f90-ts-transient` and covers:
 | Section                   | Keys                            | Commands                                        |
 |---------------------------|---------------------------------|-------------------------------------------------|
 | **Indentation**           | `TAB` `s` `I` `E`               | Indent line / statement / region / smart end    |
-| **Line editing**          | `RET` `j` `J`                   | Break line, join with prev/next                 |
+| **Line editing**          | `b` `j` `J`                     | Break line, join with prev/next                 |
+| **Mark region**           | `r` `0` `9`                     | Enlarge, first and last,                        |
+|                           | `{`,`[` `]`,`}`                 | first, prev, next and last sibling              |
 | **Comment region**        | `c` `C`                         | Default and custom prefix                       |
 | **Structural navigation** | `a` `e` `p` `n`                 | Procedure (beginning, end, prev, next)          |
 |                           | `M-a` `M-e` `M-p` `M-n`         | Type (beginning, end, prev, next)               |
 |                           | `C-M-a` `C-M-e` `C-M-p` `C-M-n` | Interface (beginning, end, prev, next)          |
-| **Region**                | `r` `0` `[` `]`                 | Enlarge, child-0, prev, next                    |
 | **Xref**                  | `.` `,` `/` `<` `>`             | Definitions, references, apropos, back, forward |
-| **Navigation side panel** | `b` `f`                         | Open and focus nav buffer                       |
+| **Navigation side panel** (alpha!) | `B` `F`                | Open and focus nav buffer                       |
 
-The entire popup can be bound to a different prefix by:
+The entire transient popup can be bound to a different prefix with a use-package statement
+in the `:bind` section as shown above, or simply by:
 
 ```elisp
 (define-key f90-ts-mode-map "..." #'f90-ts-transient)
@@ -273,17 +275,23 @@ The entire popup can be bound to a different prefix by:
 ## Features
 (with inspiration from the legacy f90 mode in emacs)
 
+- Almost all statements up to F2023
 - Syntax highlighting (font lock faces)
 - Indentation of lines, regions, multiline statements and structure blocks
+- Alignment for multiline statements with rotation and other options
 - Smart end completion
-- Break lines with automatic continuation and comment starters for comment lines
-- Join lines
-- Comment region operations with configurable prefixes and indentation rules
-- Mark regions based on tree-sitter nodes
+- Configurable leading ampersand and statement label positions
+- Break line with automatic continuation and comment starters for comment lines
+- Join with previous and next line
+- (Un)commenting regions with configurable prefixes and indentation rules
+- Special comments like doc strings and separators
+  (syntax highlighting and indentation options)
+- Keyword highlighting in comments (like TODO, Remark etc.)
 - OpenMP and preprocessor directives
 - Coarray keywords and statements
-- `Imenu` and a `Fortran` menu in the menu bar
-- Navigation (defun, things, Xref, tree as submenu and as side panel buffer)
+- Region selection based on tree-sitter nodes
+- Imenu and a Fortran menu in the menu bar
+- Navigation (defun, things, Xref, side panel tree)
 
 
 

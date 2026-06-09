@@ -13,6 +13,7 @@ f90-ts-mode provides a modern Fortran editing experience using Tree-sitter,
 including syntax highlighting, indentation, navigation, and structural editing features.
 
 ### Features
+(with inspiration from the `f90-mode` in emacs core)
 
 - Almost all statements up to F2023
 - Syntax highlighting (font lock faces)
