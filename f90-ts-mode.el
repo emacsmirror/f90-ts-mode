@@ -3945,7 +3945,7 @@ triple ((f90-ts-log-indent-print-state MSG) parent 0) directly."
 ;;++++++++++++++
 ;; simple indentation rules
 
-(defvar f90-ts-indent-rules-start
+(defvar f90-ts--indent-rules-start
   (f90-ts--with-map-rules
    ;; populate cache and then always fail
    (populate-cache parent 0)
@@ -3956,7 +3956,7 @@ triple ((f90-ts-log-indent-print-state MSG) parent 0) directly."
 The main purpose is to fill the indentation cache for a new run.")
 
 
-(defvar f90-ts-indent-rules-comments
+(defvar f90-ts--indent-rules-comments
   (f90-ts--with-map-rules
    ;; there are special comments in `f90-ts-special-comment-rules',
    ;; distinguish between default and these special comments
@@ -3980,7 +3980,7 @@ The main purpose is to fill the indentation cache for a new run.")
   "Indentation rules for comments (excluding OpenMP statements).")
 
 
-(defvar f90-ts-indent-rules-preproc
+(defvar f90-ts--indent-rules-preproc
   (f90-ts--with-map-rules
    ;; indent preprocessor directive.
    ;; directive itself: no indent
@@ -3992,7 +3992,7 @@ The main purpose is to fill the indentation cache for a new run.")
   "Indentation rules for preprocessor directives.")
 
 
-(defvar f90-ts-indent-rules-continued
+(defvar f90-ts--indent-rules-continued
   (f90-ts--with-map-rules
    ;; handle continued lines
    ;; if on first line of a continued statement, reset the continued-line cache
@@ -4013,7 +4013,7 @@ The main purpose is to fill the indentation cache for a new run.")
   "Indentation rules for continued lines.")
 
 
-(defvar f90-ts-indent-rules-internal-proc
+(defvar f90-ts--indent-rules-internal-proc
   (f90-ts--with-map-rules
    ;; contains statements in modules, programs, subroutines or functions,
    ;; no indentation for contains
@@ -4024,7 +4024,7 @@ The main purpose is to fill the indentation cache for a new run.")
 This node occurs in conjunction with \"contain\" statements.")
 
 
-(defvar f90-ts-indent-rules-prog-mod
+(defvar f90-ts--indent-rules-prog-mod
   (f90-ts--with-map-rules
    ;; program or module interface part (before contains) and end statement
    ;; in all cases: first match node with end_xyz_statement, and then only
@@ -4045,7 +4045,7 @@ This node occurs in conjunction with \"contain\" statements.")
   "Indentation rules for program and module nodes.")
 
 
-(defvar f90-ts-indent-rules-function
+(defvar f90-ts--indent-rules-function
   (f90-ts--with-map-rules
    ;; functions and subroutine bodies
    ((node-is    "end_subroutine_statement")       parent 0)
@@ -4060,7 +4060,7 @@ This node occurs in conjunction with \"contain\" statements.")
   "Indentation rules for functions and subroutines.")
 
 
-(defvar f90-ts-indent-rules-translation-unit
+(defvar f90-ts--indent-rules-translation-unit
   (f90-ts--with-map-rules
    ;; statements related to toplevel subroutine or function statements,
    ;; and ERROR cases (might or might not be toplevel)
@@ -4077,7 +4077,7 @@ These occur for functions and subroutines not within a \"contains\" section,
 and in case of ERROR nodes with incomplete code.")
 
 
-(defvar f90-ts-indent-rules-interface
+(defvar f90-ts--indent-rules-interface
   (f90-ts--with-map-rules
    ;; (abstract) interface bodies
    ((node-is    "end_interface_statement") parent 0)
@@ -4086,7 +4086,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for interface blocks.")
 
 
-(defvar f90-ts-indent-rules-dtype-enum
+(defvar f90-ts--indent-rules-dtype-enum
   (f90-ts--with-map-rules
    ;; derived type definitions
    ((n-p-gp       "end_type_statement"      "derived_type_definition" nil)                      parent 0)
@@ -4103,7 +4103,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for derived type and enumeration type statements.")
 
 
-(defvar f90-ts-indent-rules-if
+(defvar f90-ts--indent-rules-if
   (f90-ts--with-map-rules
    ;; if-then-else statements
    ;; this must be first, as its parent is an if-statement
@@ -4135,7 +4135,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for if-then-else statements.")
 
 
-(defvar f90-ts-indent-rules-where
+(defvar f90-ts--indent-rules-where
   (f90-ts--with-map-rules
    ;; where-elsewhere statements
    ((n-p-gp     "end_where_statement" "where_statement"  nil)         parent 0)
@@ -4156,7 +4156,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for else-elsewhere statements.")
 
 
-(defvar f90-ts-indent-rules-single-region
+(defvar f90-ts--indent-rules-single-region
   (f90-ts--with-map-rules
    ;; structures with a single region block and linear execution
    ((n-p-gp     "end_do_loop" "do_loop" nil)  parent 0)
@@ -4179,7 +4179,7 @@ and in case of ERROR nodes with incomplete code.")
 These are do loops, block statements, associate construct and forall statements.")
 
 
-(defvar f90-ts-indent-rules-select
+(defvar f90-ts--indent-rules-select
   (f90-ts--with-map-rules
    ;; control statements
    ((n-p-gp     "end_select_statement" "select_case_statement" nil)              parent 0)
@@ -4210,7 +4210,7 @@ These are do loops, block statements, associate construct and forall statements.
   "Indentation rules for select statements (case and type).")
 
 
-(defvar f90-ts-indent-rules-coarray
+(defvar f90-ts--indent-rules-coarray
   (f90-ts--with-map-rules
    ;; structures with a single region block and linear execution
    ((n-p-gp     "end_coarray_critical_statement" "coarray_critical_statement" nil)        parent 0)
@@ -4223,7 +4223,7 @@ These are do loops, block statements, associate construct and forall statements.
   "Indentation rules for coarray statements.")
 
 
-(defvar f90-ts-indent-rules-catch-all
+(defvar f90-ts--indent-rules-catch-all
   (f90-ts--with-map-rules
    ;; final catch-all rule
    ;;(log-state "catch all")
@@ -4233,22 +4233,22 @@ These are do loops, block statements, associate construct and forall statements.
 
 (defvar f90-ts-indent-rules
   `((fortran
-     ,@f90-ts-indent-rules-start
-     ,@f90-ts-indent-rules-preproc
-     ,@f90-ts-indent-rules-comments
-     ,@f90-ts-indent-rules-continued
-     ,@f90-ts-indent-rules-internal-proc
-     ,@f90-ts-indent-rules-prog-mod
-     ,@f90-ts-indent-rules-function
-     ,@f90-ts-indent-rules-translation-unit
-     ,@f90-ts-indent-rules-interface
-     ,@f90-ts-indent-rules-dtype-enum
-     ,@f90-ts-indent-rules-if
-     ,@f90-ts-indent-rules-where
-     ,@f90-ts-indent-rules-single-region
-     ,@f90-ts-indent-rules-select
-     ,@f90-ts-indent-rules-coarray
-     ,@f90-ts-indent-rules-catch-all))
+     ,@f90-ts--indent-rules-start
+     ,@f90-ts--indent-rules-preproc
+     ,@f90-ts--indent-rules-comments
+     ,@f90-ts--indent-rules-continued
+     ,@f90-ts--indent-rules-internal-proc
+     ,@f90-ts--indent-rules-prog-mod
+     ,@f90-ts--indent-rules-function
+     ,@f90-ts--indent-rules-translation-unit
+     ,@f90-ts--indent-rules-interface
+     ,@f90-ts--indent-rules-dtype-enum
+     ,@f90-ts--indent-rules-if
+     ,@f90-ts--indent-rules-where
+     ,@f90-ts--indent-rules-single-region
+     ,@f90-ts--indent-rules-select
+     ,@f90-ts--indent-rules-coarray
+     ,@f90-ts--indent-rules-catch-all))
   "List of all indentation rules in its proper sequence.")
 
 
