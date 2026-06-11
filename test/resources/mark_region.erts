@@ -3,23 +3,6 @@ Point-Char: |
 Code:
   (lambda ()
     (f90-ts-mode)
-    (let ((f90-ts-mark-region-order 'start))
-      (f90-ts-mode-test--modify-region #'f90-ts-mark-region-enlarge)))
-
-Name: mark extend enlarge region 3
-=-=
-subroutine sub_ext_3()
-  @print *,'hello'|
-end subroutine sub_ext_3
-=-=
-|subroutine sub_ext_3()
-  print *,'hello'
-end subroutine sub_ext_3@
-=-=-=
-
-Code:
-  (lambda ()
-    (f90-ts-mode)
     (f90-ts-mode-test--mark-region #'f90-ts-mark-region-enlarge))
 
 Name: mark initial enlarge region 1
@@ -166,21 +149,71 @@ subroutine sub_ext_2()
 end subroutine sub_ext_2
 =-=-=
 
+Name: mark extend enlarge region 3
+=-=
+subroutine sub_ext_3()
+     ! comment A
+     !!$ comment 1: text1
+     !!$            text2
+     @!!$|
+     !!$ comment 2
+
+     !!$
+     !!$ comment 3
+     !!$ comment 4
+     !!$
+     ! comment Z
+end subroutine sub_ext_3
+=-=
+subroutine sub_ext_3()
+     ! comment A
+     @!!$ comment 1: text1
+     !!$            text2
+     !!$
+     !!$ comment 2
+
+     !!$
+     !!$ comment 3
+     !!$ comment 4
+     !!$|
+     ! comment Z
+end subroutine sub_ext_3
+=-=-=
+
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-mark-region-order 'start))
+      (f90-ts-mode-test--modify-region #'f90-ts-mark-region-enlarge)))
+
+Name: mark extend enlarge region 5
+=-=
+subroutine sub_ext_4()
+  @print *,'hello'|
+end subroutine sub_ext_4
+=-=
+|subroutine sub_ext_4()
+  print *,'hello'
+end subroutine sub_ext_4@
+=-=-=
+
+
 Code:
   (lambda ()
     (f90-ts-mode)
     (let ((f90-ts-mark-region-order 'preserve))
       (f90-ts-mode-test--modify-region #'f90-ts-mark-region-enlarge)))
 
-Name: mark extend enlarge region 4
+Name: mark extend enlarge region 5
 =-=
-subroutine sub_ext_4()
+subroutine sub_ext_5()
   |print *,'hello'@
-end subroutine sub_ext_4
+end subroutine sub_ext_5
 =-=
-|subroutine sub_ext_4()
+|subroutine sub_ext_5()
   print *,'hello'
-end subroutine sub_ext_4@
+end subroutine sub_ext_5@
 =-=-=
 
 Code:

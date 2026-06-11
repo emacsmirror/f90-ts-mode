@@ -31,6 +31,13 @@
 ;; f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer) source
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
+;; Recently changed, added or improved:
+;;   [06-2026] Trailing blank part "\\(\\s-+\\|$\\)" in defcustom regexps
+;;             `f90-ts-comment-prefix-regexp' and `f90-ts-openmp-prefix-regexp'
+;;             has been removed from the defcustom definitions and is now
+;;             always appended internally.  If these variables have been
+;;             customized, please adjust.
+;;
 ;; Features:
 ;;   - Almost all statements up to F2023
 ;;   - Syntax highlighting
@@ -462,7 +469,7 @@ For matching identifiers the face `f90-ts-font-lock-special-var' is used."
   :group 'f90-ts)
 
 
-(defcustom f90-ts-comment-prefix-regexp "!\\S-*\\(\\s-+\\|$\\)"
+(defcustom f90-ts-comment-prefix-regexp "!\\S-*"
   "Regular expression for matching and capturing comment starts.
 This is used to extract the comment prefix for `f90-ts-break-line',
 `f90-ts-join-line-prev' and `f90-ts-join-line-next' operations.
@@ -494,10 +501,10 @@ in the string."
 
 
 (defcustom f90-ts-comment-prefix-keep-indent t
-  "Keep indentation in commen region operation when inserting comment prefix.
+  "Keep indentation in comment region operation when inserting comment prefix.
 If nil, just insert the prefix.  If non-nil, remove blanks up to length of
-prefix before commented command starts.  The preserves the original
-indentation."
+prefix before commented command starts.  This preserves the original
+indentation if possible."
   :type  'boolean
   :safe  #'booleanp
   :group 'f90-ts)
@@ -516,7 +523,7 @@ defaulting to end of region if there is no active region present."
   :group 'f90-ts)
 
 
-(defcustom f90-ts-openmp-prefix-regexp "!\\$\\(?:omp\\)?\\(\\s-+\\|$\\)"
+(defcustom f90-ts-openmp-prefix-regexp "!\\$\\(?:omp\\)?"
   "Regular expression for matching OpenMP starts.
 This is used for line break operations, as openmp statements require
 continuation symbols.
@@ -886,17 +893,25 @@ is matched by TYPE-RX."
        (= end (treesit-node-end node))))
 
 
-(defun f90-ts--comment-prefix (node)
+(defun f90-ts--comment-prefix (node trim)
   "Extract the starting character sequence from a comment NODE.
 NODE is assumed to be of type comment.  It uses `f90-ts-openmp-prefix-regexp'
-and `f90-ts-comment-prefix-regexp' to identify the prefix to extract."
+and `f90-ts-comment-prefix-regexp' to identify the prefix to extract.
+If TRIM is `with-blanks', trailing blanks are included in the returned prefix.
+If TRIM is `trimmed', only the matched prefix is returned."
   (cl-assert (f90-ts--node-type-p node "comment")
              nil "comment-prefix: comment node expected")
+  (cl-assert (memq trim '(with-blanks trimmed)) nil "argument trim has invalid value, got %s" trim)
+
   ;; first match openmp as comment prefix would just take the initial ! and ignoring
   ;; following $omp part in openmp statements
-  (let ((rx-comment (concat "^\\(?:" f90-ts-openmp-prefix-regexp "\\)\\|\\(?:" f90-ts-comment-prefix-regexp "\\)")))
-    (when (string-match rx-comment (treesit-node-text node))
-      (match-string 0 (treesit-node-text node)))))
+  (let* ((text (treesit-node-text node))
+         (rx-comment (concat "^\\(\\(?:" f90-ts-openmp-prefix-regexp "\\)\\|\\(?:"
+                             f90-ts-comment-prefix-regexp "\\)\\)\\(\\s-+\\|$\\)")))
+    (when (string-match rx-comment text)
+      (if (eq trim 'with-blanks)
+          (match-string 0 text)
+        (match-string 1 text)))))
 
 
 (defun f90-ts-special-var-p (node)
@@ -914,7 +929,7 @@ Note that the parse uses identifier not just for variables, but for types etc."
 (defun f90-ts-openmp-node-p (node)
   "Check if NODE is a comment node and has a OpenMP comment prefix."
   (when (f90-ts--node-type-p node "comment")
-    (string-match-p (concat "^" f90-ts-openmp-prefix-regexp)
+    (string-match-p (concat "^" f90-ts-openmp-prefix-regexp "\\(\\s-+\\|$\\)")
                     (treesit-node-text node))))
 
 
@@ -5047,14 +5062,14 @@ The variant to be used can be customized.  Intended for use in key bindings."
     ;; looks like a comment, but starting with special "!$" sequence,
     ;; breaking openmp lines requires a continuation symbol
     (let* ((node (treesit-node-at (point)))
-           (prefix (f90-ts--comment-prefix node)))
+           (prefix (f90-ts--comment-prefix node 'with-blanks)))
       (delete-horizontal-space)
       (f90-ts--break-line-insert-amp-at-end)
       (insert "\n" prefix)))
 
    ((f90-ts-in-comment-p)
     (let* ((node (treesit-node-at (point)))
-           (prefix (f90-ts--comment-prefix node)))
+           (prefix (f90-ts--comment-prefix node 'with-blanks)))
       (delete-horizontal-space)
       (insert "\n" prefix)))
 
@@ -5135,16 +5150,17 @@ deleting intermediate empty lines or if nothing can be joined."
 
          ((and is-comment-1st
                is-comment-2nd
-               (string= (f90-ts--comment-prefix first)
-                        (f90-ts--comment-prefix secnd)))
+               (string= (f90-ts--comment-prefix first 'trimmed)
+                        (f90-ts--comment-prefix secnd 'trimmed)))
           ;; two comments with same comment prefix, join comments
           (list (save-excursion
-                  ;; if the comment has trailing blanks, we need to remove them
+                  ;; if the first comment has trailing blanks, remove them
                   (goto-char (treesit-node-end first))
                   (skip-chars-backward "[ \t]")
                   (point))
                 (+ (treesit-node-start secnd)
-                   (length (f90-ts--comment-prefix secnd)))
+                   ;; if the second has leading blanks, remove them
+                   (length (f90-ts--comment-prefix secnd 'with-blanks)))
                 (lambda () (insert " "))))
 
          ((and (null is-comment-1st)
@@ -5396,8 +5412,8 @@ Currently this predicate groups comment nodes sharing the same comment prefix."
   (or (treesit-node-eq node1 node2)
       (and (f90-ts--node-type-p node1 "comment")
            (f90-ts--node-type-p node2 "comment")
-           (equal (f90-ts--comment-prefix node1)
-                  (f90-ts--comment-prefix node2)))))
+           (string= (f90-ts--comment-prefix node1 'trimmed)
+                    (f90-ts--comment-prefix node2 'trimmed)))))
 
 
 (defun f90-ts--group-block-extent (node)

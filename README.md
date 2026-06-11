@@ -34,6 +34,15 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Navigation (defun, things, Xref, side panel tree)
 
 
+### Recently added, changed or improved
+
+**06-2026**
+ - Trailing blank part `\\(\\s-+\\|$\\)` in defcustom regexps
+   `f90-ts-comment-prefix-regexp` and `f90-ts-openmp-prefix-regexp` has
+   been removed from the defcustom definitions and is now always appended
+   internally. If these variables have been customized, please adjust.
+
+
 ## Keybindings
 
 The mode provides direct keybindings for the most frequent operations like indentation with `TAB`
