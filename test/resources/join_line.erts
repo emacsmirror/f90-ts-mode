@@ -206,6 +206,61 @@ subroutine sub_1()
 end subroutine sub_1
 =-=-=
 
+Name: join prev statement 15
+=-=
+subroutine sub_same_prefix()
+     !!$ comment A
+|     !!$        B
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     !!$ comment A |B
+end subroutine sub_same_prefix
+=-=-=
+
+Name: join prev statement 16
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in second comment
+     !!$ comment A
+|     !!$     
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in second comment
+     !!$ comment A |
+end subroutine sub_same_prefix
+=-=-=
+
+Name: join prev statement 17
+=-=
+subroutine sub_same_prefix()
+     ! without trailing blanks in second comment
+     !!$ comment A
+|     !!$
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     ! without trailing blanks in second comment
+     !!$ comment A |
+end subroutine sub_same_prefix
+=-=-=
+
+Name: join prev statement 18
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in first comment
+     !!$     
+     !!$ comment A|
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in first comment
+     !!$ |comment A
+end subroutine sub_same_prefix
+=-=-=
+
+
 Name: join prev string 1
 =-=
 subroutine str1()
@@ -561,6 +616,60 @@ subroutine sub()
 end subroutine sub
 =-=-=
 
+Name: join next statement 15
+=-=
+subroutine sub_same_prefix()
+|     !!$ comment A
+     !!$        B
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     !!$ comment A |B
+end subroutine sub_same_prefix
+=-=-=
+
+Name: join next statement 16
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in second comment
+     !!$ comment A|
+     !!$     
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in second comment
+     !!$ comment A |
+end subroutine sub_same_prefix
+=-=-=
+
+Name: join next statement 17
+=-=
+subroutine sub_same_prefix()
+     ! without trailing blanks in second comment
+     !!$ comment A|
+     !!$
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     ! without trailing blanks in second comment
+     !!$ comment A |
+end subroutine sub_same_prefix
+=-=-=
+
+
+Name: join next statement 18
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in first comment
+     !!$|     
+     !!$ comment A
+end subroutine sub_same_prefix
+=-=
+subroutine sub_same_prefix()
+     ! with trailing blanks in first comment
+     !!$ |comment A
+end subroutine sub_same_prefix
+=-=-=
 
 Name: join next string 1
 =-=

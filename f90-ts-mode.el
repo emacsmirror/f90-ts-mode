@@ -31,6 +31,13 @@
 ;; f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer) source
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
+;; Recently changed, added or improved:
+;;   [06-2026] Trailing blank part "\\(\\s-+\\|$\\)" in defcustom regexps
+;;             `f90-ts-comment-prefix-regexp' and `f90-ts-openmp-prefix-regexp'
+;;             has been removed from the defcustom definitions and is now
+;;             always appended internally.  If these variables have been
+;;             customized, please adjust.
+;;
 ;; Features:
 ;;   - Almost all statements up to F2023
 ;;   - Syntax highlighting
@@ -306,6 +313,9 @@ Value is a list of the form (TYPE VALUE) where TYPE is either:
                  (cons :tag "Indent offset"
                        (const :tag "" :format "" indent)
                        (integer :tag "Offset to first line")))
+  :safe (lambda (v) (and (consp v)
+                         (memq (car v) '(column indent))
+                         (integerp (cdr v))))
   :group 'f90-ts)
 
 
@@ -321,6 +331,9 @@ With `left', the label's first digit starts on COLUMN (left-adjusted)."
            (const :tag "Right-adjusted (last digit at column)" right)
            (const :tag "Left-adjusted  (first digit at column)" left))
           (integer :tag "Column (0-based)"))
+  :safe (lambda (v) (and (consp v)
+                         (memq (car v) '(right left))
+                         (integerp (cdr v))))
   :group 'f90-ts)
 
 
@@ -396,6 +409,7 @@ Special comments such as separators are determined by rules in
 (defcustom f90-ts-nav-buffer-auto-sync t
   "If non-nil the point in the nav buffer follows point in the source buffer."
   :type 'boolean
+  :safe  #'booleanp
   :group 'f90-ts-nav)
 
 
@@ -455,7 +469,7 @@ For matching identifiers the face `f90-ts-font-lock-special-var' is used."
   :group 'f90-ts)
 
 
-(defcustom f90-ts-comment-prefix-regexp "!\\S-*\\(\\s-+\\|$\\)"
+(defcustom f90-ts-comment-prefix-regexp "!\\S-*"
   "Regular expression for matching and capturing comment starts.
 This is used to extract the comment prefix for `f90-ts-break-line',
 `f90-ts-join-line-prev' and `f90-ts-join-line-next' operations.
@@ -473,6 +487,7 @@ preserve indentation within comments with `f90-ts-break-line'."
 Trailing blank(s) are not inserted automatically, but can be provided
 in the string."
   :type  'string
+  :safe  #'stringp
   :group 'f90-ts)
 
 
@@ -481,15 +496,17 @@ in the string."
 Trailing blank(s) are not inserted automatically, but can be provided
 in the string."
   :type  '(repeat string)
+  :safe (lambda (v) (and (listp v) (cl-every #'stringp v)))
   :group 'f90-ts)
 
 
 (defcustom f90-ts-comment-prefix-keep-indent t
-  "Keep indentation in commen region operation when inserting comment prefix.
+  "Keep indentation in comment region operation when inserting comment prefix.
 If nil, just insert the prefix.  If non-nil, remove blanks up to length of
-prefix before commented command starts.  The preserves the original
-indentation."
+prefix before commented command starts.  This preserves the original
+indentation if possible."
   :type  'boolean
+  :safe  #'booleanp
   :group 'f90-ts)
 
 
@@ -506,7 +523,7 @@ defaulting to end of region if there is no active region present."
   :group 'f90-ts)
 
 
-(defcustom f90-ts-openmp-prefix-regexp "!\\$\\(?:omp\\)?\\(\\s-+\\|$\\)"
+(defcustom f90-ts-openmp-prefix-regexp "!\\$\\(?:omp\\)?"
   "Regular expression for matching OpenMP starts.
 This is used for line break operations, as openmp statements require
 continuation symbols.
@@ -523,6 +540,7 @@ The matched part of the comment is highlighted with `font-lock-warning-face'.
 Set to nil to disable keyword highlighting in comments."
   :type '(choice (const :tag "Disabled" nil)
                  (regexp :tag "Regexp"))
+  :safe (lambda (v) (or (null v) (stringp v)))
   :group 'f90-ts)
 
 
@@ -603,6 +621,17 @@ seem to make much sense."
                         (const :tag "f90-ts-font-lock-openmp-face"
                                f90-ts-font-lock-openmp-face)
                         (face :tag "other face"))))
+  :safe (lambda (v)
+          (and (listp v)
+               (cl-every (lambda (rule)
+                            (and (listp rule)
+                                 (stringp (plist-get rule :name))
+                                 (or (stringp (plist-get rule :match))
+                                     (functionp (plist-get rule :match)))
+                                 (memq (plist-get rule :indent)
+                                       '(column-0 context indented))
+                                 (symbolp (plist-get rule :face))))
+                          v)))
   :group 'f90-ts)
 
 
@@ -864,17 +893,25 @@ is matched by TYPE-RX."
        (= end (treesit-node-end node))))
 
 
-(defun f90-ts--comment-prefix (node)
+(defun f90-ts--comment-prefix (node trim)
   "Extract the starting character sequence from a comment NODE.
 NODE is assumed to be of type comment.  It uses `f90-ts-openmp-prefix-regexp'
-and `f90-ts-comment-prefix-regexp' to identify the prefix to extract."
+and `f90-ts-comment-prefix-regexp' to identify the prefix to extract.
+If TRIM is `with-blanks', trailing blanks are included in the returned prefix.
+If TRIM is `trimmed', only the matched prefix is returned."
   (cl-assert (f90-ts--node-type-p node "comment")
              nil "comment-prefix: comment node expected")
+  (cl-assert (memq trim '(with-blanks trimmed)) nil "argument trim has invalid value, got %s" trim)
+
   ;; first match openmp as comment prefix would just take the initial ! and ignoring
   ;; following $omp part in openmp statements
-  (let ((rx-comment (concat "^\\(?:" f90-ts-openmp-prefix-regexp "\\)\\|\\(?:" f90-ts-comment-prefix-regexp "\\)")))
-    (when (string-match rx-comment (treesit-node-text node))
-      (match-string 0 (treesit-node-text node)))))
+  (let* ((text (treesit-node-text node))
+         (rx-comment (concat "^\\(\\(?:" f90-ts-openmp-prefix-regexp "\\)\\|\\(?:"
+                             f90-ts-comment-prefix-regexp "\\)\\)\\(\\s-+\\|$\\)")))
+    (when (string-match rx-comment text)
+      (if (eq trim 'with-blanks)
+          (match-string 0 text)
+        (match-string 1 text)))))
 
 
 (defun f90-ts-special-var-p (node)
@@ -892,7 +929,7 @@ Note that the parse uses identifier not just for variables, but for types etc."
 (defun f90-ts-openmp-node-p (node)
   "Check if NODE is a comment node and has a OpenMP comment prefix."
   (when (f90-ts--node-type-p node "comment")
-    (string-match-p (concat "^" f90-ts-openmp-prefix-regexp)
+    (string-match-p (concat "^" f90-ts-openmp-prefix-regexp "\\(\\s-+\\|$\\)")
                     (treesit-node-text node))))
 
 
@@ -3923,7 +3960,7 @@ triple ((f90-ts-log-indent-print-state MSG) parent 0) directly."
 ;;++++++++++++++
 ;; simple indentation rules
 
-(defvar f90-ts-indent-rules-start
+(defvar f90-ts--indent-rules-start
   (f90-ts--with-map-rules
    ;; populate cache and then always fail
    (populate-cache parent 0)
@@ -3934,7 +3971,7 @@ triple ((f90-ts-log-indent-print-state MSG) parent 0) directly."
 The main purpose is to fill the indentation cache for a new run.")
 
 
-(defvar f90-ts-indent-rules-comments
+(defvar f90-ts--indent-rules-comments
   (f90-ts--with-map-rules
    ;; there are special comments in `f90-ts-special-comment-rules',
    ;; distinguish between default and these special comments
@@ -3958,7 +3995,7 @@ The main purpose is to fill the indentation cache for a new run.")
   "Indentation rules for comments (excluding OpenMP statements).")
 
 
-(defvar f90-ts-indent-rules-preproc
+(defvar f90-ts--indent-rules-preproc
   (f90-ts--with-map-rules
    ;; indent preprocessor directive.
    ;; directive itself: no indent
@@ -3970,7 +4007,7 @@ The main purpose is to fill the indentation cache for a new run.")
   "Indentation rules for preprocessor directives.")
 
 
-(defvar f90-ts-indent-rules-continued
+(defvar f90-ts--indent-rules-continued
   (f90-ts--with-map-rules
    ;; handle continued lines
    ;; if on first line of a continued statement, reset the continued-line cache
@@ -3991,7 +4028,7 @@ The main purpose is to fill the indentation cache for a new run.")
   "Indentation rules for continued lines.")
 
 
-(defvar f90-ts-indent-rules-internal-proc
+(defvar f90-ts--indent-rules-internal-proc
   (f90-ts--with-map-rules
    ;; contains statements in modules, programs, subroutines or functions,
    ;; no indentation for contains
@@ -4002,7 +4039,7 @@ The main purpose is to fill the indentation cache for a new run.")
 This node occurs in conjunction with \"contain\" statements.")
 
 
-(defvar f90-ts-indent-rules-prog-mod
+(defvar f90-ts--indent-rules-prog-mod
   (f90-ts--with-map-rules
    ;; program or module interface part (before contains) and end statement
    ;; in all cases: first match node with end_xyz_statement, and then only
@@ -4023,7 +4060,7 @@ This node occurs in conjunction with \"contain\" statements.")
   "Indentation rules for program and module nodes.")
 
 
-(defvar f90-ts-indent-rules-function
+(defvar f90-ts--indent-rules-function
   (f90-ts--with-map-rules
    ;; functions and subroutine bodies
    ((node-is    "end_subroutine_statement")       parent 0)
@@ -4038,7 +4075,7 @@ This node occurs in conjunction with \"contain\" statements.")
   "Indentation rules for functions and subroutines.")
 
 
-(defvar f90-ts-indent-rules-translation-unit
+(defvar f90-ts--indent-rules-translation-unit
   (f90-ts--with-map-rules
    ;; statements related to toplevel subroutine or function statements,
    ;; and ERROR cases (might or might not be toplevel)
@@ -4055,7 +4092,7 @@ These occur for functions and subroutines not within a \"contains\" section,
 and in case of ERROR nodes with incomplete code.")
 
 
-(defvar f90-ts-indent-rules-interface
+(defvar f90-ts--indent-rules-interface
   (f90-ts--with-map-rules
    ;; (abstract) interface bodies
    ((node-is    "end_interface_statement") parent 0)
@@ -4064,7 +4101,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for interface blocks.")
 
 
-(defvar f90-ts-indent-rules-dtype-enum
+(defvar f90-ts--indent-rules-dtype-enum
   (f90-ts--with-map-rules
    ;; derived type definitions
    ((n-p-gp       "end_type_statement"      "derived_type_definition" nil)                      parent 0)
@@ -4081,7 +4118,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for derived type and enumeration type statements.")
 
 
-(defvar f90-ts-indent-rules-if
+(defvar f90-ts--indent-rules-if
   (f90-ts--with-map-rules
    ;; if-then-else statements
    ;; this must be first, as its parent is an if-statement
@@ -4113,7 +4150,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for if-then-else statements.")
 
 
-(defvar f90-ts-indent-rules-where
+(defvar f90-ts--indent-rules-where
   (f90-ts--with-map-rules
    ;; where-elsewhere statements
    ((n-p-gp     "end_where_statement" "where_statement"  nil)         parent 0)
@@ -4134,7 +4171,7 @@ and in case of ERROR nodes with incomplete code.")
   "Indentation rules for else-elsewhere statements.")
 
 
-(defvar f90-ts-indent-rules-single-region
+(defvar f90-ts--indent-rules-single-region
   (f90-ts--with-map-rules
    ;; structures with a single region block and linear execution
    ((n-p-gp     "end_do_loop" "do_loop" nil)  parent 0)
@@ -4157,7 +4194,7 @@ and in case of ERROR nodes with incomplete code.")
 These are do loops, block statements, associate construct and forall statements.")
 
 
-(defvar f90-ts-indent-rules-select
+(defvar f90-ts--indent-rules-select
   (f90-ts--with-map-rules
    ;; control statements
    ((n-p-gp     "end_select_statement" "select_case_statement" nil)              parent 0)
@@ -4188,7 +4225,7 @@ These are do loops, block statements, associate construct and forall statements.
   "Indentation rules for select statements (case and type).")
 
 
-(defvar f90-ts-indent-rules-coarray
+(defvar f90-ts--indent-rules-coarray
   (f90-ts--with-map-rules
    ;; structures with a single region block and linear execution
    ((n-p-gp     "end_coarray_critical_statement" "coarray_critical_statement" nil)        parent 0)
@@ -4201,7 +4238,7 @@ These are do loops, block statements, associate construct and forall statements.
   "Indentation rules for coarray statements.")
 
 
-(defvar f90-ts-indent-rules-catch-all
+(defvar f90-ts--indent-rules-catch-all
   (f90-ts--with-map-rules
    ;; final catch-all rule
    ;;(log-state "catch all")
@@ -4211,22 +4248,22 @@ These are do loops, block statements, associate construct and forall statements.
 
 (defvar f90-ts-indent-rules
   `((fortran
-     ,@f90-ts-indent-rules-start
-     ,@f90-ts-indent-rules-preproc
-     ,@f90-ts-indent-rules-comments
-     ,@f90-ts-indent-rules-continued
-     ,@f90-ts-indent-rules-internal-proc
-     ,@f90-ts-indent-rules-prog-mod
-     ,@f90-ts-indent-rules-function
-     ,@f90-ts-indent-rules-translation-unit
-     ,@f90-ts-indent-rules-interface
-     ,@f90-ts-indent-rules-dtype-enum
-     ,@f90-ts-indent-rules-if
-     ,@f90-ts-indent-rules-where
-     ,@f90-ts-indent-rules-single-region
-     ,@f90-ts-indent-rules-select
-     ,@f90-ts-indent-rules-coarray
-     ,@f90-ts-indent-rules-catch-all))
+     ,@f90-ts--indent-rules-start
+     ,@f90-ts--indent-rules-preproc
+     ,@f90-ts--indent-rules-comments
+     ,@f90-ts--indent-rules-continued
+     ,@f90-ts--indent-rules-internal-proc
+     ,@f90-ts--indent-rules-prog-mod
+     ,@f90-ts--indent-rules-function
+     ,@f90-ts--indent-rules-translation-unit
+     ,@f90-ts--indent-rules-interface
+     ,@f90-ts--indent-rules-dtype-enum
+     ,@f90-ts--indent-rules-if
+     ,@f90-ts--indent-rules-where
+     ,@f90-ts--indent-rules-single-region
+     ,@f90-ts--indent-rules-select
+     ,@f90-ts--indent-rules-coarray
+     ,@f90-ts--indent-rules-catch-all))
   "List of all indentation rules in its proper sequence.")
 
 
@@ -5025,14 +5062,14 @@ The variant to be used can be customized.  Intended for use in key bindings."
     ;; looks like a comment, but starting with special "!$" sequence,
     ;; breaking openmp lines requires a continuation symbol
     (let* ((node (treesit-node-at (point)))
-           (prefix (f90-ts--comment-prefix node)))
+           (prefix (f90-ts--comment-prefix node 'with-blanks)))
       (delete-horizontal-space)
       (f90-ts--break-line-insert-amp-at-end)
       (insert "\n" prefix)))
 
    ((f90-ts-in-comment-p)
     (let* ((node (treesit-node-at (point)))
-           (prefix (f90-ts--comment-prefix node)))
+           (prefix (f90-ts--comment-prefix node 'with-blanks)))
       (delete-horizontal-space)
       (insert "\n" prefix)))
 
@@ -5113,16 +5150,17 @@ deleting intermediate empty lines or if nothing can be joined."
 
          ((and is-comment-1st
                is-comment-2nd
-               (string= (f90-ts--comment-prefix first)
-                        (f90-ts--comment-prefix secnd)))
+               (string= (f90-ts--comment-prefix first 'trimmed)
+                        (f90-ts--comment-prefix secnd 'trimmed)))
           ;; two comments with same comment prefix, join comments
           (list (save-excursion
-                  ;; if the comment has trailing blanks, we need to remove them
+                  ;; if the first comment has trailing blanks, remove them
                   (goto-char (treesit-node-end first))
                   (skip-chars-backward "[ \t]")
                   (point))
                 (+ (treesit-node-start secnd)
-                   (length (f90-ts--comment-prefix secnd)))
+                   ;; if the second has leading blanks, remove them
+                   (length (f90-ts--comment-prefix secnd 'with-blanks)))
                 (lambda () (insert " "))))
 
          ((and (null is-comment-1st)
@@ -5374,8 +5412,8 @@ Currently this predicate groups comment nodes sharing the same comment prefix."
   (or (treesit-node-eq node1 node2)
       (and (f90-ts--node-type-p node1 "comment")
            (f90-ts--node-type-p node2 "comment")
-           (equal (f90-ts--comment-prefix node1)
-                  (f90-ts--comment-prefix node2)))))
+           (string= (f90-ts--comment-prefix node1 'trimmed)
+                    (f90-ts--comment-prefix node2 'trimmed)))))
 
 
 (defun f90-ts--group-block-extent (node)
