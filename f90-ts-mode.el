@@ -1104,12 +1104,6 @@ work with lambda expressions."
   (not (f90-ts--node-type-p node '("comment" "ERROR"))))
 
 
-(defun f90-ts-node-overlap-region-p (node start end)
-  "Return non-nil if NODE overlaps with region START END."
-  (and (< (treesit-node-start node) end)
-       (> (treesit-node-end node)   start)))
-
-
 (defconst f90-ts--node-op-expr-types
   '("logical_expression"
     "math_expression"
