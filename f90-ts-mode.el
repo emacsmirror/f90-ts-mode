@@ -1116,11 +1116,6 @@ work with lambda expressions."
   (not (f90-ts--node-type-p node "ERROR")))
 
 
-(defun f90-ts--node-not-comment-or-error-p (node)
-  "Return non-nil if NODE is not of type comment or error."
-  (not (f90-ts--node-type-p node '("comment" "ERROR"))))
-
-
 (defun f90-ts--node-not-comment-or-preproc-p (node)
   "Return non-nil if NODE is not of type comment or a preproc NODE."
   (and (f90-ts--node-not-comment-p node)
@@ -1312,9 +1307,10 @@ Finally return the leaf node at the start of the line.  Follow continued
 lines to first line of continued statement.
 
 Ignore nodes which do not satisfy the predicate
-`f90-ts--node-not-comment-or-error-p' during ascend or descend,
-for example comment nodes."
-  (let* ((predicate #'f90-ts--node-not-comment-or-error-p)
+`f90-ts--node-not-comment-error-preproc-p' during ascend or descend.
+For ascend, it suffices to ignore errors, but for descend we also need to
+exclude comment and preprocessor nodes in `f90-ts--before-child'."
+  (let* ((predicate #'f90-ts--node-not-comment-error-preproc-p)
          ;; ascend until a previous ancestor is found
          (prev-sib-of-anc
           (cl-loop for ancestor = node then (treesit-node-parent ancestor)
