@@ -887,13 +887,13 @@ is matched by TYPE-RX."
              (string-match-p type-rx type-n)))))
 
 
-(defun f90-ts--node-same-span-p (node1 node2)
+(defun f90-ts--nodes-same-span-p (node1 node2)
   "Return non-nil if NODE1 and NODE2 have the same span."
   (and (= (treesit-node-start node1) (treesit-node-start node2))
        (= (treesit-node-end node1)   (treesit-node-end node2))))
 
 
-(defun f90-ts--node-has-span-p (node beg end)
+(defun f90-ts--node-span-p (node beg end)
   "Return non-nil if NODE has the span BEG..END."
   (and (= beg (treesit-node-start node))
        (= end (treesit-node-end node))))
@@ -920,7 +920,7 @@ If TRIM is `trimmed', only the matched prefix is returned."
         (match-string 1 text)))))
 
 
-(defun f90-ts-special-var-p (node)
+(defun f90-ts--node-special-var-p (node)
   "Check if NODE is an identifier and matches the special variable regexp.
 Note that the parse uses identifier not just for variables, but for types etc."
   (when (f90-ts--node-type-p node "identifier")
@@ -932,14 +932,14 @@ Note that the parse uses identifier not just for variables, but for types etc."
                     (treesit-node-text node))))
 
 
-(defun f90-ts-openmp-node-p (node)
+(defun f90-ts--node-openmp-p (node)
   "Check if NODE is a comment node and has a OpenMP comment prefix."
   (when (f90-ts--node-type-p node "comment")
     (string-match-p (concat "^" f90-ts-openmp-prefix-regexp "\\(\\s-+\\|$\\)")
                     (treesit-node-text node))))
 
 
-(defun f90-ts-preproc-node-p (node)
+(defun f90-ts--node-preproc-p (node)
   "Check if NODE is a preprocessor node and has the '#' prefix."
     (let ((type (treesit-node-type node)))
       (or (string-prefix-p "#" type)
@@ -1028,7 +1028,7 @@ This uses `f90-ts--preproc-block-keyword-regexp' as a regexp for the matching."
 Used with face `font-lock-builtin-face'.")
 
 
-(defun f90-ts-builtin-function-p (node)
+(defun f90-ts--builtin-function-p (node)
   "Return non-nil if NODE represents a builtin function.
 The function assumes that NODE is an identifier and only checks the text of the
 node."
@@ -1044,7 +1044,7 @@ node."
     (string-match-p rx text)))
 
 
-(defun f90-ts-in-string-p ()
+(defun f90-ts--in-string-p ()
   "Non-nil if point is inside a string."
   (when-let ((node (treesit-node-at (point))))
     (when (f90-ts--node-type-p node "string_literal")
@@ -1055,25 +1055,25 @@ node."
         (and (< start pos) (< pos end))))))
 
 
-(defun f90-ts-in-openmp-p ()
+(defun f90-ts--in-openmp-p ()
   "Non-nil if point is inside an OpenMP statement.
 OpenMP statements are parsed as comment nodes, but always start with !$.
 The grammar does not parse OpenMP currently."
   (when-let ((node (treesit-node-at (point))))
-    (when (f90-ts-openmp-node-p node)
+    (when (f90-ts--node-openmp-p node)
       (let ((start (treesit-node-start node))
             (pos (point)))
         ;; start position is the comment symbol itself
         (and (< start pos))))))
 
 
-(defun f90-ts-in-comment-p ()
+(defun f90-ts--in-comment-p ()
   "Non-nil if point is after start of comment.
 This excludes OpenMP statements, which look like comments and are currently not
 parsed by the treesitter grammar."
   (when-let ((node (treesit-node-at (point))))
     (when (and (f90-ts--node-type-p node "comment")
-               (not (f90-ts-openmp-node-p node)))
+               (not (f90-ts--node-openmp-p node)))
       (let ((start (treesit-node-start node))
             (pos (point)))
         ;; start position is the comment symbol itself
@@ -1101,7 +1101,7 @@ work with lambda expressions."
   (not (string= (treesit-node-type node) "number_literal")))
 
 
-(defun f90-ts--node-is-ampersand-p (node)
+(defun f90-ts--node-ampersand-p (node)
   "Check whether NODE is continuation symbol &."
   (f90-ts--node-type-p node "&"))
 
@@ -1109,6 +1109,11 @@ work with lambda expressions."
 (defun f90-ts--node-not-comment-p (node)
   "Return non-nil if NODE is not of type comment."
   (not (f90-ts--node-type-p node "comment")))
+
+
+(defun f90-ts--node-not-error-p (node)
+  "Return non-nil if NODE is not of type error."
+  (not (f90-ts--node-type-p node "ERROR")))
 
 
 (defun f90-ts--node-not-comment-or-error-p (node)
@@ -1119,7 +1124,14 @@ work with lambda expressions."
 (defun f90-ts--node-not-comment-or-preproc-p (node)
   "Return non-nil if NODE is not of type comment or a preproc NODE."
   (and (f90-ts--node-not-comment-p node)
-       (not (f90-ts-preproc-node-p node))))
+       (not (f90-ts--node-preproc-p node))))
+
+
+(defun f90-ts--node-not-comment-error-preproc-p (node)
+  "Return non-nil if NODE is not of type comment, error or preproc."
+  (and (f90-ts--node-not-comment-p node)
+       (f90-ts--node-not-error-p node)
+       (not (f90-ts--node-preproc-p node))))
 
 
 (defconst f90-ts--node-op-expr-types
@@ -1134,7 +1146,7 @@ expression overlap, as user defined operators are always interpreted as math
 expression, even if operating on booleans (for example: .imply.  operator).")
 
 
-(defun f90-ts--node-is-op-expr-p (node)
+(defun f90-ts--node-op-expr-p (node)
   "Return non-nil if NODE is of some expression type."
   (member (treesit-node-type node)
           f90-ts--node-op-expr-types))
@@ -1223,7 +1235,7 @@ Querying with [POS-1,POS) gives the expected answer."
          (sparse (treesit-induce-sparse-tree
                   node
                   (lambda (n) (and (treesit-node-check n 'named)
-                                   (f90-ts--node-has-span-p n beg end))))))
+                                   (f90-ts--node-span-p n beg end))))))
     ;; get the first leaf, descend the first child until a leaf is reached
     (cl-loop for current = sparse then (car (cdr current))
              while (cdr current)
@@ -1238,7 +1250,7 @@ same bounds, which is the contains_statement node."
   (treesit-parent-while
    node
    (lambda (n)
-     (f90-ts--node-same-span-p n node))))
+     (f90-ts--nodes-same-span-p n node))))
 
 
 (defun f90-ts--siblings-between (node1 node2 &optional named)
@@ -1316,7 +1328,7 @@ for example comment nodes."
                         for next = (and (> (treesit-node-child-count sib) 0)
                                         (f90-ts--before-child sib line-num predicate))
                         ;; if there is a next, continue and shift next to sib
-                        ;; with for sib=next in the first line
+                        ;; with "for sib=next" in the first cl-loop line
                         while next
                         finally return sib))))
     ;; take continuation lines into account and go to beginning of statement
@@ -1337,7 +1349,7 @@ example on empty lines)."
                         then (f90-ts--node-line pstmt-1)
            for pstmt-1 = (f90-ts--previous-stmt-first-line ancestor cur-line)
            while pstmt-1
-           when (not (f90-ts-preproc-node-p pstmt-1)) return pstmt-1))
+           when (not (f90-ts--node-preproc-p pstmt-1)) return pstmt-1))
 
 
 (defun f90-ts--previous-stmt-keyword-by-first (first)
@@ -1509,7 +1521,7 @@ ampersand node of this sequence.  FIRST is assumed to be the first node
 on its line!"
   (when-let ((nprev
               (cond
-               ((f90-ts--node-is-ampersand-p first)
+               ((f90-ts--node-ampersand-p first)
                 ;; go one step back to first ampersand or sequence
                 ;; of comments
                 (treesit-node-prev-sibling first))
@@ -1525,7 +1537,7 @@ on its line!"
     ;; then the final non-comment node is not an ampersand and we return nil
     (cl-loop for node = nprev then (treesit-node-prev-sibling node)
              while (f90-ts--node-type-p node "comment")
-             finally return (and (f90-ts--node-is-ampersand-p node)
+             finally return (and (f90-ts--node-ampersand-p node)
                                  node))))
 
 
@@ -1539,7 +1551,7 @@ by `f90-ts--last-node-line'"
   ;; no other sibling follows, we are probably at end of file
   (when (treesit-node-next-sibling last)
     (cond
-     ((f90-ts--node-is-ampersand-p last)
+     ((f90-ts--node-ampersand-p last)
       t)
 
      ((f90-ts--node-type-p last "comment")
@@ -1547,7 +1559,7 @@ by `f90-ts--last-node-line'"
       ;; but it must be on the same line
       (let ((prev (treesit-node-prev-sibling last)))
         (and prev
-             (f90-ts--node-is-ampersand-p prev)
+             (f90-ts--node-ampersand-p prev)
              (= (line-number-at-pos pos)
                 (f90-ts--node-line prev)))))
 
@@ -1821,11 +1833,11 @@ rule but not for matched keywords, which are enforced with override=t."
    :feature 'builtin
    `((call_expression
       (identifier) @font-lock-builtin-face
-      (:pred f90-ts-builtin-function-p @font-lock-builtin-face))
+      (:pred f90-ts--builtin-function-p @font-lock-builtin-face))
      (subroutine_call
       "call"
       subroutine: (identifier) @font-lock-builtin-face
-      (:pred f90-ts-builtin-function-p @font-lock-builtin-face)))))
+      (:pred f90-ts--builtin-function-p @font-lock-builtin-face)))))
 
 
 (defun f90-ts--font-lock-rules-keyword ()
@@ -2107,7 +2119,7 @@ rule but not for matched keywords, which are enforced with override=t."
    :feature 'variable
    '(
      ((identifier) @f90-ts-font-lock-special-var-face
-      (:pred f90-ts-special-var-p @f90-ts-font-lock-special-var-face)))))
+      (:pred f90-ts--node-special-var-p @f90-ts-font-lock-special-var-face)))))
 
 
 (defun f90-ts--font-lock-rules-value ()
@@ -2740,12 +2752,12 @@ line.  The first statement line itself is not matched."
 (defun f90-ts--openmp-comment-is (node _parent _bol &rest _)
   "Succeed if NODE is an OpenMP comment."
   (and (f90-ts--node-type-p node "comment")
-       (f90-ts-openmp-node-p node)))
+       (f90-ts--node-openmp-p node)))
 
 
 (defun f90-ts--preproc-node-is (node _parent _bol &rest _)
   "Succeed if NODE a fortran preprocessor statement."
-  (and node (f90-ts-preproc-node-p node)))
+  (and node (f90-ts--node-preproc-p node)))
 
 
 (defun f90-ts--preproc-at-toplevel-is (_node parent _bol &rest _)
@@ -2757,11 +2769,11 @@ node (like program, module, etc.)."
   ;;   preprocessor node.
   ;; - If that ancestor is a module or program -> toplevel indent
   (and parent
-       (f90-ts-preproc-node-p parent)
+       (f90-ts--node-preproc-p parent)
        (let ((ancestor (treesit-parent-until
                         parent
                         (lambda (n)
-                          (not (f90-ts-preproc-node-p n))))))
+                          (not (f90-ts--node-preproc-p n))))))
          (and ancestor
               (string-match-p "module\\|program"
                               (treesit-node-type ancestor))))))
@@ -3117,7 +3129,7 @@ example, for a logical/math/relational etc. expression chain like
 the function returns the outermost expression node."
   (treesit-parent-while
    node
-   #'f90-ts--node-is-op-expr-p))
+   #'f90-ts--node-op-expr-p))
 
 
 ;;++++++++++++++
@@ -3162,7 +3174,7 @@ An expression like (A and B and C) is represented as
 logical_expression(logical_expression(A and B) and C).
 The routine returns the five children A, and, B, and, C.
 It does not descend into parenthesized_expressions."
-  (if (f90-ts--node-is-op-expr-p node)
+  (if (f90-ts--node-op-expr-p node)
       (mapcan #'f90-ts--align-list-expand-op-expr
               (treesit-node-children node))
     (list node)))
@@ -3175,7 +3187,7 @@ The expression node is provided as car of CONTEXT, and the assignment or
 parenthesis node if present as cdr of CONTEXT."
   (let ((list-context (car context))
         (aux-context (cdr context)))
-    (cl-assert (f90-ts--node-is-op-expr-p list-context)
+    (cl-assert (f90-ts--node-op-expr-p list-context)
                nil
                "expected list context: some expression node, got list-context=%s"
                list-context)
@@ -3481,7 +3493,7 @@ See `f90-ts--align-list-other-paren-expr-core' for the shared logic.
 
 CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
 the align-list-other family."
-  (cl-assert (f90-ts--node-is-op-expr-p (car context))
+  (cl-assert (f90-ts--node-op-expr-p (car context))
              nil
              "align-list-other-op-expr: wrong context, expected some op-expr, got '%s'"
              (car context))
@@ -3898,9 +3910,9 @@ nil).  But we do not need to ascend further."
   (let* ((node (alist-get 'node loc))
          (line (alist-get 'line loc))
          (stmt-min
-          (or (and (f90-ts--node-is-op-expr-p node)
+          (or (and (f90-ts--node-op-expr-p node)
                    node)
-              (and (f90-ts--node-is-op-expr-p parent)
+              (and (f90-ts--node-op-expr-p parent)
                    parent)))
          ;; find root of expression
          (root-expr (and stmt-min (f90-ts--node-op-expr-chain-root stmt-min)))
@@ -3950,7 +3962,7 @@ This function return nil as second auxiliary context node."
     ;; parenthesized_expression, which are allowed within expressions,
     ;; but this is another context
     (when (and list-context
-               (not (f90-ts--node-is-op-expr-p list-context)))
+               (not (f90-ts--node-op-expr-p list-context)))
       (cons list-context nil))))
 
 
@@ -5207,10 +5219,10 @@ The variant to be used can be customized.  Intended for use in key bindings."
   "Break line at point, insert continuation marker where necessary and indent."
   (interactive "*")
   (cond
-   ((f90-ts-in-string-p)
+   ((f90-ts--in-string-p)
     (insert "&\n&"))
 
-   ((f90-ts-in-openmp-p)
+   ((f90-ts--in-openmp-p)
     ;; looks like a comment, but starting with special "!$" sequence,
     ;; breaking openmp lines requires a continuation symbol
     (let* ((node (treesit-node-at (point)))
@@ -5219,7 +5231,7 @@ The variant to be used can be customized.  Intended for use in key bindings."
       (f90-ts--break-line-insert-amp-at-end)
       (insert "\n" prefix)))
 
-   ((f90-ts-in-comment-p)
+   ((f90-ts--in-comment-p)
     (let* ((node (treesit-node-at (point)))
            (prefix (f90-ts--comment-prefix node 'with-blanks)))
       (delete-horizontal-space)
@@ -5555,7 +5567,7 @@ The node must be strictly larger than the region (BEG END)."
     (f90-ts--largest-node-same-span cover)))
 
 
-(defun f90-ts--node-same-group-p (node1 node2)
+(defun f90-ts--nodes-same-group-p (node1 node2)
   "Return non-nil if NODE1 and NODE2 belong to the same navigation group.
 
 Currently this predicate groups comment nodes sharing the same comment prefix."
@@ -5573,12 +5585,12 @@ Currently this predicate groups comment nodes sharing the same comment prefix."
   (let* ((first (cl-loop
                  for cur = node then next
                  for next = (treesit-node-prev-sibling cur)
-                 while (and next (f90-ts--node-same-group-p next node))
+                 while (and next (f90-ts--nodes-same-group-p next node))
                  finally return cur))
          (last  (cl-loop
                  for cur = node then next
                  for next = (treesit-node-next-sibling cur)
-                 while (and next (f90-ts--node-same-group-p next node))
+                 while (and next (f90-ts--nodes-same-group-p next node))
                  finally return cur)))
     (cons first last)))
 
@@ -5612,10 +5624,10 @@ nodes also belong to the same group."
        node-end
        (treesit-node-eq (treesit-node-parent node-beg)
                         (treesit-node-parent node-end))
-       (f90-ts--node-same-group-p node-beg node-end)
+       (f90-ts--nodes-same-group-p node-beg node-end)
        (cl-loop for cur = node-beg then (treesit-node-next-sibling cur t)
                 while (and cur (not (treesit-node-eq cur node-end)))
-                always (f90-ts--node-same-group-p cur node-beg))))
+                always (f90-ts--nodes-same-group-p cur node-beg))))
 
 
 (defun f90-ts--group-block-region-classify (beg end node-beg node-end)
