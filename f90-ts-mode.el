@@ -4876,38 +4876,50 @@ If INDENT-STRUCT is true, then indent the whole block with `indent-region'."
 (defmacro f90-ts--with-check-modified-line (&rest body)
   "Execute BODY, restoring unmodified status if current line is unchanged.
 
-Note: do not use symbols `modified-before' and `line-before' symbols
-in BODY."
+Note: do not use symbols starting with `wcml-'in BODY."
   (declare (indent 0))
-  `(let* ((modified-before (buffer-modified-p))
+  `(let* ((wcml-modified-before (buffer-modified-p))
+          (wcml-beg (line-beginning-position))
+          (wcml-end (line-end-position))
           (f90-ts--indent-modified-outside-line nil)
-          (line-before (unless modified-before
-                         (buffer-substring-no-properties
-                          (line-beginning-position)
-                          (line-end-position)))))
-     ,@body
-     (unless (or modified-before f90-ts--indent-modified-outside-line)
-       (when (string= line-before
-                      (buffer-substring-no-properties
-                       (line-beginning-position)
-                       (line-end-position)))
-         (restore-buffer-modified-p nil)))))
+          (wcml-line-before (unless wcml-modified-before
+                              (buffer-substring-no-properties
+                               wcml-beg wcml-end)))
+          wcml-bol-marker
+          wcml-eol-marker)
+     (unwind-protect
+         (progn
+           (setq wcml-bol-marker (copy-marker wcml-beg))
+           (setq wcml-eol-marker (copy-marker wcml-end t))
+           ,@body
+           (unless (or wcml-modified-before
+                       f90-ts--indent-modified-outside-line)
+             (when (string= wcml-line-before
+                            (buffer-substring-no-properties
+                             wcml-bol-marker wcml-eol-marker))
+               (restore-buffer-modified-p nil))))
+       (set-marker wcml-bol-marker nil)
+       (set-marker wcml-eol-marker nil))))
 
 
 (defmacro f90-ts--with-check-modified-region (beg end &rest body)
   "Execute BODY, restoring unmodified status if region BEG..END is unchanged.
 
-Note: do not use symbols `modified-before' and `region-before' symbols
-in BODY."
+Note: do not use symbols starting with `wcmr-' in BODY."
   (declare (indent 2))
-  `(let* ((modified-before (buffer-modified-p))
-          (region-before (unless modified-before
-                           (buffer-substring-no-properties ,beg ,end))))
-     ,@body
-     (unless modified-before
-       (when (string= region-before
-                      (buffer-substring-no-properties ,beg ,end))
-         (restore-buffer-modified-p nil)))))
+  `(let* ((wcmr-modified-before (buffer-modified-p))
+          (wcmr-region-before (unless wcmr-modified-before
+                                (buffer-substring-no-properties ,beg ,end)))
+          wcmr-end-marker)
+     (unwind-protect
+         (progn
+           (setq wcmr-end-marker (copy-marker ,end t))
+           ,@body
+           (unless wcmr-modified-before
+             (when (string= wcmr-region-before
+                            (buffer-substring-no-properties ,beg wcmr-end-marker))
+               (restore-buffer-modified-p nil))))
+       (set-marker wcmr-end-marker nil))))
 
 
 (defun f90-ts--indent-leading-ampersand-column ()
