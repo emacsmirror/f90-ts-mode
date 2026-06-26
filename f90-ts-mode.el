@@ -32,6 +32,9 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [09-2026]  Syntax highlighting, indentation and break/join/fill for string literals improved.
+;;              This requires a proposed (but not yet merged) tree-sitter language grammar extension.
+;;              See README.md for more details.
 ;;   [09-2026] Tested with Emacs 31.1 and tree-sitter 0.26.
 ;;
 ;;   [08-2026] `f90-ts-shift-line-break' as combined break/join function added.
@@ -69,15 +72,15 @@
 ;;   - Smart end completion
 ;;   - Configurable leading ampersand and statement label positions
 ;;   - Breaking and joining of continued lines
-;;   - Filling and rebalancing of lines or regions (with rightmost breakpoint
+;;   - Fill and rebalance operations for lines or regions (with rightmost breakpoint
 ;;     selection or interactive break and join session)
+;;   - Region selection based on tree-sitter nodes
 ;;   - (Un)commenting regions with configurable prefixes and indentation rules
 ;;   - Special comments like doc strings and separators
 ;;     (syntax highlighting and indentation options)
 ;;   - Keyword highlighting in comments (like TODO, Remark etc.)
 ;;   - OpenMP and preprocessor directives
 ;;   - Coarray keywords and statements
-;;   - Region selection based on tree-sitter nodes
 ;;   - Imenu and a Fortran menu in the menu bar
 ;;   - Navigation (defun, things, Xref, side panel tree)
 ;;
@@ -134,6 +137,9 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
+- Improve syntax highlighting, indentation and break/join/fill for string
+  literals.  This requires a proposed (but not yet merged) tree-sitter
+  language grammar extension.  See README.md for more details.
 - Tested with emacs 31.1 and tree-sitter 0.26.
 
 [08-2026]
@@ -438,6 +444,12 @@ With `left', the label's first digit starts on COLUMN (left-adjusted)."
   "Face used to highlight operators (e.g. +, -, *, /)."
   :group 'f90-ts-font-lock)
 
+
+(defface f90-ts-font-lock-escape-face
+  '((t :inherit font-lock-escape-face))
+  "Face used to highlight quotes in strings used as escape character.
+This is the first quote in double single- or double- quotes within strings."
+  :group 'f90-ts-font-lock)
 
 (defface f90-ts-font-lock-openmp-face
   '((t :inherit font-lock-preprocessor-face))
@@ -1059,6 +1071,41 @@ This is used by the Makefile to run ert tests during development."
 
 
 ;;;-----------------------------------------------------------------------------
+;;; switches for grammar variant
+
+(defvar f90-ts--string-literal-variant-cached 'unknown
+  "Cached grammar variant for string_literal of loaded fortran grammar.
+Original grammar just had a named leaf node `string_literal'.
+New grammar decomposes it into its parts and ampersand, comment and
+quote symbols.
+Value is `unknown' until first detection, then t for new and nil
+for original grammar rule.")
+
+
+(defun f90-ts--string-literal-decomposed-p ()
+  "Return non-nil if string_literal is decomposed by the Fortran grammar.
+The original grammar provided `string_literal' as a named leaf node.
+Newer grammars decompose it into its parts (with `string_literal_part',
+quotation, comment etc. as children of `string_literal').
+Result is detected once and cached for the session."
+  (when (eq f90-ts--string-literal-variant-cached 'unknown)
+    (setq f90-ts--string-literal-variant-cached
+          (condition-case nil
+              (progn
+                ;; eagerly compile a query with `string_literal_part',
+                ;; if it is unknown, this signals a `treesit-query-error',
+                ;; otherwise a `treesit-compiled-query' object is returned
+                (treesit-query-compile 'fortran '((string_literal_part) @x) t)
+                t)
+            (treesit-query-error nil)
+            (error nil)))
+    ;;(f90-ts-log-msg :grammar "discovered string literal: %s" f90-ts--string-literal-variant-cached)
+    )
+  ;; return cached value
+  f90-ts--string-literal-variant-cached)
+
+
+;;;-----------------------------------------------------------------------------
 ;;; auxiliary predicates, walk and query functions
 
 (defun f90-ts--node-line (node)
@@ -1097,6 +1144,11 @@ If NODE is non-nil, return line number at which start position is
 located, otherwise return line number of current point position."
   (or (and node (f90-ts--node-line node))
       (line-number-at-pos)))
+
+
+(defun f90-ts--node-length (node)
+  "Return length of text of NODE."
+  (- (treesit-node-end node) (treesit-node-start node)))
 
 
 (defun f90-ts--node-start-trimmed (node)
@@ -1271,7 +1323,7 @@ the text of a comment node."
 
 (defun f90-ts--match-comment-omp-prefix (text)
   "Match a comment prefix at the start of TEXT.
-Returns the prefix in the comment TEXT if matched, nil otherwise.
+Return the prefix in the comment TEXT if matched, nil otherwise.
 It uses `f90-ts--comment-omp-prefix-regexp' to capture the prefix."
   (when (string-match (f90-ts--comment-omp-prefix-regexp) text)
     (or (match-string 1 text)
@@ -1359,6 +1411,25 @@ Note that the parse uses identifier not just for variables, but for types etc."
   (when (f90-ts--node-type-p node "comment")
     (string-match-p (concat "^" f90-ts-openmp-prefix-regexp "\\(\\s-+\\|$\\)")
                     (treesit-node-text node))))
+
+
+(defun f90-ts--node-line-leading-p (node)
+  "Check whether NODE is the first node on its source line.
+It checks whether there are any non-blank characters between start of line
+and start of NODE."
+  (save-excursion
+    (goto-char (treesit-node-start node))
+    (skip-chars-backward " \t")
+    (bolp)))
+
+
+(defun f90-ts--node-leading-real-ampersand-p (node)
+  "Check whether NODE is a non-virtual ampersand at the start of its line.
+Note that leading ampersand are optional.  If missing, the grammar injects
+a virtual zero-length ampersand token."
+  (and (f90-ts--node-type-p node "&")
+       (= 1 (f90-ts--node-length node))
+       (f90-ts--node-line-leading-p node)))
 
 
 (defun f90-ts--node-block-label-ancestor (node)
@@ -1509,38 +1580,53 @@ node."
     (string-match-p rx text)))
 
 
-(defun f90-ts--in-string-p ()
-  "Non-nil if point is inside a string."
-  (when-let* ((node (treesit-node-at (point))))
-    (when (f90-ts--node-type-p node "string_literal")
-      (let ((start (treesit-node-start node))
-            (end (treesit-node-end node))
-            (pos (point)))
-        ;; start and end position are the quotation characters
-        (and (< start pos) (< pos end))))))
+;; this works for both old and new string_literal parsing rules
+(defun f90-ts--node-string (node)
+  "Return the string_literal associated to NODE or nil.
+The associated string_literal is NODE itself or a parent of this type."
+  ;; only ascend if node type is possible within a string
+  (and (f90-ts--node-type-p node '("string_literal"
+                                   "string_literal_part"
+                                   "comment"
+                                   "&"
+                                   "\""
+                                   "\\"))
+       (treesit-parent-until
+        node
+        (lambda (n) (f90-ts--node-type-p n "string_literal"))
+        t)))
 
 
-(defun f90-ts--in-openmp-p ()
-  "Non-nil if point is inside an OpenMP statement.
+;; this works for both old and new string_literal parsing rules
+(defun f90-ts--in-string-p (pos)
+  "Non-nil if POS is inside a string."
+  (when-let* ((node (treesit-node-at pos))
+              (string-node (f90-ts--node-string node)))
+    (let ((start (treesit-node-start string-node))
+          (end   (treesit-node-end   string-node)))
+      ;; start/end are the opening/closing quotation characters
+      (and (< start pos) (< pos end)))))
+
+
+(defun f90-ts--in-openmp-p (pos)
+  "Non-nil if POS is inside an OpenMP statement.
 OpenMP statements are parsed as comment nodes, but always start with !$.
 The grammar does not parse OpenMP currently."
-  (when-let* ((node (treesit-node-at (point))))
+  (when-let* ((node (treesit-node-at pos)))
     (when (f90-ts--node-openmp-p node)
-      (let ((start (treesit-node-start node))
-            (pos (point)))
+      (let ((start (treesit-node-start node)))
         ;; start position is the comment symbol itself
         (and (< start pos))))))
 
 
-(defun f90-ts--in-comment-p ()
-  "Non-nil if point is after start of comment.
+(defun f90-ts--in-comment-p (pos)
+  "Non-nil if POS is after start of comment.
 This excludes OpenMP statements, which look like comments and are currently not
 parsed by the treesitter grammar."
-  (when-let* ((node (treesit-node-at (point))))
+  (when-let* ((node (treesit-node-at pos)))
     (when (and (f90-ts--node-type-p node "comment")
                (not (f90-ts--node-openmp-p node)))
-      (let ((start (treesit-node-start node))
-            (pos (point)))
+      (let ((start (treesit-node-start node)))
         ;; start position is the comment symbol itself
         (and (< start pos))))))
 
@@ -2338,10 +2424,17 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
    :language 'fortran
    :feature 'preproc
    ;; highlight macro names in definitions
-   '((preproc_include
-      "#include"             @font-lock-preprocessor-face
-      path: (string_literal) @font-lock-string-face)
-     (preproc_def
+   (if (f90-ts--string-literal-decomposed-p)
+       '((preproc_include
+          "#include"                                  @font-lock-preprocessor-face
+          path: (string_literal (string_literal_part) @font-lock-string-face)))
+     '((preproc_include
+      "#include"                                      @font-lock-preprocessor-face
+      path: (string_literal)                          @font-lock-string-face)))
+
+   :language 'fortran
+   :feature 'preproc
+   '((preproc_def
       "#define"            @font-lock-preprocessor-face
       name: (identifier)   @font-lock-constant-face)
      (preproc_function_def
@@ -2534,19 +2627,31 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
   (treesit-font-lock-rules
    :language 'fortran
    :feature 'variable
-   '(
-     ((identifier) @f90-ts-font-lock-special-var-face
+   '(((identifier) @f90-ts-font-lock-special-var-face
       (:pred f90-ts--node-special-var-p @f90-ts-font-lock-special-var-face)))))
 
 
-(defun f90-ts--font-lock-rules-value ()
-  "Font-lock rules for numbers, strings, booleans etc."
-  (treesit-font-lock-rules
-   :language 'fortran
-   :feature 'string
-   '(((string_literal) @font-lock-string-face)
-     (preproc_include path: (string_literal) @font-lock-string-face))
+(defun f90-ts--font-lock-rules-string ()
+  "Font-lock rules for strings."
+  (if (f90-ts--string-literal-decomposed-p)
+      (treesit-font-lock-rules
+       :language 'fortran
+       :feature 'string
+       '(((string_literal_part) @font-lock-string-face))
 
+       :language 'fortran
+       :feature 'escape-sequence
+       '(("\\" @f90-ts-font-lock-escape-face)))
+
+    (treesit-font-lock-rules
+     :language 'fortran
+     :feature 'string
+     '(((string_literal) @font-lock-string-face)))))
+
+
+(defun f90-ts--font-lock-rules-value ()
+  "Font-lock rules for numbers, booleans, etc. (except strings)."
+  (treesit-font-lock-rules
    :language 'fortran
    :feature 'number
    '(((number_literal) @font-lock-number-face)
@@ -2556,7 +2661,7 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
    :feature 'constant
    '(((boolean_literal) @font-lock-constant-face)
      ((null_literal) @font-lock-constant-face)
-     (statement_label) @font-lock-constant-face)))
+     ((statement_label) @font-lock-constant-face))))
 
 
 (defun f90-ts--font-lock-rules-delimiter ()
@@ -2568,7 +2673,9 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
 
    :language 'fortran
    :feature 'delimiter
-   '(["," ":" ";" "::" "=>" "&"] @f90-ts-font-lock-delimiter-face)))
+   `(["," ":" ";" "::" "=>" "&"
+      ,@(when (f90-ts--string-literal-decomposed-p) '("\""))]
+     @f90-ts-font-lock-delimiter-face)))
 
 
 (defun f90-ts--font-lock-rules-operator ()
@@ -2621,9 +2728,11 @@ changes in how string_literal is parsed and whether it is decomposed."
    (f90-ts--font-lock-rules-end)
    (f90-ts--font-lock-rules-operator)
    (f90-ts--font-lock-rules-variable)
+   (f90-ts--font-lock-rules-string)
    (f90-ts--font-lock-rules-value)
    (f90-ts--font-lock-rules-delimiter)
    (f90-ts--font-lock-rules-error)))
+
 
 ;;;-----------------------------------------------------------------------------
 ;;; Xref backend
@@ -2678,7 +2787,7 @@ This function:
 2. Filters captured nodes whose text matches IDENTIFIER.
 3. Converts matching nodes into xref-item objects.
 
-Returns a list of xref-item instances suitable for consumption by
+Return a list of xref-item instances suitable for consumption by
 `xref-backend-definitions'."
   (let* ((id-lowcase (downcase identifier))
          (scope (treesit-buffer-root-node))
@@ -2703,7 +2812,7 @@ IDENTIFIER.
 Note that this approach is purely syntactic and does not account
 for scope, shadowing, or semantic resolution.
 
-Returns a list of xref-item instances suitable for
+Return a list of xref-item instances suitable for
 `xref-backend-references'."
   (let* ((id-lowcase (downcase identifier))
          (scope (treesit-buffer-root-node))
@@ -3533,8 +3642,11 @@ If NODE is nil return nil."
             )))
 
        ((f90-ts--node-type-p node "&")
-        ;; text is not always "&" (like virtual ampersand at beginning of line)
         'ampersand)
+
+       ((f90-ts--node-type-p node "\\")
+        ;; escape quote in string (double quote)
+        'escape)
 
        (t
         (let ((text (treesit-node-text node)))
@@ -3542,9 +3654,10 @@ If NODE is nil return nil."
             ((or "(" ")" "[" "]" "(/" "/)")
              'parenthesis)
             (","  'comma)
-            ("&"  'ampersand)
             ("=>" 'associate)
             ("="  'assignment)
+            ((or "\"" "'")
+             'quote)
             ;; default: argument for anything else (this is probably a named node
             ;; of type identifier, number_literal, call_expression, parenthesized_expression etc.
             (_    'named))))))))
@@ -3703,8 +3816,8 @@ parenthesis node if present as cdr of CONTEXT."
 ;;++++++++++++++
 ;; list context: parenthesized expressions, arguments, array, parameters
 
-(defun f90-ts--align-list-items-children (context _loc)
-  "Return all children of CONTEXT.
+(defun f90-ts--align-list-items-children-no-paren (context _loc)
+  "Return all children of CONTEXT except for parenthesis.
 This is used for a context where all direct children are relevant,
 which are \"parenthesized_expression\", \"argument_list\",
 \"array_literal\" and \"parameters\"."
@@ -3754,6 +3867,34 @@ before and after \"::\")."
                                   (lambda (c) (f90-ts--node-type-p c "="))
                                   (treesit-node-children n)))))
                      decl-children))))))
+
+
+;;++++++++++++++
+;; list context: string_literal
+
+(defun f90-ts--align-list-items-string (context _loc)
+  "Return almost all children of CONTEXT of type string_literal.
+There is one small exception:
+Always drop the second quote in an escape double quote sequence,
+which is represented as a string_literal_part."
+  (cl-assert (f90-ts--string-literal-decomposed-p)
+             nil "wrong grammar, string_literal not decomposed by parser")
+  ;; example code (where we want to primarily try to align the text):
+  ;; s = """start with quoted quote&
+  ;;        and continue without leading ampersand"
+  ;; exclude the escape node (second \" of the three quotes) from the items list
+  (let* ((list-context (car context))
+        (children (treesit-node-children list-context)))
+    (cl-assert (f90-ts--node-type-p list-context
+                                    '("string_literal"))
+               nil "expected list context: string_literal, got '%s'" list-context)
+    (seq-filter
+     (lambda (n)
+       (let* ((psib (treesit-node-prev-sibling n)))
+         (not
+           (and (f90-ts--node-type-p psib "\\")
+                (f90-ts--node-type-p n "string_literal_part")))))
+     children)))
 
 
 ;;++++++++++++++
@@ -4042,9 +4183,7 @@ This primary position is returned as first element of the list."
          (nsym (alist-get 'nsym loc))
          (child-paren (treesit-node-child list-context 0 nil)))
     (cl-assert (f90-ts--node-type-p list-context "association_list")
-               nil
-               "align-list-other-association: wrong context, got '%s'"
-               list-context)
+               nil "wrong context, got '%s'" list-context)
 
     (f90-ts--collecting-anoff
      (cl-assert (f90-ts--node-type-p child-paren "(")
@@ -4057,6 +4196,40 @@ This primary position is returned as first element of the list."
                 ('parenthesis f90-ts-indent-paren-close)   ; indents ")"
                 (_            f90-ts-indent-paren-default) ; all other kind of nodes
                 ))
+     (merge-items (f90-ts--align-list-other-epilog
+                   items-plist (anything-collected-p))))))
+
+
+(defun f90-ts--align-list-other-string (context loc items-plist)
+  "Return a list of default positions (anchors offset) for string nodes.
+The first entry of the returned \"other\" list is used as primary anchor.
+For string literals these anchors depend on CONTEXT, node-sym (nsym in
+LOC), ITEMS-SYM and ITEMS-PLIST.
+
+A string_literal consists of opening and closing quoting symbol,
+string_literal_part, ampersand, quote escape character and comments.
+Note that a leading ampersand cannot be removed, as following blank characters
+must be preserved.  Thus we need to deal with the ampersand.  It should be
+aligned to the opening ampersand as primary position."
+  (cl-assert (f90-ts--string-literal-decomposed-p)
+             nil "wrong grammar, string_literal not decomposed by parser")
+  (let* ((list-context (car context))
+         (nsym (alist-get 'nsym loc))
+         (open-quote (treesit-node-child list-context 0 nil))
+         (items-prev (plist-get items-plist :prev)))
+    (cl-assert (f90-ts--node-type-p list-context "string_literal")
+               nil "wrong context, got '%s'" list-context)
+    (f90-ts--collecting-anoff
+     (when (member nsym '(ampersand comment quote))
+       (as-primary open-quote 0))
+     ;; if node is string_literal_part ('named) collect escape nodes, and vice versa
+     (when-let* ((opp-sym (cond ((eq nsym 'named) 'escape)
+                                ((eq nsym 'escape) 'named))))
+       (cl-loop
+        for (n . s) in items-prev
+        when (eq s opp-sym)
+        do (collect n 0)))
+
      (merge-items (f90-ts--align-list-other-epilog
                    items-plist (anything-collected-p))))))
 
@@ -4126,28 +4299,32 @@ for default continued line indentation."
 ;;++++++++++++++
 ;; list context: items and columns
 
-(defun f90-ts--align-list-filter-prev-nsym (items-all cur-line)
-  "Filter ITEMS-ALL and add node symbol information.
-ITEMS-ALL are all nodes of a list context and might contain nodes from future
-lines.
+(defun f90-ts--align-list-filter-prev (items cur-line)
+  "Filter ITEMS by line number and remove most ampersands.
+For alignment purposes, only items on previous lines are relevant.
 
 The filter removes any items not before line CUR-LINE.  It also filters out
-ampersand nodes (continuation symbols), which are not relevant for alignment.
-Those ampersands cannot appear as leading nodes in a line, since they leading
-ampersands are removed during indentation.
+trailing and virtual ampersand nodes, which are not relevant for alignment.
+Leading ampersands are removed during indentation, except for ampersands
+within strings, which we want to keep."
+  (seq-filter
+   ;; filter by line number, use only items on some previous line,
+   ;; also drop continuation symbols, as these are not relevant for alignment
+   (lambda (n) (and (< (f90-ts--node-line n)
+                       cur-line)
+                    (or (not (f90-ts--node-type-p n "&"))
+                        ;; accept a real leading ampersand
+                        ;; (which appears within a string_literal)
+                        (f90-ts--node-leading-real-ampersand-p n))))
+   items))
 
-It returns a list (NODE . NSYM) with symbol information for all filtered
-items."
-  (let ((items-filtered (seq-filter
-                         ;; filter by line number, use only items on some previous line,
-                         ;; also drop continuation symbols, as these are not relevant for alignment
-                         (lambda (n) (and (< (f90-ts--node-line n)
-                                             cur-line)
-                                          (not (f90-ts--node-type-p n "&"))))
-                         items-all)))
-    (mapcar
-     (lambda (n) (cons n (f90-ts--align-node-symbol n)))
-     items-filtered)))
+
+(defun f90-ts--align-list-attach-nsym (items)
+  "Attach node symbol information to a list of ITEMS.
+Map each NODE in ITEMS, to a cons cell (NODE . NSYM)."
+  (mapcar
+   (lambda (n) (cons n (f90-ts--align-node-symbol n)))
+   items))
 
 
 (defun f90-ts--align-list-items-head-p (node-nsym context-line)
@@ -4355,12 +4532,15 @@ LOC is an alist which provides the node and further location data.
 Note: for anchor-offset pairs extracted from CONTEXT nodes directly,
 the offset is assumed to be 0."
   (let* ((get-items (f90-ts--get-list-context-prop :get-items-fn context))
-         (items-all (funcall get-items context loc))
          (cur-line (alist-get 'line loc))
          (cntxt-line (f90-ts--node-line (or (cdr context) (car context))))
          (node-sym (alist-get 'nsym loc))
+         (items-all
+          (funcall get-items context loc))
+         (items-prev
+          (f90-ts--align-list-filter-prev items-all cur-line))
          (items-prev-sym
-          (f90-ts--align-list-filter-prev-nsym items-all cur-line))
+          (f90-ts--align-list-attach-nsym items-prev))
          (items-head
           (f90-ts--align-list-nsym-filter-offset
            items-prev-sym
@@ -4451,9 +4631,11 @@ Finally use VARIANT to select one pair to align with."
 (defconst f90-ts--align-list-context-properties
   (let ((expr-prop  '(:get-items-fn f90-ts--align-list-items-op-expr
                       :get-other-fn f90-ts--align-list-other-op-expr))
-        (paren-prop '(:get-items-fn f90-ts--align-list-items-children
+        (paren-prop '(:get-items-fn f90-ts--align-list-items-children-no-paren
                       :get-other-fn f90-ts--align-list-other-paren))
         (bind-prop  '(:get-items-fn f90-ts--align-list-items-children2)))
+    (cl-remove-if
+     #'null
      (list
       (cons "logical_expression"       expr-prop)
       (cons "math_expression"          expr-prop)
@@ -4465,6 +4647,10 @@ Finally use VARIANT to select one pair to align with."
       (cons "parenthesized_expression" paren-prop)
       (cons "argument_list"            paren-prop)
       (cons "array_literal"            paren-prop)
+      (when (f90-ts--string-literal-decomposed-p)
+        (cons "string_literal"
+              '(:get-items-fn f90-ts--align-list-items-string
+                :get-other-fn f90-ts--align-list-other-string)))
       (cons "parameters"               paren-prop)
       (cons "association_list"
             '(:get-items-fn f90-ts--align-list-items-assocation
@@ -4473,7 +4659,7 @@ Finally use VARIANT to select one pair to align with."
             '(:get-items-fn f90-ts--align-list-items-var-decl
               :get-other-fn f90-ts--align-list-other-var-decl))
       (cons "import_statement"
-            '(:get-items-fn f90-ts--align-list-items-children1))))
+            '(:get-items-fn f90-ts--align-list-items-children1)))))
   "List of tree-sitter node types presenting some kind of list context.
 A list context is a node with children which are suitable for alignment if
 spread over several lines in a continued line statement.
@@ -4589,10 +4775,9 @@ Return value nil signals that position is not within a list context.
 
 Only expressions return an auxiliary node, which is assignment \"=\"
 or parenthesis \"(\".  It is required but not part of the list context node."
-  (let ((stmt-max (f90-ts--align-list-context-max loc)))
-    (when stmt-max
-      (or (f90-ts--align-list-context-op-expr loc parent)
-          (f90-ts--align-list-context-other loc parent)))))
+  (when-let* ((stmt-max (f90-ts--align-list-context-max loc)))
+    (or (f90-ts--align-list-context-op-expr loc parent)
+        (f90-ts--align-list-context-other loc parent))))
 
 
 (defun f90-ts--continued-line-anchor-offset (variant pstmt-1 loc parent)
@@ -4716,7 +4901,7 @@ passed through unchanged."
 (defmacro f90-ts--with-map-rules (&rest triples)
   "Build a list of treesit indent rule triples.
 Each element of TRIPLES is in most cases a (MATCHER ANCHOR OFFSET) form as
-accepted by `f90-ts--map-rule'.  Returns a list of all expanded
+accepted by `f90-ts--map-rule'.  Return a list of all expanded
 triples suitable for the treesit simple indentation engine.
 
 The first exception is (log-state MSG), which expands to the
@@ -4806,10 +4991,12 @@ The main purpose is to fill the indentation cache for a new run."
    ;; indent-region operations with buffering)
    (continued-line-cache-start parent 0)
 
+   ;; grammar variant without string_literal decomposition:
    ;; continued strings need special care, the ampersands do not appear as
    ;; separate nodes, (treesit-node-at pos) at indentation position returns
    ;; the string_literal, which starts at some previous line
-   ((nopp-n-p-gp nil "string_literal" nil) nopp-parent 0)
+   (unless (f90-ts--string-literal-decomposed-p)
+     ((nopp-n-p-gp nil "string_literal" nil) nopp-parent 0))
 
    ;; it is easy to see whether we are on a continued line (not the first line
    ;; of a multiline statement, only subsequent lines), but handling specific
@@ -5466,39 +5653,53 @@ continued statement plus the configured offset."
               f90-ts-leading-ampersand-style))))
 
 
+(defun f90-ts--blank-ampersand-at-point ()
+  "Blank a real leading ampersand at point, if present.
+Point is assumed to be at the first non-blank character of the current line.
+Return \\='(amp) if an ampersand was blanked, nil otherwise.
+Does nothing if the ampersand is a virtual ampersand, part of a
+string_literal, or if the line is just a trailing ampersand (optionally
+followed by a comment), which is left untouched."
+  ;; a line with just a trailing ampersand (and optional comment) is not
+  ;; a leading ampersand to blank, so leave it as is
+  (unless (looking-at "&\\s-*\\(?:!\\|$\\)")
+    (let ((node (treesit-node-at (point))))
+      (when (and node
+                 (= (point) (treesit-node-start node))
+                 (f90-ts--node-type-p node "&")
+                 ;; make sure this is not part of a string_literal
+                 (not (f90-ts--in-string-p (point))))
+        (delete-char 1)
+        (insert " ")
+        '(amp)))))
+
+
+(defun f90-ts--blank-label-at-point ()
+  "Blank a statement label at point, if present.
+Point is assumed to be at the first non-blank character of the current line.
+Return \\='(label . label-text) if a label was blanked, nil otherwise."
+  (when-let* ((node (treesit-node-at (point)))
+              ((= (point) (treesit-node-start node)))
+              ((f90-ts--node-type-p node "statement_label"))
+              (text (treesit-node-text node)))
+    (delete-char (length text))
+    (insert (make-string (length text) ?\s))
+    (cons 'label text)))
+
+
 (defun f90-ts--indent-blank-leading-amp-or-label-line ()
   "Blank a leading ampersand or statement label on the current line.
-Returns nil if neither was found, \\='(amp) if an ampersand was
-blanked, or \\='(label . label-text) if a statement label was
-blanked."
+Return nil if neither was found, \\='(amp) if an ampersand was
+blanked, or \\='(label . label-text) if a statement label was blanked."
   (unless (f90-ts--point-on-empty-line-p)
     (save-excursion
       (back-to-indentation)
       (let ((c (char-after (point))))
         (cond
-         ;; leading ampersand
          ((and c (eq c ?&))
-          ;; if this line contains a single ampersand and optionally some comment,
-          ;; then we should considers this to be a trailing ampersand and keep it as is
-          (unless (looking-at  "&\\s-*\\(?:!\\|$\\)")
-            (let ((node (treesit-node-at (point))))
-              ;; this excludes string literals
-              (when (and node
-                         (= (point) (treesit-node-start node))
-                         (f90-ts--node-type-p node "&"))
-                (delete-char 1)
-                (insert " ")
-                '(amp)))))
-         ;; statement label
+          (f90-ts--blank-ampersand-at-point))
          ((and c (>= c ?0) (<= c ?9))
-          (let ((node (treesit-node-at (point))))
-            (when (and node
-                       (= (point) (treesit-node-start node))
-                       (f90-ts--node-type-p node "statement_label"))
-              (let ((text (treesit-node-text node)))
-                (delete-char (length text))
-                (insert (make-string (length text) ?\s))
-                (cons 'label text))))))))))
+          (f90-ts--blank-label-at-point)))))))
 
 
 (defun f90-ts--indent-restore-leading-ampersand-line ()
@@ -5565,7 +5766,7 @@ AMP-OR-LABEL is a value previously returned by
 
 (defun f90-ts--indent-blank-leading-amp-or-label-region (beg end)
   "Blank leading ampersands and statement labels for each line in BEG..END.
-Returns a vector (one entry per line) of values as returned by
+Return a vector (one entry per line) of values as returned by
 `f90-ts--indent-blank-leading-amp-or-label-line'."
   (save-excursion
     (goto-char beg)
@@ -5710,8 +5911,7 @@ completion for a region, like indent-stmt operations on an end struct line."
     join-comments-same-prefix-trimmed
     join-comments-same-prefix-with-blanks
     append-comment-after-amp
-    append-comment-after-stmt
-    failed-comment-within-string)
+    append-comment-after-stmt)
   "All valid action symbols returned by `f90-ts--join-line-prev-aux'.")
 
 
@@ -5724,8 +5924,7 @@ completion for a region, like indent-stmt operations on an end struct line."
     join-comments-same-prefix-trimmed
     join-comments-same-prefix-with-blanks
     append-comment-after-amp
-    append-comment-after-stmt
-    failed-comment-within-string)
+    append-comment-after-stmt)
   "All valid action symbols returned by `f90-ts--join-line-next-aux'.")
 
 
@@ -5920,10 +6119,12 @@ The variant to be used can be customized.  Intended for use in key bindings."
   "Break line at point, insert continuation marker where necessary and indent."
   (interactive "*")
   (cond
-   ((f90-ts--in-string-p)
-    (insert "&\n&"))
+   ((f90-ts--bol-to-point-blank-p)
+    ;; this results in an empty line, no ampersand
+    (delete-horizontal-space)
+    (insert "\n"))
 
-   ((f90-ts--in-openmp-p)
+   ((f90-ts--in-openmp-p (point))
     ;; looks like a comment, but starting with special "!$" sequence,
     ;; breaking openmp lines requires a continuation symbol
     (let* ((node (treesit-node-at (point)))
@@ -5932,16 +6133,36 @@ The variant to be used can be customized.  Intended for use in key bindings."
       (f90-ts--break-line-insert-amp-at-end)
       (insert "\n" prefix)))
 
-   ((f90-ts--in-comment-p)
+   ((f90-ts--in-comment-p (point))
+    (cl-assert (not (f90-ts--in-openmp-p (point))) nil "unexpectedly within openmp comment")
     (let* ((node (treesit-node-at (point)))
            (prefix (f90-ts--comment-prefix node 'with-blanks)))
       (delete-horizontal-space)
       (insert "\n" prefix)))
 
-   ((f90-ts--bol-to-point-blank-p)
-    ;; this results in an empty line, no ampersand
-    (delete-horizontal-space)
-    (insert "\n"))
+   ;; comments can be within continued strings, so comments must be checked
+   ;; before the in-string predicate (in fac in-comment-p and in-string-p can both be true
+   ((f90-ts--in-string-p (point))
+    (cl-assert (not (f90-ts--in-comment-p (point))) nil "unexpectedly within comment")
+    (if (not (f90-ts--string-literal-decomposed-p))
+        ;; old style continued string (this does not handle all cases properly
+        (insert "&\n&")
+      ;; first determine where point is within string
+      (let ((node (treesit-node-on (1- (point)) (point))))
+        (if (or (f90-ts--node-type-p node '("string_literal_part"
+                                            "\""
+                                            "\\"))
+                (and (f90-ts--node-type-p node "&")
+                     (string= (treesit-node-text node) "&") ; exclude virtual ampersand
+                     (= (treesit-node-start node)
+                        (f90-ts--pos-first-nonspace (point)))))
+            (insert "&\n&")
+          ;; point is after a continuation symbol &, delete horizontal space and
+          ;; just add an empty line with a leading ampersand
+          (delete-horizontal-space)
+          (newline 1)
+          (insert "&&")
+          (backward-char)))))
 
    (t
     (delete-horizontal-space)
@@ -5981,16 +6202,30 @@ Move point to first character on the line after it was originally placed."
 
 (defun f90-ts--join-line-string (node pos1 pos2)
   "Join previous line with current line both belonging to a continued string.
-The string is provided by NODE, which is of type string_literal.
-Positions POS1 and POS2 are end of previous line and start of current line."
-  (cl-assert (f90-ts--node-type-p node "string_literal")
-             nil "node is not a string literal")
-  (cl-assert (eq (char-before pos1) ?&)
+Positions POS1 and POS2 are end of previous line and start of current line.
+
+If the grammar variant does not decompose the string_literal, then NODE is
+of type string_literal.  For the decomposed variant, NODE is the first
+ampersand before POS1 and within the string_literal to be joined."
+  (cl-assert (if (f90-ts--string-literal-decomposed-p)
+                 (and (f90-ts--node-type-p node '("&" "string_literal_part" "\""))
+                      (f90-ts--node-type-p (treesit-node-parent node) "string_literal"))
+               (f90-ts--node-type-p node "string_literal"))
+             nil "node is not within a string literal")
+  (cl-assert (or (not (f90-ts--node-type-p node "&"))
+                 (eq (char-before pos1) ?&))
              nil "character before pos1 is not an ampersand")
-  (cl-assert (eq (char-after pos2) ?&)
-             nil "character at pos2 is not an ampersand")
-  (let ((beg (1- pos1))
-        (end (1+ pos2)))
+
+  (let ((beg (if (eq (char-before pos1) ?&)
+                 (1- pos1)
+             ;; the continued string is missing the ampersand on the first line,
+             ;; we still can safely join, but do not delete blanks after pos1
+              (save-excursion
+                (goto-char pos1)
+                (line-end-position))))
+        (end (if (eq (char-after pos2) ?&)
+                 (1+ pos2)
+               pos2)))
     (delete-region beg end)
     (goto-char beg)))
 
@@ -6082,9 +6317,31 @@ Argument IS-PREV signals whether the function was called from the
               'remove-blank-lines-between))))))
 
 
+(defun f90-ts--join-line-is-cont-str (first secnd)
+  "Check whether the join is performed within a continued string literal.
+FIRST and SECND are the leaf nodes at the first and second join positions,
+which are at end of first and beginning of second line.
+The predicate only returns non-nil if FIRST and SECND are ampersand nodes,
+without any comments in-between (the non-decomposed grammar variant fails to
+parse comments within strings)."
+  (if (f90-ts--string-literal-decomposed-p)
+      (and (f90-ts--node-type-p first '("&"
+                                        ;; these are only posssible within a
+                                        ;; malformed continued string without &
+                                        "string_literal_part" "\""))
+           (f90-ts--node-type-p secnd '("&"
+                                        ;; these are only posssible within a
+                                        ;; malformed continued string without &
+                                        "string_literal_part" "\"" "\\"))
+           (f90-ts--node-type-p (treesit-node-parent first) "string_literal"))
+    (and (f90-ts--node-type-p first "string_literal")
+         (f90-ts--node-type-p secnd "string_literal")
+         (treesit-node-eq first secnd))))
+
+
 (defun f90-ts--join-line-prev-aux ()
   "Join previous line with the current one, if part of a continued statement.
-Returns a cons (THUNK . ACTION); the caller is responsible for executing
+Return a cons (THUNK . ACTION); the caller is responsible for executing
 THUNK and for messaging on failure."
   (cond
    ((f90-ts--point-on-empty-line-p)
@@ -6108,9 +6365,7 @@ THUNK and for messaging on failure."
                    (point)))
            (first (f90-ts--node-on-pos pos1 'left))
            (secnd (f90-ts--node-on-pos pos2 'right))
-           (is-cont-str (and (f90-ts--node-type-p first "string_literal")
-                             (f90-ts--node-type-p secnd "string_literal")
-                             (treesit-node-eq first secnd))))
+           (is-cont-str (f90-ts--join-line-is-cont-str first secnd)))
       ;;(f90-ts-log-msg :joinprev "pos1: %s, %s" pos1 first)
       ;;(f90-ts-log-msg :joinprev "pos2: %s, %s" pos2 secnd)
       ;;(f90-ts-log-msg :joinprev "is-cont-str: %s" is-cont-str)
@@ -6128,11 +6383,8 @@ THUNK and for messaging on failure."
                  nil "secnd node has wrong start position")
       (cond
        (is-cont-str
-        (if (eq (char-before pos1) ?&)
-            (cons (lambda () (f90-ts--join-line-string first pos1 pos2))
-                  'join-continued-string)
-          (cons (lambda () (back-to-indentation))
-                'failed-comment-within-string)))
+        (cons (lambda () (f90-ts--join-line-string first pos1 pos2))
+              'join-continued-string))
 
        (first
         (f90-ts--join-line-action-common first secnd t))
@@ -6154,15 +6406,12 @@ If previous line has comments (at end, next line etc.) joining is not done."
          (action (cdr pair)))
     (cl-assert (member action f90-ts--join-line-prev-valid-actions)
                nil "invalid action from f90-ts--join-line-prev-aux, got %s" action)
-    (funcall process-fn)
-    (when (and (called-interactively-p 'interactive)
-               (eq action 'failed-comment-within-string))
-      (message "join failed: joining not possible"))))
+    (funcall process-fn)))
 
 
 (defun f90-ts--join-line-next-aux ()
   "Join current line with the next one, if part of a continued statement.
-Returns a cons (THUNK . ACTION); the caller is responsible for executing
+Return a cons (THUNK . ACTION); the caller is responsible for executing
 THUNK and for messaging on failure."
   (cond
    ((f90-ts--point-on-empty-line-p)
@@ -6186,9 +6435,7 @@ THUNK and for messaging on failure."
                    (point)))
            (first (f90-ts--node-on-pos pos1 'left))
            (secnd (f90-ts--node-on-pos pos2 'right))
-           (is-cont-str (and (f90-ts--node-type-p first "string_literal")
-                             (f90-ts--node-type-p secnd "string_literal")
-                             (treesit-node-eq first secnd))))
+           (is-cont-str (f90-ts--join-line-is-cont-str first secnd)))
       ;;(f90-ts-log-msg :joinnext "pos1: %s, %s" pos1 first)
       ;;(f90-ts-log-msg :joinnext "pos2: %s, %s" pos2 secnd)
       ;;(f90-ts-log-msg :joinnext "is-cont-str: %s" is-cont-str)
@@ -6214,11 +6461,8 @@ THUNK and for messaging on failure."
               'end-of-buffer))
 
        (is-cont-str
-        (if (eq (char-after pos2) ?&)
-            (cons (lambda () (f90-ts--join-line-string first pos1 pos2))
-                  'join-continued-string)
-          (cons (lambda () (end-of-line))
-                'failed-comment-within-string)))
+        (cons (lambda () (f90-ts--join-line-string first pos1 pos2))
+              'join-continued-string))
 
        (t
         (f90-ts--join-line-action-common first secnd nil)))))))
@@ -6234,10 +6478,7 @@ If continued line has comments (at end, next line etc.) joining is not done."
          (action (cdr pair)))
     (cl-assert (member action f90-ts--join-line-next-valid-actions)
                nil "invalid action from f90-ts--join-line-next-aux, got %s" action)
-    (funcall process-fn)
-    (when (and (called-interactively-p 'interactive)
-               (eq action 'failed-comment-within-string))
-      (message "join failed: joining not possible"))))
+    (funcall process-fn)))
 
 
 (defun f90-ts-shift-line-break ()
@@ -6324,7 +6565,7 @@ available.  Cleared after each statement is joined and broken up completely.")
 
 (defun f90-ts--seed-markers-push ()
   "Push a seed marker at the current non-whitespace position.
-Skips backward over whitespace before recording the position.
+Skip backwards over blanks before recording the position.
 Does nothing if a seed marker at that position already exists."
   (save-excursion
     (skip-chars-backward " \t")
@@ -6357,18 +6598,28 @@ Does nothing if a seed marker at that position already exists."
 (defun f90-ts--breakpoint-node-within-fill-col-p (node pos fill-col)
   "Return non-nil if POS is within the effective fill column for NODE.
 If NODE is a comment, no continuation ampersand is added, so FILL-COL
-is compared directly.  Otherwise two characters are subtracted to
-account for the space and ampersand appended by the break operation."
-  (<= (f90-ts--column-number-at-pos pos)
-      (if (f90-ts--node-type-p node "comment")
-          fill-col
-        (- fill-col 2))))
+is compared directly.
+If NODE is a string_literal, the continuation ampersand is added without a
+blank, hence FILL-COL needs to be reduced by 1.
+Otherwise two characters are subtracted to
+account for the blank and ampersand appended by the break operation."
+  (let ((fill-col-adjusted
+         (cond
+          ((f90-ts--node-type-p node "comment")
+           fill-col)
+          ((f90-ts--node-type-p node '("string_literal_part"))
+           (- fill-col 1))
+          (t
+           (- fill-col 2)))))
+
+    (<= (f90-ts--column-number-at-pos pos)
+        fill-col-adjusted)))
 
 
 (defun f90-ts--breakpoint-pos-within-fill-col-p (pos fill-col)
   "Return non-nil if POS is within the effective fill column.
-Depending on whether pos is within a statement or with a comment, FILL-COL
-needs to be adjusted.
+Depending on whether pos is within a statement, within a comment
+or within a string, FILL-COL needs to be adjusted.
 Like `f90-ts--breakpoint-node-within-fill-col-p', but queries the node at
 POS via `treesit-node-at'."
   (f90-ts--breakpoint-node-within-fill-col-p (treesit-node-at pos) pos fill-col))
@@ -6385,7 +6636,7 @@ be found otherwise."
                      (skip-chars-forward " \t\n")
                      (point)))
          (node-next (when pos-next
-                    (treesit-node-at pos-next))))
+                      (treesit-node-at pos-next))))
     (not (or
           ;; do not split right before any of these delimiters
           (f90-ts--node-type-p node-next '("," "(" "%"))
@@ -6399,7 +6650,9 @@ Scan the comment text for word boundaries (whitespace preceded by a
 non-whitespace character) that fall within the fill budget.  The
 comment prefix (matched by `f90-ts-comment-prefix-regexp') is skipped
 before searching for break candidates.
-Returns a sorted list of buffer positions, or nil."
+Return a sorted list of buffer positions, or nil."
+  (cl-assert (f90-ts--node-type-p node "comment")
+             nil "\"comment\" node expected")
   (let* ((end (f90-ts--node-end-trimmed node)))
     (save-excursion
       (f90-ts--comment-forward-prefix node)
@@ -6421,6 +6674,60 @@ Returns a sorted list of buffer positions, or nil."
        #'<))))
 
 
+(defun f90-ts--find-breakpoint-in-string (node beg fill-col &optional prefer)
+  "Find all break positions inside string literal NODE at column <= FILL-COL.
+Start the search at position BEG.  NODE is the whole string_literal and can
+start well before the current line.
+Scan the string content for word boundaries (whitespace preceded by a
+non-whitespace character) that fall within the fill budget and are on the
+current line.  Return a sorted list of buffer positions, or nil.
+If PREFER is non-nil, select only some positions (like after a word etc.),
+otherwise return all positions."
+  (cl-assert (f90-ts--node-type-p node "string_literal")
+             nil "\"string_literal\" node expected")
+  (save-excursion
+    ;; make sure that we stay on the line and within node boundaries
+    ;; (string_literal can start before current line, argument beg
+    ;; already restrict start to after default indentation column)
+    (let* ((start (max beg
+                       (save-excursion
+                         (back-to-indentation)
+                         (skip-chars-forward "&")
+                         (point))))
+           (end (min (f90-ts--node-end-trimmed node)
+                     (progn
+                       (goto-char (line-end-position))
+                       ;; add one additional character (blank or &, which is matched
+                       ;; in re-search-forward below to ensure that position is eligible
+                       (move-to-column (min (1+ fill-col) (current-column)))
+                       (point)))))
+      (if (null prefer)
+          ;; take all positions, allow breaking at any point within the string
+          (cl-loop for pos from (1+ start) below end
+                   when (<= (f90-ts--column-number-at-pos pos) (1- fill-col))
+                   collect pos)
+        (goto-char start)
+        (cl-loop
+         ;; at whitespace boundary (\S- followed by \s-), or after punctuation
+         ;;do (f90-ts-log-line :brpstr "match" ?\u25C6)
+         ;;do (f90-ts-log-line :brpstr "match" ?\x1f48e)
+         while (re-search-forward
+                "\\S-\\(\\s-\\|[^[:alnum:]]\\)\\|[^[:alnum:]]"
+                end t)
+         for pos = (if (match-beginning 1)
+                       (match-beginning 1)
+                     (match-end 0))
+         ;; advance by at least one position, do not use pos, as leading characters
+         ;; in the match might just be used for assertions
+         ;; (make it general so that we can possibly make the regexp a defcustom)
+         do (goto-char (1+ (match-beginning 0)))
+         when (and (< start pos)
+                   (<= (f90-ts--column-number-at-pos pos) (1- fill-col)))
+         collect pos
+         into positions
+         finally return positions)))))
+
+
 (defun f90-ts--find-breakpoint-collect (sparse-tree)
   "Collect all break-point positions from SPARSE-TREE.
 SPARSE-TREE is a cons of a list of position integers and a possibly empty list
@@ -6436,32 +6743,48 @@ It returns a sorted list of buffer positions of prospective breakpoints."
      (sort collected #'<))))
 
 
-(defun f90-ts--find-breakpoints-for-node (node fill-col)
-  "Return a list of break positions for NODE before FILL-COL.
+(defun f90-ts--find-breakpoints-for-node (node beg fill-col &optional prefer)
+  "Return a list of break positions for NODE after BEG and before FILL-COL.
 In general, it returns the (trimmed) end position of the node as a
 singleton list, if the column is below (- FILL-COL 2).  Two is subtracted to
 account for a blank and the continuation symbol, which will be added by
-breaking at this position.  However, for comment nodes, there might be several
-prospective positions within the node.  These are collected by
-`f90-ts--find-breakpoint-in-comment'."
-  (if (f90-ts--node-type-p node "comment")
-      (f90-ts--find-breakpoint-in-comment node fill-col)
+breaking at this position.  However, for comment nodes and string literals,
+there might be several prospective positions within the node.  These are
+collected by `f90-ts--find-breakpoint-in-comment' and by
+`f90-ts--find-breakpoint-in-string'
+
+If PREFER is non-nil, then break points within string literals is
+restricted to preferred positions."
+  (cond
+   ((f90-ts--node-type-p node "comment")
+    (f90-ts--find-breakpoint-in-comment node fill-col))
+
+   ((and (f90-ts--string-literal-decomposed-p)
+         (f90-ts--node-type-p node "string_literal_part"))
+    (f90-ts--find-breakpoint-in-string (treesit-node-parent node)
+                                       beg fill-col
+                                       prefer))
+
+   (t
     (let* ((pos (f90-ts--node-end-trimmed node)))
       (when (f90-ts--breakpoint-node-within-fill-col-p node pos fill-col)
-        (list pos)))))
+        (list pos))))))
 
 
-(defun f90-ts--find-breakpoint-sparse-tree (root beg end fill-col &optional prefer-p)
-  "Return sparse tree of nodes, whose end position are possible breakpoints.
-Start at ROOT, which should be some node properly covering the line to be
-broken.
+(defun f90-ts--find-breakpoint-sparse-tree (root beg end fill-col &optional prefer)
+  "Return sparse tree of break points within tree ROOT.
+The sparse tree is obtained by filtering relevant nodes and then mapping those
+nodes to a list of possible break points.
 
-Nodes are selected by their (trimmed) end position.  In particular, a node's
-end should be between BEG and END and sufficiently below FILL-COL (in general,
-two characers are required for the \" &\" continuation symbol.
+In most cases, the function filters for leaf nodes whose end position is a
+possible break point.  Nodes are selected by their (trimmed) end position.
+In particular, the trimmed end of node should be between BEG and END and respect
+the fill column FILL-COL.
+If PREFER is non-nil, then further reduce selection of nodes and break points
+to preferred positions, using `f90-ts--find-breakpoint-prefer-p'.
 
-Predicate function PREFER-P can be be used additionally to other selection
-conditions to reduce the tree to only contain preferred break points."
+Comment and string literal nodes require special care, as these nodes can be
+broken in the middle."
   ;; first map root to a sparse tree of prospective positions,
   ;; then collect and sort the list
   (treesit-induce-sparse-tree
@@ -6470,13 +6793,13 @@ conditions to reduce the tree to only contain preferred break points."
      (let* ((end-node (f90-ts--node-end-trimmed n)))
        ;; only leaf nodes whose trimmed end falls on the
        ;; current line, the column check is done in the process-fn
-       ;; function, as comment nodes need special care
+       ;; function, as comment and string_literal nodes need special care
        (and (null (treesit-node-children n))
             (<= beg end-node)
             (<= end-node end)
             (not (f90-ts--node-type-p n "&"))
-            (or (null prefer-p) (funcall prefer-p n)))))
-   (lambda (n) (f90-ts--find-breakpoints-for-node n fill-col))))
+            (or (null prefer) (f90-ts--find-breakpoint-prefer-p n)))))
+   (lambda (n) (f90-ts--find-breakpoints-for-node n beg fill-col prefer))))
 
 
 (defun f90-ts--find-breakpoint-rightmost-idx (positions fill-col)
@@ -6502,8 +6825,8 @@ which jumps to the rightmost candidate at or before FILL-COL."
                         "r rightmost, "
                         "BACKSPACE/DEL join, RET confirm"
                         (if at-end
-                            ", q skip, SPC skip and extend region"
-                          ", q/SPC skip")
+                            ", q skip line, SPC skip and extend region"
+                          ", q/SPC skip line")
                         ", C-g abort")))
     (message prompt))
   (let ((key (read-key))
@@ -6569,7 +6892,7 @@ FILL-COL."
 (defun f90-ts--find-breakpoint-interactive (positions fill-col allow-continue)
   "Interactively select a break point from POSITIONS.
 Moves point to each candidate position as the user navigates with
-LEFT/RIGHT or \\[previous-line]/\\[next-line].  Returns the selected position
+LEFT/RIGHT or \\[previous-line]/\\[next-line].  Return the selected position
 on RET, or nil on \\[keyboard-quit].
 Use POSITIONS to determine a candidate closest to FILL-COL but before that.
 ALLOW-CONTINUE controls whether SPC is offered to extend the fill region.
@@ -6614,56 +6937,85 @@ some improvements."
       (goto-char orig-point))))
 
 
+(defun f90-ts--find-breakpoints-indent ()
+  "Estimate the indentation column of the next line after breaking current line.
+This estimate is reuqired to make sure a break point is chosen after the
+new indentation level, so that breaking the line does not does not make the
+layout worse.
+The return value is a buffer position on the current line indicating the
+guessed indentation column on the next line.  Any break point on the current
+is after that buffer position."
+  ;; TODO: what kind of estimate do we really need here??
+  ;; possible contexts: single line statement, multiline statements,
+  ;;           comments, statement with trailing comment, ...
+  ;; example: breaking
+  ;; x=very_long_unbreakable_variable_name
+  ;; could give
+  ;; x= &
+  ;;      very_long_unbreakable_variable_name
+  ;; due to indentation rules, making it worse than before
+  (save-excursion
+    (back-to-indentation)
+    (let ((node (treesit-node-at (point))))
+      (+ (point)
+         (cond
+          ((f90-ts--subsequent-line-of-continued-stmt-p (point))
+           1)
+          ((f90-ts--node-type-p node "comment")
+           0)
+          (t
+           f90-ts-indent-continued))))))
+
+
 (defun f90-ts--find-breakpoints-all (fill-col fill-col-select)
   "Collect all candidate break points on the current line.
-A break point is any end position of a leaf node on the current line,
-at column at most FILL-COL-SELECT minus 2 and beyond the estimated
-indentation of the continuation line.  FILL-COL is used to compute
-that indentation estimate.
-Returns a list of candidate POSITIONS.  First preferred positions are tried,
-and if nil, then all positions are determined.  If no positions exist,
-then it returns nil."
+In general a break point is any end position of a leaf node on the current
+line, at column at most FILL-COL-SELECT minus 2 and beyond the estimated
+indentation of the continued line.  FILL-COL is the fill column,
+which can be ignored in interactive mode, but is still used to preselect
+prospective break positions and for some cursor movements in interactive mode.
+
+Return a list of candidate POSITIONS.  There are three cases:
+- no preferred positions exist: fall back to all positions, bounded by
+  FILL-COL-SELECT;
+- in interactive mode, preferred positions exist but none are within
+  FILL-COL: merge all positions within FILL-COL with the preferred
+  positions (which may lie beyond FILL-COL), so navigating past fill-col
+  only offers sensible break points;
+- otherwise (preferred positions exist, and either at least one is
+  within FILL-COL, or selection mode is not interactive): use the preferred
+  positions as-is.
+
+If no positions exist, then it returns nil."
   (let* ((beg (line-beginning-position))
          (end (line-end-position))
-         ;; estimate the indentation of the line after breaking it, we need
-         ;; to make sure that the break point is before new indentation level
-         ;; TODO: what kind of estimate do we really need here??
-         ;; examples: single line statement, multiline statements, comments
-         ;;           statement with trailing comment, ...
-         (indent (save-excursion
-                   (back-to-indentation)
-                   (let ((node (treesit-node-at (point))))
-                     (+ (point)
-                        (cond
-                         ((f90-ts--subsequent-line-of-continued-stmt-p (point))
-                          1)
-                         ((f90-ts--node-type-p node "comment")
-                          0)
-                         (t
-                          f90-ts-indent-continued))))))
+         (indent (f90-ts--find-breakpoints-indent))
          (root (treesit-node-on beg end))
          (pos-prefer (f90-ts--find-breakpoint-collect
                       (f90-ts--find-breakpoint-sparse-tree
                        root indent end fill-col-select
-                       #'f90-ts--find-breakpoint-prefer-p)))
-         (positions (or pos-prefer
-                        (f90-ts--find-breakpoint-collect
-                         (f90-ts--find-breakpoint-sparse-tree
-                          root indent end fill-col-select)))))
+                       'prefer)))
+
+         (positions (if (and pos-prefer
+                             (f90-ts--breakpoint-pos-within-fill-col-p (car pos-prefer) fill-col))
+                        pos-prefer
+                      (f90-ts--find-breakpoint-collect
+                       (f90-ts--find-breakpoint-sparse-tree
+                        root indent end fill-col-select
+                        nil)))))
 
     (if (eq f90-ts-fill-select-breakpoint-by 'interactive)
-        ;; when we have pos-prefer but suggested breakpoint is not in positions, then add it
         (let ((marker-pos (f90-ts--find-breakpoint-initial-pos pos-prefer fill-col)))
           (if (and marker-pos (not (member marker-pos positions)))
               (cl-sort (cons marker-pos positions) #'<)
             positions))
-        positions)))
+      positions)))
 
 
 (defun f90-ts--find-breakpoint (fill-col allow-continue)
   "Find a break point on the current line.
 A break point is any end position of a leaf node on the current line and at
-column at most FILL-COL minus 2.  Returns the buffer position to break at,
+column at most FILL-COL minus 2.  Return the buffer position to break at,
 or nil if no suitable break point exists.
 
 The selection strategy is controlled by `f90-ts-fill-select-breakpoint-by'.
@@ -6694,7 +7046,7 @@ control whether SPC is offered to extend the fill region."
   "Break the current line once if it exceeds FILL-COL.
 Find a breakpoint via `f90-ts--find-breakpoint' according to
 `f90-ts-find-breakpoint-select' and call `f90-ts-break-line' with position.
-Returns non-nil if a break was performed, nil if the line already fits
+Return non-nil if a break was performed, nil if the line already fits
 or no breakpoint can be found.  The function assumes that the line has
 no trailing blanks.
 
@@ -6839,7 +7191,7 @@ heuristics are bypassed.  END-MARKER is the region end marker and is moved
 to the start of the next line if it falls inside the newly joined line, so that
 the main loop's while condition does not abort prematurely.  FILL-COL is the
 target fill column passed to `f90-ts--join-line-fill'.
-Returns non-nil if a join was performed or signalled."
+Return non-nil if a join was performed or signalled."
   (unless (f90-ts--point-on-empty-line-p)
     (let ((joined (f90-ts--join-line-fill fill-col end-marker
                                           (and (memq broke '(join-prev join-next))
@@ -6862,7 +7214,7 @@ line is empty, no break is attempted.  END-MARKER is used to determine
 whether the `continue' action should be offered: it is only available
 when END-MARKER is exactly at the start of the next line, avoiding
 accidental region extension when the boundary is not visible.
-Returns the result of `f90-ts--break-line-wrap', or nil if skipped."
+Return the result of `f90-ts--break-line-wrap', or nil if skipped."
   (unless (or joined (f90-ts--point-on-empty-line-p))
     (end-of-line)
     (delete-horizontal-space)
@@ -7140,7 +7492,7 @@ nodes also belong to the same group."
 If nodes at BEG and END exists but do not form a group, return them marked
 as disparate, as these nodes are still useful for further operations.
 
-Returns a list:
+Return a list:
   ('single    NODE)  region is exactly one node
   ('block     FN LN) region is exactly the full group from FN to LN
   ('partial   FN LN) region is within group but neither single nor full
@@ -7746,7 +8098,7 @@ nodes after struct."
 
 (defun f90-ts--nav-tree-node-table (root)
   "Capture all menu nodes under ROOT in one pass using name-struct pairing.
-Returns a hash table mapping each struct node to a list of (KEY NAME POS)
+Return a hash table mapping each struct node to a list of (KEY NAME POS)
 triples, where KEY is a type name from `f90-ts--nav-queries'."
   (let* ((captures (treesit-query-capture root f90-ts--nav-tree-query-compiled))
          (entities (f90-ts--nav-tree-combine-captures captures))
@@ -7943,7 +8295,7 @@ SPARSE-NODE is from `f90-ts--nav-tree-build' and originates in
 where each ENTRY in the list of ENTRIES has the form (KEY NAME POS).
 CHILDREN are further sparse nodes of the same shape.
 
-Returns a flat list of `f90-ts-nav-buffer-node' structs."
+Return a flat list of `f90-ts-nav-buffer-node' structs."
   (let* ((entries  (car sparse-node))
          (children (cdr sparse-node)))
     (cond
@@ -8064,7 +8416,7 @@ buffer being idle."
 POS is a buffer position in the source buffer.
 Must be called with the nav buffer as current buffer, as it reads
 `f90-ts--nav-buffer-source' to resolve line numbers in the source buffer.
-Returns nil if no suitable entry is found.
+Return nil if no suitable entry is found.
 
 For non-variable entries the associated entry is the closest one whose
 marker position is <= POS.  For variable entries the marker must be on
@@ -8536,11 +8888,13 @@ package `markdown-mode' are available, then use these."
   (setq-local treesit-font-lock-feature-list
               '((comment preproc error)                          ; level 1
                 (builtin keyword string type)                    ; level 2
-                (constant number)                                ; level 3
+                (constant number escape-sequence)                ; level 3
                 (function variable operator bracket delimiter))) ; level 4
 
-  ;; set font-lock and indentation rules
+  ;; use the pre-defined font-lock rules variable
   (setq-local treesit-font-lock-settings (f90-ts-font-lock-rules))
+
+  ;; use the pre-defined indentation rules variable
   (setq-local treesit-simple-indent-rules (f90-ts-indent-rules))
 
   ;; set Imenu
