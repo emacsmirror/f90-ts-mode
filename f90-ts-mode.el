@@ -752,6 +752,20 @@ seem to make much sense."
   "Keymap for `f90-ts-mode'.")
 
 
+(transient-define-infix f90-ts-transient--indent-list-line ()
+  "Transient infix for indent-line alignment variant."
+  :class    'transient-lisp-variable
+  :variable 'f90-ts-indent-list-line
+  :prompt   "Indent list line method: "
+  :reader   (lambda (prompt initial _history)
+              (let* ((choice (completing-read
+                               prompt
+                               f90-ts--indent-options-alist
+                               nil t nil nil
+                               (car (rassq initial f90-ts--indent-options-alist)))))
+                (cdr (assoc choice f90-ts--indent-options-alist)))))
+
+
 (transient-define-infix f90-ts-transient--fill-column ()
   "Transient infix for fill column override."
   :class    'transient-lisp-variable
@@ -779,6 +793,7 @@ seem to make much sense."
   "F90 Tree-sitter Mode."
   ;; Modify
   [["Indentation, break & join"
+    ("L"   "Indent list line:"          f90-ts-transient--indent-list-line)
     ("TAB" "Indent line"                f90-ts-indent-and-complete-line)
     ("s"   "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
     ("I"   "Indent & complete region"   f90-ts-indent-and-complete-region)
@@ -794,10 +809,11 @@ seem to make much sense."
     ("["   "Previous sibling"           f90-ts-mark-region-prev-sibling)
     ("]"   "Next sibling"               f90-ts-mark-region-next-sibling)
     ("}"   "Last sibling"               f90-ts-mark-region-last-sibling)
+    ("X"   "Exchange point and mark"    exchange-point-and-mark)
     ("c"   "Comment region (default)"   f90-ts-comment-region-default)
     ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]
    ["Fill/Rebalance"
-    ("C-f" "Fill column"                f90-ts-transient--fill-column)
+    ("C-f" "Fill column:"               f90-ts-transient--fill-column)
     ("C-b"                              f90-ts-transient--fill-select-breakpoint-by) ; text is in description slot
     ("f"   "Fill region/buffer"         f90-ts-fill-region)
     ("M-f" "Fill at line"               f90-ts-fill-at-line)
