@@ -590,6 +590,7 @@ Set to nil to disable keyword highlighting in comments."
   :type '(choice (const :tag "Disabled" nil)
                  (regexp :tag "Regexp"))
   :safe (lambda (v) (or (null v) (stringp v)))
+  :group 'f90-ts-font-lock
   :group 'f90-ts-comment)
 
 
@@ -681,6 +682,8 @@ seem to make much sense."
                                        '(column-0 context indented))
                                  (symbolp (plist-get rule :face))))
                           v)))
+  :group 'f90-ts-font-lock
+  :group 'f90-ts-indent
   :group 'f90-ts-comment)
 
 
