@@ -13,6 +13,9 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
 ### Recently added, changed or improved
 
+**07-2026**
+ - Alignment of unary expressions with leading minus or plus improved.
+
 **06-2026**
  - Fill line and region operations added
  - Defcustom group f90-ts-comment added.

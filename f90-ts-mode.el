@@ -32,6 +32,7 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [07-2026] Alignment of unary expressions with leading minus or plus improved.
 ;;   [06-2026] Fill line and region operations added.
 ;;   [06-2026] Defcustom group f90-ts-comment added.
 ;;   [06-2026] Indentation of lines after a structure beginning line with
@@ -1547,7 +1548,7 @@ same bounds, which is the contains_statement node."
 
 (defun f90-ts--siblings-between (node1 node2 &optional named)
   "Return sibling between NODE1 and NODE2, including NODE1 and excluding NODE2.
-It is assumed that node1 and node2 are sibling (have the same parent.
+It is assumed that node1 and node2 are sibling (have the same parent).
 If NAMED is non-nil, return only named nodes."
   (cl-assert (treesit-node-eq (treesit-node-parent node1)
                               (treesit-node-parent node2))
@@ -2788,15 +2789,15 @@ previously (already indented) lines to select the proper one.
 The cache is required for `indent-region' operations, which work in a
 batch mode.  If a previous line has not already been flushed, which is
 the default case, we need to compute the column number ourselves after
-not-yet-applied indentation.  To this end, we store the computed delta
-in the cache.
-Moreover, we also store BOL-COL to detect, whether internal indentation
+not-yet-applied indentation.
+To this end, we store the computed delta in the cache.  Except for the first
+line, we can compute the indentation delta and cache it.  For the first line,
+the delta is not known and initially stored as DELTA=0.  Once we detect a
+flush, we can compute the delta and add it to all cached lines.  This is
+necessary to have consistent indentation across all previous lines
+
+The cache also stores BOL-COL to detect, whether internal indentation
 buffer of `treesit-indent-region' has already been flushed for a line.
-Except for the first line, we can compute the indentation delta and
-cache it.  For the first line, the delta is not known and initially
-stored as DELTA=0. Once we detect a flush using cached column at bol,
-we can compute the delta and add to all cached lines.  This is necessary
-to have consistent indentation across all previous lines
 
 As mentioned above, the cache is an alist (LINE . (BOL-COL DELTA)),
 mapping buffer LINE numbers to BOL-COL and DELTA, where:
@@ -2898,19 +2899,28 @@ to a line is more expensive)."
                        f90-ts--continued-line-cache))))))
 
 
-(defun f90-ts--continued-line-cache-get-col (node)
-  "Return the final column of NODE in a continued statement.
-NODE is a potential anchor on some previous line, for which indentation
-has already been computed.
-Lookup the cache for the line node is placed on.  If current and cached
+(defun f90-ts--continued-line-cache-get-col (anoff)
+  "Return the final column of ANOFF in a continued statement.
+ANOFF is a cons (ANCHOR.OFFSET), where ANCHOR is a node or buffer position on
+some previous line, for which indentation has already been computed.
+OFFSET is an integer value to provide a relative offset to the anchor.
+It is allowed to be negative.  If the resulting column becomes negative,
+then it is bounded by zero.
+
+Lookup the cache for the line anchor is placed on.  If current and cached
 indentation is equal, then apply cached delta to current column,
 otherwise return column as is."
-  (let* ((pos (treesit-node-start node))
-         (col (f90-ts--column-number-at-pos pos)))
+  (let* ((anchor (car anoff))
+         (offset (cdr anoff))
+         (pos (if (treesit-node-p anchor)
+                  (treesit-node-start anchor)
+                anchor))
+         (col (max 0 (+ (f90-ts--column-number-at-pos pos)
+                        offset))))
     (if f90-ts--align-continued-variant-tab
         ;; line based indentation, no caching
         col
-      (let* ((line (f90-ts--node-line node))
+      (let* ((line (line-number-at-pos pos))
              (entry (cdr (assq line f90-ts--continued-line-cache)))
              (delta (cadr entry))
              (bol-col (car entry))
@@ -3255,54 +3265,91 @@ succeeding matcher or the corresponding anchor."
 ;;++++++++++++++
 ;; lists on continued lines: auxiliary functions
 
+(defun f90-ts--node-leftmost-unary (node)
+  "Return leftmost descendant of NODE if it is an unary_expression.
+This is only done, if NODE is a binary expression of type math_expression,
+logical_expression or relational_expression.  It checks for field :left
+and descend it until there is no such field or the node is of
+type unary_expression."
+  (cond
+   ((f90-ts--node-type-p node "unary_expression")
+    node)
+
+   ((f90-ts--node-type-p node '("math_expression"
+                                "logical_expression"
+                                "relational_expression"))
+    (cl-loop
+     for n = node then (treesit-node-child-by-field-name n "left")
+     while (and n (treesit-node-child-by-field-name n "left"))
+     ;; note that a logical_expression without a left field is an unary expression
+     ;; with operator .not., but it is not recorded as an unary_expression node
+     finally return (when (and n
+                               (f90-ts--node-type-p n '("unary_expression"
+                                                        "logical_expression")))
+                      n)))))
+
+
 (defun f90-ts--align-node-symbol (node)
   "Return a symbol for NODE to group and select nodes for alignment selection.
 Nodes for alignment are mostly selected among nodes with the same symbol.
 If NODE is nil return nil."
   (when node
-    (cond
-     ((f90-ts--node-type-p node "ERROR")
-      'error)
+    (let ((unary-leftm (f90-ts--node-leftmost-unary node)))
+      (cond
+       ((f90-ts--node-type-p node "ERROR")
+        'error)
 
-     ((f90-ts--node-type-p node "comment")
-      'comment)
+       ((f90-ts--node-type-p node "comment")
+        'comment)
 
-     ((f90-ts--node-type-p node "unary_expression")
-      ;; is this the right approach and symbol?
-      ;; (not that of unary expressions, node is not the operator
-      ;; but the unary_expression node itself)
-      'operator-unary)
+       (unary-leftm
+        (if (f90-ts--node-type-p (treesit-node-child-by-field-name unary-leftm "operator")
+                                 '("-" "+"))
+            'operator-unary-minusplus
+          ;; either user defined operator or logical .not.
+          'operator-unary-other))
 
-     ((string= (treesit-node-field-name node) "operator")
-      (let* ((parent (treesit-node-parent node))
-             (type (and parent (treesit-node-type parent))))
-      (pcase type
-        ("logical_expression"        'operator-logical)
-        ("math_expression"           'operator-math)
-        ("relational_expression"     'operator-relation)
-        ;; map concatenation to math_expression, as user defined
-        ;; operators are also handled by that way
-        ("concatentation_expression" 'operator-math)
-        ;("unary_expression"          'operator-unary) ; can this happen here
-        (_                           'operator) ; anything still missing?
-        )))
+       ((string= (treesit-node-field-name node) "operator")
+        ;; applies if node is a binary operator like "+" or ".and."
+        (let* ((parent (treesit-node-parent node))
+               (type (and parent (treesit-node-type parent))))
+          (pcase type
+            ("logical_expression"        'operator-logical)
+            ("math_expression"           'operator-math)
+            ("relational_expression"     'operator-relation)
+            ;; map concatenation to math_expression, as user defined
+            ;; operators are also handled by that way
+            ("concatentation_expression" 'operator-math)
+            (_                           'operator) ; anything still missing?
+            )))
 
-     ((f90-ts--node-type-p node "&")
-      ;; text is not always "&" (like virtual ampersand at beginning of line)
-      'ampersand)
+       ((f90-ts--node-type-p node "&")
+        ;; text is not always "&" (like virtual ampersand at beginning of line)
+        'ampersand)
 
-     (t
-      (let ((text (treesit-node-text node)))
-        (pcase text
-          ((or "(" ")" "[" "]" "(/" "/)")
-           'parenthesis)
-          (","  'comma)
-          ("&"  'ampersand)
-          ("=>" 'associate)
-          ("="  'assignment)
-          ;; default: argument for anything else (this is probably a named node
-          ;; of type identifier, number_literal, call_expression etc.
-          (_    'named)))))))
+       (t
+        (let ((text (treesit-node-text node)))
+          (pcase text
+            ((or "(" ")" "[" "]" "(/" "/)")
+             'parenthesis)
+            (","  'comma)
+            ("&"  'ampersand)
+            ("=>" 'associate)
+            ("="  'assignment)
+            ;; default: argument for anything else (this is probably a named node
+            ;; of type identifier, number_literal, call_expression, parenthesized_expression etc.
+            (_    'named))))))))
+
+
+(defun f90-ts--align-nsym-compatible-p (nsym1 nsym2)
+  "Return non-nil if NSYM1 and NSYM2 are considered compatible for alignment.
+Two node symbols are equal if `eq', or if both NSYM1 and NSYM2 are
+members of `(named operator-unary-minusplus operator-unary-other)'
+We consider operator-unary of type named, but with the hint to adjust
+offset to align the body and ignore the leading minus."
+  (or (eq nsym1 nsym2)
+      (and (memq nsym1 '(named operator-unary-minusplus operator-unary-other))
+           (memq nsym2 '(named operator-unary-minusplus operator-unary-other)))))
 
 
 (defun f90-ts--align-list-location (node)
@@ -3354,6 +3401,13 @@ the function returns the outermost expression node."
    #'f90-ts--node-op-expr-p))
 
 
+(defun f90-ts--align-list-aux-context-p (context)
+  "Return t if the node CONTEXT represents an auxiliary context node.
+In some cases, a list context is part of an assignment, parenthesized
+expression or a comma separated list, which are called auxiliary context."
+  (f90-ts--node-type-p context '("=" "(" ",")))
+
+
 ;;++++++++++++++
 ;; list context: association_list
 
@@ -3391,12 +3445,17 @@ The list context is provided as car of CONTEXT."
 ;; list context: operator expressions
 
 (defun f90-ts--align-list-expand-op-expr (node)
-  "Recursively compute relevant children of a logical expression tree NODE.
-An expression like (A and B and C) is represented as
-logical_expression(logical_expression(A and B) and C).
+  "Recursively compute relevant children of a expression tree NODE.
+An expression like (A and B and C) or (x + y) is represented as a binary tree
+like logical_expression(logical_expression(A and B) and C).
 The routine returns the five children A, and, B, and, C.
-It does not descend into parenthesized_expressions."
-  (if (f90-ts--node-op-expr-p node)
+Similar for other expression types like math_expression.
+It does not descend into parenthesized_expressions and unary_expression whose
+operator is a minus."
+  (if (and (f90-ts--node-op-expr-p node)
+           (not (and (f90-ts--node-type-p node "unary_expression")
+                     (f90-ts--node-type-p (treesit-node-child-by-field-name node "operator")
+                                          "-"))))
       (mapcan #'f90-ts--align-list-expand-op-expr
               (treesit-node-children node))
     (list node)))
@@ -3422,8 +3481,8 @@ parenthesis node if present as cdr of CONTEXT."
 
     ;; assert that auxiliary context is nil or assignment or opening parenthesis
     (cl-assert (or (null aux-context)
-                   (f90-ts--node-type-p aux-context '("=" "(" ",")))
-               "invalid aux context in op-expr, list-context=%, aux-context=%s"
+                   (f90-ts--align-list-aux-context-p aux-context))
+               "invalid aux context, list-context=%, aux-context=%s"
                list-context aux-context)
 
     (let* ((items-expr (f90-ts--align-list-expand-op-expr list-context))
@@ -3550,16 +3609,27 @@ from ITEMS becomes the new primary."
     `(let ((,acc nil))
        (cl-flet ((collect (arg1 &optional arg2)
                    (when arg1
-                     (push (if arg2 (list arg1 arg2) arg1)
+                     (push (cons arg1 (or arg2 0))
                            ,acc)))
+
                  (as-primary (arg1 &optional arg2)
-                   (when arg1
-                     (setq ,acc (append ,acc (list (if arg2 (list arg1 arg2) arg1))))))
+                   (cl-assert (or (null arg1)
+                                  (and (consp arg1) (not arg2))
+                                  (integerp arg1)
+                                  (treesit-node-p arg1))
+                              nil "wrong usage of as-primary")
+                   (setq ,acc (append ,acc
+                                      (list
+                                       (cond
+                                        ((consp arg1) arg1)
+                                        (arg1 (cons arg1 (or arg2 0))))))))
+
                  (merge-items (items)
                    (when items
                      (setq ,acc (append ,acc (reverse items)))))
                  (anything-collected-p ()
                    ,acc))
+
          ,@body
          ;; reverse order, the first item collected is used as primary,
          ;; it must be the first in the final list
@@ -3571,16 +3641,15 @@ from ITEMS becomes the new primary."
 This is start position of pstmt-1 as anchor and `f90-ts-indent-continued'
 as offset."
   (let ((pstmt-1 (f90-ts--indent-prev-stmt-first)))
-    (list (treesit-node-start pstmt-1)
+    (cons (treesit-node-start pstmt-1)
           f90-ts-indent-continued)))
 
 
 (defun f90-ts--align-list-smallest-anoff (items)
   "Return the item with the smallest column number in a list of ITEMS.
 ITEMS is not asssumed to be sorted by their column.
-Currently an item must be a node.  It is assumed that anchor is a node (in
-general it is a node or a buffer position) and offset is 0.
-Pairs anoff=(anchor offset) are not yet implemented so far."
+Currently an item must be a cons (node . offset).  It is assumed that anchor
+is a node (in general it is a node or a buffer position) and offset is 0."
   (car (seq-sort-by #'f90-ts--continued-line-cache-get-col
                     #'<
                     items)))
@@ -3589,16 +3658,16 @@ Pairs anoff=(anchor offset) are not yet implemented so far."
 (defun f90-ts--align-list-smallest-column (items)
   "Return the smallest column number found in a list of ITEMS.
 ITEMS is not asssumed to be sorted.
-Currently an item must be a node.  It is assumed that anchor is a node (in
-general it is a node or a buffer position) and offset is 0.
-Pairs anoff=(anchor offset) are not yet implemented so far."
+Currently an item must be a cons (node . offset).  It is assumed that anchor
+is a node (in general it is a node or a buffer position) and offset is 0."
   ;;(f90-ts-log-msg :smallcol "cache = %s" f90-ts--continued-line-cache)
   ;;(cl-loop
-  ;; for node in items
-  ;; do (f90-ts-log-msg :smallcol "node col = %s, %s" node (f90-ts--continued-line-cache-get-col node)))
+  ;; for node-off in items
+  ;; do (f90-ts-log-msg :smallcol "node-off col = %s, %s"
+  ;;     node-off (f90-ts--continued-line-cache-get-col node-off)))
   (cl-loop
-   for node in items
-   minimize (f90-ts--continued-line-cache-get-col node)))
+   for node-off in items
+   minimize (f90-ts--continued-line-cache-get-col node-off)))
 
 
 (defun f90-ts--align-list-other-epilog (items-plist has-items)
@@ -3641,7 +3710,7 @@ ITEMS-PLIST is the plist collection of items lists."
   (let* ((items-head (plist-get items-plist :head))
          (items-tail (plist-get items-plist :tail))
          (col-min    (f90-ts--align-list-smallest-column items-tail))
-         (col-lead   (f90-ts--continued-line-cache-get-col node-lead)))
+         (col-lead   (f90-ts--continued-line-cache-get-col (cons node-lead 0))))
     (f90-ts--collecting-anoff
      (if (eq node-sym 'parenthesis)
          ;; closing parenthesis: align relative to indentation if any prior
@@ -3675,7 +3744,7 @@ ITEMS-PLIST is the plist collection of items lists."
            (as-primary start-lead offset-lead)))
 
        ;; ensure both positions are always present in the result list
-       (collect start-lead   offset-lead)
+       (collect start-lead     offset-lead)
        (collect indent-at-lead f90-ts-indent-continued)))))
 
 
@@ -3716,13 +3785,15 @@ See `f90-ts--align-list-other-paren-expr-core' for the shared logic.
 CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
 the align-list-other family."
   (cl-assert (f90-ts--node-op-expr-p (car context))
-             nil
-             "align-list-other-op-expr: wrong context, expected some op-expr, got '%s'"
-             (car context))
+             nil "wrong context, expected some op-expr, got '%s'" (car context))
 
   (let* ((aux-context (cdr context)))
     (f90-ts--collecting-anoff
      (when aux-context
+       (cl-assert (f90-ts--align-list-aux-context-p aux-context)
+                  "invalid aux context, list-context=%, aux-context=%s"
+                  (car context) aux-context)
+
        (let* ((list-context  (car context))
               (node-sym      (alist-get 'nsym loc))
               (psib-context  (f90-ts--prev-sibling-proper list-context))
@@ -3730,6 +3801,7 @@ the align-list-other family."
               (start-aux     (treesit-node-start aux-context))
               (indent-at-aux (f90-ts--indent-pos-at-node aux-context))
               (offset-aux    (pcase psib-type
+                               ;; if there is an auxiliary context, one of the three cases is true
                                ("("
                                 (if (eq node-sym 'parenthesis)
                                     f90-ts-indent-paren-close
@@ -3786,10 +3858,10 @@ The first entry of the returned \"other\" list is used as primary anchor.
 For variable declarations these anchors depend on CONTEXT, node-sym (nsym
 in LOC) and ITEMS-PLIST.
 
-Car of CONTEXT is a variable_declaration.  For this, the continued line
-position is always added.
-If ITEMS-SYM in ITEMS=(ITEMS-PREV ITEMS-SYM) has entries, then return the
-entry with the smallest column as primary anchor.
+Car of CONTEXT is a variable_declaration.
+
+If ITEMS-SYM in ITEMS-PLIST has entries, then return the entry with the
+smallest column as primary anchor.
 Always return position of pstmt-1 with offset `f90-ts-indent-continued'
 for default continued line indentation."
   (let* ((list-context (car context))
@@ -3812,14 +3884,18 @@ for default continued line indentation."
     (f90-ts--collecting-anoff
      (cond
       (node-colons
-       ;; start of "::" plus f90-ts-indent-declaration
-       (collect (treesit-node-start node-colons)
-                f90-ts-indent-declaration))
+       (when (< (f90-ts--node-line node-colons)
+                (alist-get 'line loc))
+         ;; start of "::" plus f90-ts-indent-declaration
+         (collect (treesit-node-start node-colons)
+                  f90-ts-indent-declaration)))
       (node-type-attr
-       ;; no colons, take last node (type or attribute, and add to end position of that node
-       ;; f90-ts-indent-declaration minus 2 (subtracting length of "::")
-       (collect (treesit-node-end node-type-attr)
-                (- f90-ts-indent-declaration 2))))
+       (when (< (f90-ts--node-line node-colons)
+                (alist-get 'line loc))
+         ;; no colons, take last node (type or attribute, and add to end position of that node
+         ;; f90-ts-indent-declaration minus 2 (subtracting length of "::")
+         (collect (treesit-node-end node-type-attr)
+                  (- f90-ts-indent-declaration 2)))))
 
      ;; the following conditions should be mutually exclusive
      (cond
@@ -3841,56 +3917,157 @@ for default continued line indentation."
 ;;++++++++++++++
 ;; list context: items and columns
 
-(defun f90-ts--align-list-filter-items (items node-sym)
-  "From a list ITEMS of node items select compatible nodes.
-Currently these are nodes with the same NODE-SYM."
-  (when node-sym
-    (let ((pred-node-sym
-           (lambda (n) (eq (f90-ts--align-node-symbol n)
-                           node-sym))))
-      (seq-filter pred-node-sym
-                  items))))
+(defun f90-ts--align-list-filter-prev-nsym (items-all cur-line)
+  "Filter ITEMS-ALL and add node symbol information.
+ITEMS-ALL are all nodes of a list context and might contain nodes from future
+lines.
+
+The filter removes any items not before line CUR-LINE.  It also filters out
+ampersand nodes (continuation symbols), which are not relevant for alignment.
+Those ampersands cannot appear as leading nodes in a line, since they leading
+ampersands are removed during indentation.
+
+It returns a list (NODE . NSYM) with symbol information for all filtered
+items."
+  (let ((items-filtered (seq-filter
+                         ;; filter by line number, use only items on some previous line,
+                         ;; also drop continuation symbols, as these are not relevant for alignment
+                         (lambda (n) (and (< (f90-ts--node-line n)
+                                             cur-line)
+                                          (not (f90-ts--node-type-p n "&"))))
+                         items-all)))
+    (mapcar
+     (lambda (n) (cons n (f90-ts--align-node-symbol n)))
+     items-filtered)))
 
 
-(defun f90-ts--align-list-map-col-pos (anchor)
-  "Map an ANCHOR to a triple (column position offset).
-ANCHOR is either a node or an otherwise obtained pair (position offset), .
-For a node, position is start of node and offset is zero."
+(defun f90-ts--align-list-items-head-p (node-nsym context-line)
+  "Predicate to determine relevant items on first context line (head line).
+NODE-NSYM is a cons (NODE . NSYM) providing NODE and the symbol for NODE.
+The predicate compares line number of NODE with CONTEXT-LINE.
+It also drops comments and auxiliary context nodes (assignment, parenthesis,
+comma) on the head line, as items on the head line are used to  verify whether
+proper items are present on this line."
+  (let ((n (car node-nsym)))
+    (and (= context-line (f90-ts--node-line n))
+         (not (f90-ts--node-type-p n "comment"))
+         (not (f90-ts--align-list-aux-context-p n)))))
+
+
+(defun f90-ts--align-list-items-tail-p (node-nsym context-line)
+  "Predicate to determine relevant items in the tail after context line.
+NODE-NSYM is a cons (NODE . NSYM) providing NODE and the symbol for NODE.
+The predicate compares line number of NODE with CONTEXT-LINE."
+  (let ((n (car node-nsym)))
+    (< context-line (f90-ts--node-line n))))
+
+
+(defun f90-ts--align-list-nsym-offset (loc item-nsym)
+  "Compute alignment offset for ITEM-NSYM depending on LOC.
+LOC is the location data at point, and provides a reference symbol and the
+node at point.  ITEM-NSYM is a cons (NODE . NSYM) for a filtered item of the
+list context.
+
+NSYM at LOC and item-nsym determine the offset:
+`named' is paired with `operator-unary-minusplus' gives offset -1;
+`operator-unary-minusplus' paired with an item `named' gives offset 1;
+otherwise offset is 0.
+Note that `operator-unary-minusplus' are unary_expression nodes with
+operator \"-\" and no other unary expression.
+Furthermore, offset is in fact the difference of \"-\" and argument node of
+unary_expression, to handle blanks between the minus and the value content."
+  (let ((nsym (cdr item-nsym))
+        (nsym-loc (alist-get 'nsym loc)))
+    (cond
+     ((and (memq nsym-loc '(named operator-unary-other))
+           (eq nsym 'operator-unary-minusplus))
+      (let* ((node (car item-nsym))
+             (unary-leftm (f90-ts--node-leftmost-unary node))
+             (arg (treesit-node-child-by-field-name unary-leftm "argument")))
+        (if (= (f90-ts--node-line node) (f90-ts--node-line arg))
+            (- (treesit-node-start arg) (treesit-node-start node))
+          ;; argument of unary expression is not on the same line
+          ;; TODO: this should be resolved at the anchor level (do not the
+          ;; unary-minus node as anchor, instead use argument as anchor...)
+          1)))
+
+     ((and (eq nsym-loc 'operator-unary-minusplus)
+           (memq nsym '(named operator-unary-other)))
+      (let* ((node (alist-get 'node loc))
+             (unary-leftm (f90-ts--node-leftmost-unary node))
+             (arg (treesit-node-child-by-field-name unary-leftm "argument")))
+        (if (= (f90-ts--node-line node) (f90-ts--node-line arg))
+            (- (treesit-node-start node) (treesit-node-start arg))
+          ;; argument of unary expression is not on the same line, there is not much we
+          ;; can do about this, just move the minus one character to the left of the
+          ;; '(named operator-unary-other) anchor
+          -1)))
+
+     (t 0))))
+
+
+(defun f90-ts--align-list-nsym-filter-offset (items-prev-sym pred loc)
+  "Filter ITEMS-PREV-SYM by PRED, then map to (NODE . OFFSET) cons cells.
+ITEMS-PREV-SYM is a list of (NODE . NSYM).  PRED is called for
+each (NODE . NSYM) cons cell in ITEMS-PREV-SYM.  LOC is passed to
+`f90-ts--align-list-nsym-offset' to compute the offset for each item,
+which satisfies PRED."
+  (mapcar
+   (lambda (nsym)
+     (cons (car nsym)
+           (f90-ts--align-list-nsym-offset loc nsym)))
+   (seq-filter pred items-prev-sym)))
+
+
+(defun f90-ts--align-list-map-col-pos-off (anoff)
+  "Map an ANOFF = (ANCHOR.OFFSET) to a triple (COLUMN POSITION OFFSET).
+ANCHOR is either a node or an otherwise obtained position.
+For a node, the start position of node is used.
+
+The returned COLUMN in the triple is the final column, taking (possibly)
+cached indentation on the line at anchor into account.
+
+OFFSET is allowed to be negative and restricted if necessary to avoid negative
+column numbers."
   (cl-assert
-   (or (treesit-node-p anchor)
-       (and (integerp (car anchor))
-            (integerp (cadr anchor))))
+   (and (or (treesit-node-p (car anoff))
+            (integerp (car anoff)))
+        (integerp (cdr anoff)))
    nil
-   "anchor is not a node or a pair of integers, got %s" anchor)
+   "anoff is not a cons (node . offset) or (pos . offset), got %s" anoff)
 
-  (if (treesit-node-p anchor)
-      (list
-       ;; some node, compute column number and buffer position, offset=0
-       (f90-ts--continued-line-cache-get-col anchor)
-       (treesit-node-start anchor)
-       0)
-    ;; a pair (buffer position, offset) add column
-    ;; compute column at position and then add offset
-    ;; (do not compute column at position + offset, this might not be valid)
-    (cons
-     (+ (f90-ts--column-number-at-pos (car anchor)) (cadr anchor))
-     anchor)))
+  (let* ((anchor (car anoff))
+         (offset (cdr anoff))
+         (pos (if (treesit-node-p anchor)
+                  (treesit-node-start anchor)
+                anchor))
+         ;; we need to bound offset here if negative
+         (col (f90-ts--continued-line-cache-get-col (cons pos 0)))
+         (offset-bounded (max (- col) offset)))
+    ;; if offset is negative, we need to be careful, to avoid getting a
+    ;; negative column (corresponding to a buffer position on the
+    ;; previous line), the used position must always be valid in the
+    ;; current buffer before indentation takes place
+    (list
+     (+ col offset-bounded)
+     pos
+     offset-bounded)))
 
 
-(defun f90-ts--align-list-cp-sort (cp-alist)
-  "Make CP-ALIST of (column position offset) triples unique by column position.
+(defun f90-ts--align-list-cpo-sort (cpo-list)
+  "Make CPO-LIST of (column position offset) triples unique by column position.
 For several entries with same column number, take the element with the largest
 buffer position."
-  (let ((cp-alist-unique
+  (let ((cpo-list-unique
          (seq-map (lambda (group)
                     ;; elements produced by seq-group-by are:
                     ;; group = (col (col pos1 offset1) (col pos2 offset2) ...)
                     ;; ((cdr group) gets rid of initial col)
-                    (cl-reduce (lambda (cp1 cp2)
-                                 (if (> (cadr cp1) (cadr cp2)) cp1 cp2))
+                    (cl-reduce (lambda (cpo1 cpo2)
+                                 (if (> (cadr cpo1) (cadr cpo2)) cpo1 cpo2))
                                (cdr group)))
-                  (seq-group-by #'car cp-alist))))
-    (seq-sort (lambda (a b) (< (car a) (car b))) cp-alist-unique)))
+                  (seq-group-by #'car cpo-list))))
+    (seq-sort (lambda (a b) (< (car a) (car b))) cpo-list-unique)))
 
 
 (defun f90-ts--align-list-select (variant cur-col primary items)
@@ -3902,27 +4079,27 @@ PRIMARY is a default/fallback anchor (position offset).  Depending on
 VARIANT (like keep-or-primary) and current alignment, PRIMARY is
 selected."
   ;; note that entries in col-pos are triples
-  ;; cp = (column, buffer position, offset),
+  ;; cpo = (column position offset),
   ;; where buffer position must be start of a previous node to ensure
   ;; that treesitter buffering in indent-region works as expected,
-  (let* ((col-pos-unsorted (seq-map #'f90-ts--align-list-map-col-pos items))
-         (col-pos (f90-ts--align-list-cp-sort col-pos-unsorted))
-         (aligned-at (seq-find (lambda (cp) (= cur-col (car cp)))
-                               col-pos))
-         (primary-col-pos (f90-ts--align-list-map-col-pos primary)))
+  (let* ((col-pos-off-unsorted (seq-map #'f90-ts--align-list-map-col-pos-off items))
+         (col-pos-off (f90-ts--align-list-cpo-sort col-pos-off-unsorted))
+         (aligned-at (seq-find (lambda (cpo) (= cur-col (car cpo)))
+                               col-pos-off))
+         (primary-col-pos-off (f90-ts--align-list-map-col-pos-off primary)))
     ;; :get-other-fn should always return some fallback position
     ;; (like pstmt-1+default indent for continued lines), and thus
-    ;; there must always be some anchors in col-pos
-    (cl-assert col-pos nil "no relevant columns found")
+    ;; there must always be some anchors in col-pos-off
+    (cl-assert col-pos-off nil "no relevant columns found")
 
     ;; the selection process selects a triple, drops the column and returns
     ;; the two remaining elements (buffer position, offset)
     (cond
      ;; special case (e.g. after inserting newline by <return> or f90-line-break)
-     ;; check whether we are before first entry in col-pos,
-     ;; if this is the case we go to primary, not to first entry in col-pos
-     ((< cur-col (caar col-pos))
-      (cdr primary-col-pos))
+     ;; check whether we are before first entry in col-pos-off,
+     ;; if this is the case we go to primary, not to first entry in col-pos-off
+     ((< cur-col (caar col-pos-off))
+      (cdr primary-col-pos-off))
 
      ;; cases: (aligned, rotate), (not-aligned, rotate),
      ;;        (not-aligned,keep-or-rotate)
@@ -3930,33 +4107,33 @@ selected."
           (and (not aligned-at)
                (eq variant 'keep-or-rotate)))
       ;; go to next column or wrap around,
-      ;; recall that col-pos is sorted by columns
-      (let ((aligned-next (seq-find (lambda (cp) (< cur-col (car cp)))
-                                    col-pos)))
+      ;; recall that col-pos-off is sorted by columns
+      (let ((aligned-next (seq-find (lambda (cpo) (< cur-col (car cpo)))
+                                    col-pos-off)))
         ;; next if there is a next, otherwise first entry (not necessarily primary)
         (or (cdr aligned-next)
-            (cdar col-pos))))
+            (cdar col-pos-off))))
 
      ;; cases: (not-aligned, keep-or-primary),
      ;;        (aligned, primary), (not-aligned, primary)
      ((or (not aligned-at)
           (eq variant 'primary))
-      (cdr primary-col-pos))
+      (cdr primary-col-pos-off))
 
      ;; cases: (aligned, keep-or-primary)
      ;;        (aligned, keep-or-rotate)
      ((and aligned-at
            (member variant '(keep-or-primary
                              keep-or-rotate)))
-      ;; aligned, keep current column, but use proper element from col-pos
+      ;; aligned, keep current column, but use proper element from col-pos-off
       ;; as anchor, otherwise indent-region does not take indentation of anchor
       ;; position into account
       (cdr aligned-at))
 
      (t
       ;; all eight cases plus node before minimal column are covered above
-      (cl-assert col-pos nil "cond logic not complete")
-      (cdr primary-col-pos)))))
+      (cl-assert col-pos-off nil "cond logic not complete")
+      (cdr primary-col-pos-off)))))
 
 
 (defun f90-ts--align-list-anoff-items (loc context)
@@ -3972,31 +4149,30 @@ the offset is assumed to be 0."
          (items-all (funcall get-items context loc))
          (cur-line (alist-get 'line loc))
          (cntxt-line (f90-ts--node-line (or (cdr context) (car context))))
-         (items-prev (seq-filter
-                      ;; filter by line number, use only items on some previous line,
-                      ;; also drop continuation symbols, as these are not relevant for alignment
-                      (lambda (n) (and (< (f90-ts--node-line n)
-                                          cur-line)
-                                       (not (f90-ts--node-type-p n "&"))))
-                      items-all))
-         (items-head (seq-filter
-                      ;; determine nodes on first context line (head line),
-                      ;; but drop comments, assignment and parenthesis on this line, as items-head
-                      ;; is used to verify whether proper items are present on this line
-                      (lambda (n) (and (= (f90-ts--node-line n)
-                                          cntxt-line)
-                                       (not (f90-ts--node-type-p n '("comment" "=" "(" ",")))))
-                       items-prev))
-         (items-tail (seq-filter
-                      ;; all items-prev, which are not on the context line (first line) itself
-                      (lambda (n) (< cntxt-line
-                                     (f90-ts--node-line n)))
-                      items-prev))
-         (items-sym  (f90-ts--align-list-filter-items items-prev
-                                                      (alist-get 'nsym loc))))
-    ;; further filter by symbol type node-sym of current node at point
+         (node-sym (alist-get 'nsym loc))
+         (items-prev-sym
+          (f90-ts--align-list-filter-prev-nsym items-all cur-line))
+         (items-head
+          (f90-ts--align-list-nsym-filter-offset
+           items-prev-sym
+           (lambda (node-nsym)
+             (f90-ts--align-list-items-head-p node-nsym cntxt-line))
+           loc))
+         (items-tail
+          (f90-ts--align-list-nsym-filter-offset
+           items-prev-sym
+           (lambda (node-nsym)
+             (f90-ts--align-list-items-tail-p node-nsym cntxt-line))
+           loc))
+         ;; further filter by symbol type node-sym of current node at point
+         (items-sym
+          (when node-sym
+            (f90-ts--align-list-nsym-filter-offset
+             items-prev-sym
+             (lambda (nsym) (f90-ts--align-nsym-compatible-p (cdr nsym) node-sym))
+             loc))))
     (list :sym  items-sym
-          :prev items-prev
+          :prev items-prev-sym
           :head items-head
           :tail items-tail)))
 
@@ -4024,12 +4200,12 @@ statement by pstmt-1) are considered.
 Finally use VARIANT to select one pair to align with."
   (let* ((anoff-items-plist (f90-ts--align-list-anoff-items loc
                                                             context))
-         (anoff-items-sym (plist-get anoff-items-plist :sym))
          ;;(_ (progn
          ;;     (f90-ts-log-msg :anoff "items-sym = %s"  (plist-get anoff-items-plist :sym))
          ;;     (f90-ts-log-msg :anoff "items-prev = %s" (plist-get anoff-items-plist :prev))
          ;;     (f90-ts-log-msg :anoff "items-head = %s" (plist-get anoff-items-plist :head))
          ;;     (f90-ts-log-msg :anoff "items-tail = %s" (plist-get anoff-items-plist :tail))))
+         (anoff-items-sym (plist-get anoff-items-plist :sym))
          (anoff-other (f90-ts--align-list-anoff-other loc
                                                       anoff-items-plist
                                                       context))
@@ -4044,6 +4220,7 @@ Finally use VARIANT to select one pair to align with."
                               anoff-other
                               anoff-items-sym)))
     ;;(f90-ts-log-msg :anoff "items-other = %s" anoff-other)
+    ;;(f90-ts-log-msg :anoff "items-final = %s" anoff-final)
     ;;(f90-ts-log-msg :anoff "item-primary = %s" anoff-primary)
     (f90-ts--align-list-select variant
                                (alist-get 'col loc)
@@ -4132,10 +4309,8 @@ nil).  But we do not need to ascend further."
   (let* ((node (alist-get 'node loc))
          (line (alist-get 'line loc))
          (stmt-min
-          (or (and (f90-ts--node-op-expr-p node)
-                   node)
-              (and (f90-ts--node-op-expr-p parent)
-                   parent)))
+          (or (when (f90-ts--node-op-expr-p node)   node)
+              (when (f90-ts--node-op-expr-p parent) parent)))
          ;; find root of expression
          (root-expr (and stmt-min (f90-ts--node-op-expr-chain-root stmt-min)))
          ;; if we are on the same line as the root, we might need to check
