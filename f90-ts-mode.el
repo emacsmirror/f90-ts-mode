@@ -32,6 +32,7 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [07-2026] Inherit attribute of some font lock faces fixed.
 ;;   [07-2026] Alignment of unary expressions with leading minus or plus improved.
 ;;   [06-2026] Fill line and region operations added.
 ;;   [06-2026] Defcustom group f90-ts-comment added.
@@ -357,19 +358,19 @@ With `left', the label's first digit starts on COLUMN (left-adjusted)."
 ;;;-----------------------------------------------------------------------------
 
 (defface f90-ts-font-lock-delimiter-face
-  '((t :inherit default))
+  '((t :inherit font-lock-delimiter-face))
   "Face used to highlight delimiter symbols (e.g. commas)."
   :group 'f90-ts-font-lock)
 
 
 (defface f90-ts-font-lock-bracket-face
-  '((t :inherit default))
+  '((t :inherit font-lock-bracket-face))
   "Face used to highlight brackets and parenthesis."
   :group 'f90-ts-font-lock)
 
 
 (defface f90-ts-font-lock-operator-face
-  '((t :inherit default))
+  '((t :inherit font-lock-operator-face))
   "Face used to highlight operators (e.g. +, -, *, /)."
   :group 'f90-ts-font-lock)
 
