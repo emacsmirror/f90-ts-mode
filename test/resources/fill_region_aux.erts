@@ -244,6 +244,23 @@ subroutine comments()
 end subroutine comments
 =-=-=
 
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts--fill-region-aux (point-min) (point-max) 60))
+
+Name: fill all break 9
+=-=
+subroutine comment_with_a()
+     ! this tests whether the comment is broken after the a for which fill col should be 60
+end subroutine comment_with_a
+=-=
+subroutine comment_with_a()
+     ! this tests whether the comment is broken after the a
+     ! for which fill col should be 60
+end subroutine comment_with_a
+=-=-=
+
 Point-Char: |
 
 Code:

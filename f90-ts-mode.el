@@ -6147,8 +6147,12 @@ Returns a sorted list of buffer positions, or nil."
       (sort
        (cl-loop
         with prefix-end = (point)
-        while (re-search-forward "\\S-\\(\\s-+\\S-\\)" end t)
+        while (re-search-forward "\\S-\\(\\s-+\\)\\S-" end t)
         for pos = (match-beginning 1)
+        ;; go back to avoid skipping the last \\S- match, which is
+        ;; captured in the next loop as the first \\S-, otherwise we skip
+        ;; one letter words like "a"
+        do (goto-char (match-end 1))
         when (<= (f90-ts--column-number-at-pos pos) fill-col)
         collect pos
         into positions

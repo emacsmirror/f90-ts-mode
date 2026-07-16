@@ -232,10 +232,10 @@ end subroutine sub@
 subroutine |sub()
      ! very long comment header with
      ! lots and lots of gibberish
-     !    content 1 content 2 content
-     !    3 content 4 content 5 content
-     !    6 content 3 content 4 content
-     !    5 content 6 content 7
+     !    content 1 content 2 content 3
+     !    content 4 content 5 content 6
+     !    content 3 content 4 content 5
+     !    content 6 content 7
      ! another header
      !    content 110 content 123
      !    content 234 content 345
