@@ -14,6 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **07-2026**
+ - Inherit attribute of some font lock faces fixed.
  - Alignment of unary expressions with leading minus or plus improved.
 
 **06-2026**
