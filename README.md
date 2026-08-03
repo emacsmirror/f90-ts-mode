@@ -13,6 +13,10 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
 ### Recently added, changed or improved
 
+**08-2026**
+ - Smart end completion of coarray "change team ... end team" blocks fixed. It was
+   wrongly assumed that the end statement is "end change team".
+
 **07-2026**
  - Inherit attribute of some font lock faces fixed.
  - Alignment of unary expressions with leading minus or plus improved.

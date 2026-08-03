@@ -32,8 +32,12 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] Smart end completion of coarray "change team ... end team" blocks fixed.
+;;             It was wrongly assumed that the end statement is "end change team".
+;;
 ;;   [07-2026] Inherit attribute of some font lock faces fixed.
 ;;   [07-2026] Alignment of unary expressions with leading minus or plus improved.
+;;
 ;;   [06-2026] Fill line and region operations added.
 ;;   [06-2026] Defcustom group f90-ts-comment added.
 ;;   [06-2026] Indentation of lines after a structure beginning line with
@@ -4927,7 +4931,8 @@ Return non-nil if something was changed and text actually replaced."
                                           " (type_name) @name"
                                           "))"))
     ("coarray_critical_statement" . "(coarray_critical_statement (block_label_start_expression _ @name \":\")? \"critical\" @construct)")
-    ("coarray_team_statement"     . "(coarray_team_statement (block_label_start_expression _ @name \":\")? \"change\" @construct \"team\" @construct2)"))
+    ;; this is counter intuitive: "change team" is ended by "end team" not by "end change team"
+    ("coarray_team_statement"     . "(coarray_team_statement (block_label_start_expression _ @name \":\")? \"change\" \"team\" @construct)"))
   "Treesitter queries to extract relevant nodes for smart end completion.")
 
 

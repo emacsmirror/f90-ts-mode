@@ -924,6 +924,7 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "indent_region_select.erts"
    "indent_region_preproc.erts"
    "indent_region_openmp.erts"
+   "indent_region_coarray.erts"
    "indent_region_stmt_label.erts")
  '(nil ; no modification
    f90-ts-mode-test--remove-indent
