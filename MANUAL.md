@@ -18,6 +18,7 @@ for implementation.
   - [Keybindings](#keybindings)
 - [Features](#features)
   - [Syntax highlight and font lock faces](#syntax-highlight-and-font-lock-faces)
+    - [Syntax highlighting of error regions](#syntax-highlighting-of-error-regions)
     - [Special variables](#special-variables)
     - [Comment regexps and rules](#comment-regexps-and-rules)
   - [Indentation](#indentation)
@@ -301,7 +302,7 @@ in the `:bind` section as shown above, or simply by:
 
 The mode has four levels of font-locking, which is controlled by customizable variable `treesit-font-lock-level`.
 
- - level 1: comment, preprocessor,
+ - level 1: comment, preprocessor, error,
  - level 2: builtin, keyword, string, type,
  - level 3: constant, number,
  - level 4: function, variable, operator, bracket, delimiter.
@@ -316,6 +317,13 @@ Additionally to the usual faces, there are some extra custom faces:
 | `f90-ts-font-lock-openmp-face`            | openmp directives                                       |
 | `f90-ts-font-lock-special-var-face`       | special variables (e.g. `self`, `this`)                 |
 | `f90-ts-font-lock-separator-comment-face` | separator comments like `!---------` and `! arguments`) |
+| `f90-ts-font-lock-error-face`             | additional properties for errors                        |
+
+#### Syntax highlighting of error regions
+
+The syntax highlighting of error regions (spanned by an `ERROR` node) can be enabled or disabled by
+`f90-ts-font-lock-error'. If nil, it is switched off, otherwise the variable provides the face to apply
+(with default value `f90-ts-font-lock-error-face`).
 
 
 #### Special variables

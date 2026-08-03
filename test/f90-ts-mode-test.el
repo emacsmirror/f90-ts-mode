@@ -148,6 +148,7 @@ without final newline."
     (f90-ts-fill-select-breakpoint-by . rightmost)
     (f90-ts-stmt-label-column . (left . 0))
     (f90-ts-special-comment-rules . ,f90-ts-mode-test--special-comment-rules)
+    (f90-ts-font-lock-error . f90-ts-font-lock-error-face)
     (f90-ts-comment-prefix-regexp . "!\\S-*")
     (f90-ts-comment-prefix-separator-regexp . "\\s-")
     (f90-ts-openmp-prefix-regexp . "!\\$\\(?:omp\\)?")
@@ -1034,7 +1035,8 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "font_lock_openmp.f90"
    "font_lock_coarray.f90"
    "font_lock_value.f90"
-   "font_lock_special_var.f90"))
+   "font_lock_special_var.f90"
+   "font_lock_error.f90"))
 
 
 ;; xref tests
