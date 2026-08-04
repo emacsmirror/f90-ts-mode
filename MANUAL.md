@@ -36,7 +36,7 @@ for implementation.
   - [Breaking and joining lines](#breaking-and-joining-lines)
     - [Breaking lines](#breaking-lines)
     - [Joining lines](#joining-lines)
-  - [Fill lines and regions(#fill-lines-and-regions)
+  - [Fill lines and regions](#fill-lines-and-regions)
   - [Comment region](#comment-region)
   - [Mark regions based on tree-sitter nodes](#mark-regions-based-on-tree-sitter-nodes)
 - [Development and Testing](#development-and-testing)
