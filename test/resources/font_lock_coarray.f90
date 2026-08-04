@@ -1,6 +1,9 @@
  program coarray_test
 !^^^^^^^ font-lock-keyword-face
 !        ^^^^^^^^^^^^ font-lock-function-name-face
+  use iso_fortran_env
+! ^^^ font-lock-keyword-face
+!     ^^^^^^^^^^^^^^^ nil
   implicit none
 ! ^^^^^^^^ font-lock-keyword-face
 !          ^^^^ font-lock-keyword-face
@@ -50,13 +53,13 @@
 !          ^^^^^^^^^^^^^^^^^^^^^^ font-lock-keyword-face
 !                                 ^^ f90-ts-font-lock-delimiter-face
 !                                    ^^^ nil
-  integer :: team_value[*]
-! ^^^^^^^ font-lock-type-face
-!         ^^ f90-ts-font-lock-delimiter-face
-!            ^^^^^^^^^^ nil
-!                      ^ f90-ts-font-lock-bracket-face
-!                       ^ nil
-!                        ^ f90-ts-font-lock-bracket-face
+  type(team_type) :: team_value
+! ^^^^ font-lock-keyword-face
+!     ^ f90-ts-font-lock-bracket-face
+!      ^^^^^^^^^ font-lock-type-face
+!               ^ f90-ts-font-lock-bracket-face
+!                 ^^ f90-ts-font-lock-delimiter-face
+!                    ^^^^^^^^^^ nil
   type(lock_type), codimension[*] :: mylock
 ! ^^^^ font-lock-keyword-face
 !     ^ f90-ts-font-lock-bracket-face
@@ -67,14 +70,14 @@
 !                                 ^^ f90-ts-font-lock-delimiter-face
 !                                    ^^^^^^ nil
 
-  scalar_co[1]       = 42
+  scalar_co[1]      = 42
 ! ^^^^^^^^^ nil
 !          ^ f90-ts-font-lock-bracket-face
 !           ^ font-lock-number-face
 !            ^ f90-ts-font-lock-bracket-face
-!                    ^ f90-ts-font-lock-operator-face
-!                      ^^ font-lock-number-face
-  arr(5)[1, 2]       = 3.14
+!                   ^ f90-ts-font-lock-operator-face
+!                     ^^ font-lock-number-face
+  arr(5)[1, 2]      = 3.14
 ! ^^^ nil
 !    ^ f90-ts-font-lock-bracket-face
 !     ^ font-lock-number-face
@@ -83,16 +86,16 @@
 !         ^ f90-ts-font-lock-delimiter-face
 !           ^ font-lock-number-face
 !            ^ f90-ts-font-lock-bracket-face
-!                    ^ f90-ts-font-lock-operator-face
-!                      ^^^^ font-lock-number-face
-  val[this_image()]  = this_image()
+!                   ^ f90-ts-font-lock-operator-face
+!                     ^^^^ font-lock-number-face
+  val[this_image()] = this_image()
 ! ^^^ nil
 !    ^ f90-ts-font-lock-bracket-face
 !     ^^^^^^^^^^ font-lock-builtin-face
 !               ^^^ f90-ts-font-lock-bracket-face
-!                    ^ f90-ts-font-lock-operator-face
-!                      ^^^^^^^^^^ font-lock-builtin-face
-!                                ^^ f90-ts-font-lock-bracket-face
+!                   ^ f90-ts-font-lock-operator-face
+!                     ^^^^^^^^^^ font-lock-builtin-face
+!                               ^^ f90-ts-font-lock-bracket-face
 
   ! intrinsics
 ! ^^^^^^^^^^^^ font-lock-comment-face
@@ -204,11 +207,10 @@
 !                                ^ f90-ts-font-lock-delimiter-face
 !                                  ^^^^^^^^^^ font-lock-builtin-face
 !                                            ^^ f90-ts-font-lock-bracket-face
-  end change team name_ch
+  end team name_ch
 ! ^^^ font-lock-keyword-face
-!     ^^^^^^ font-lock-keyword-face
-!            ^^^^ font-lock-keyword-face
-!                 ^^^^^^^ nil
+!     ^^^^ font-lock-keyword-face
+!          ^^^^^^^ nil
 
  end program coarray_test
 !^^^ font-lock-keyword-face

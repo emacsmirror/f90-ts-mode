@@ -390,6 +390,7 @@ Code:
   (lambda ()
     (f90-ts-mode)
     (let ((fill-column 40)
+          (inhibit-message t)
           (f90-ts-fill-select-breakpoint-by 'interactive))
       (f90-ts-mode-test--with-mocked-keys
        '[left return right backspace end left left left left left left return space delete home right right right right right right delete left left delete left left return backspace return right return ?q]
@@ -425,6 +426,7 @@ Code:
   (lambda ()
     (f90-ts-mode)
     (let ((fill-column 40)
+          (inhibit-message t)
           (f90-ts-fill-select-breakpoint-by 'interactive))
       (f90-ts-mode-test--with-mocked-keys
        '[space left left return delete space space space space delete delete space space left return space]
@@ -467,6 +469,7 @@ Code:
   (lambda ()
     (f90-ts-mode)
     (let ((fill-column 40)
+          (inhibit-message t)
           (f90-ts-fill-select-breakpoint-by 'interactive))
       (f90-ts-mode-test--with-mocked-keys
        '[space space left return return left return]
@@ -491,6 +494,7 @@ Code:
   (lambda ()
     (f90-ts-mode)
     (let ((fill-column 40)
+          (inhibit-message t)
           (f90-ts-fill-select-breakpoint-by 'interactive))
       (f90-ts-mode-test--with-mocked-keys
        '[space ?q left return return left return]
