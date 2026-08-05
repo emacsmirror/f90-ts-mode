@@ -1090,6 +1090,21 @@ located, otherwise return line number of current point position."
     (point)))
 
 
+(defun f90-ts--node-span-trimmed (node)
+  "Return the trimmed span of NODE as cons cell (START . END).
+The trimmed span starts at the first non-blank character
+and ends at the last non-blank character of NODE."
+  (save-excursion
+    (cons (progn
+            (goto-char (treesit-node-start node))
+            (skip-chars-forward " \t\n\r\f")
+            (point))
+          (progn
+            (goto-char (treesit-node-end node))
+            (skip-chars-backward " \t\n\r\f")
+            (point)))))
+
+
 (defun f90-ts--empty-comment-node-p (node)
   "Return non-nil if comment NODE has no content after its prefix."
   (and (f90-ts--node-type-p node "comment")
@@ -2125,19 +2140,15 @@ error node has descendant, then the function appends
 `f90-ts-font-lock-error-face' to existing font-lock face.
 Often an error results in several \"ERROR\" nodes in the chain towards the root.
 Only the smallest error nodes should be marked.  Moreover, the span is trimmed
-to exclude trailing blanks, which are sometimes part of more complex nodes."
+to exclude leading and trailing blanks, which are sometimes part of ERROR nodes."
   (when (and f90-ts-font-lock-error
              (let ((sparse-tree (treesit-induce-sparse-tree node "^ERROR$")))
                ;; if the sparse-tree has only one node (node itself),
                ;; it has the shape "(nil (node))"
                (and (= (length (cdr sparse-tree)) 1)
                     (null (cdr (cadr sparse-tree))))))
-    (let ((start (treesit-node-start node))
-           (end (save-excursion
-                  ;; trim trailing blanks
-                  (goto-char (treesit-node-end node))
-                  (skip-chars-backward " \t\n\r\f")
-                  (point))))
+
+    (cl-destructuring-bind (start . end) (f90-ts--node-span-trimmed node)
       (treesit-fontify-with-override start end
                                      f90-ts-font-lock-error
                                      'append))))
