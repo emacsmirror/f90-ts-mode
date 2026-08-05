@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] Additional font-locking for error regions added.  This can be
+;;             customized by `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
 ;;   [08-2026] Smart end completion of coarray "change team ... end team" blocks fixed.
 ;;             It was wrongly assumed that the end statement is "end change team".
 ;;
@@ -52,7 +54,7 @@
 ;;
 ;; Features:
 ;;   - Almost all statements up to F2023
-;;   - Syntax highlighting
+;;   - Syntax highlighting, including syntactically incorrect code
 ;;   - Indentation of lines, regions, multiline statements and structure blocks
 ;;   - Alignment for multiline statements with rotation and other options
 ;;   - Smart end completion
@@ -402,6 +404,26 @@ Special comments such as separators are determined by rules in
 `f90-ts-special-comment-rules'."
   :group 'f90-ts-font-lock
   :group 'f90-ts-comment)
+
+
+(defface f90-ts-font-lock-error-face
+  '((t (:underline (:style wave :color "OrangeRed"))))
+  "Additional face properties applied to Tree-sitter ERROR nodes.
+
+The face is appended to the existing syntax highlighting, so it is
+intended to specify only UI-related attributes such as slant,
+underline, or a subtle background."
+  :group 'f90-ts-font-lock)
+
+
+(defcustom f90-ts-font-lock-error 'f90-ts-font-lock-error-face
+  "Additional face properties appended to Tree-sitter ERROR nodes.
+
+If nil, do not apply any additional highlighting to ERROR nodes."
+  :type '(choice
+          (const :tag "Disabled" nil)
+          (face :tag "Face"))
+  :group 'f90-ts-font-lock)
 
 
 ;;;-----------------------------------------------------------------------------
@@ -2039,6 +2061,31 @@ rule but not for matched keywords, which are enforced with override=t."
                        'font-lock-warning-face t))))))
 
 
+(defun f90-ts--fontify-error (node _override _start _end &rest _)
+  "Add error fontification for span of NODE if enabled and applicable.
+If `f90-ts-font-lock-error' is non-nil, and NODE of type \"ERROR\" has no other
+error node has descendant, then the function appends
+`f90-ts-font-lock-error-face' to existing font-lock face.
+Often an error results in several \"ERROR\" nodes in the chain towards the root.
+Only the smallest error nodes should be marked.  Moreover, the span is trimmed
+to exclude trailing blanks, which are sometimes part of more complex nodes."
+  (when (and f90-ts-font-lock-error
+             (let ((sparse-tree (treesit-induce-sparse-tree node "^ERROR$")))
+               ;; if the sparse-tree has only one node (node itself),
+               ;; it has the shape "(nil (node))"
+               (and (= (length (cdr sparse-tree)) 1)
+                    (null (cdr (cadr sparse-tree))))))
+    (let ((start (treesit-node-start node))
+           (end (save-excursion
+                  ;; trim trailing blanks
+                  (goto-char (treesit-node-end node))
+                  (skip-chars-backward " \t\n\r\f")
+                  (point))))
+      (treesit-fontify-with-override start end
+                                     f90-ts-font-lock-error
+                                     'append))))
+
+
 ;;;-----------------------------------------------------------------------------
 ;;; Font-locking: treesitter rules
 
@@ -2403,6 +2450,19 @@ rule but not for matched keywords, which are enforced with override=t."
       (:pred f90-ts--node-not-number-literal-p @_unary_arg))))))
 
 
+(defun f90-ts--font-lock-rules-error ()
+  "Font-lock rule for error nodes.
+Append a customizable property like italic or underline to hightlight an
+error region, which tree-sitter was not able to parse.
+This rule should be processed last, so that the error property can be
+append to a determined font lock face."
+  (treesit-font-lock-rules
+   :language 'fortran
+   :feature 'error
+   '(;; if enabled append some error face properties to existing faces
+     ((ERROR) @f90-ts--fontify-error))))
+
+
 (defvar f90-ts-font-lock-rules
   (list
    (f90-ts--font-lock-rules-comment)
@@ -2417,7 +2477,8 @@ rule but not for matched keywords, which are enforced with override=t."
    (f90-ts--font-lock-rules-operator)
    (f90-ts--font-lock-rules-variable)
    (f90-ts--font-lock-rules-value)
-   (f90-ts--font-lock-rules-delimiter))
+   (f90-ts--font-lock-rules-delimiter)
+   (f90-ts--font-lock-rules-error))
   "List of font-lock rules.")
 
 
@@ -8216,7 +8277,7 @@ and keyword are sometimes equal.  But we only want the structure node."
 
   ;; font-lock feature list controls what features are enabled for highlighting
   (setq-local treesit-font-lock-feature-list
-              '((comment preproc)                                ; level 1
+              '((comment preproc error)                          ; level 1
                 (builtin keyword string type)                    ; level 2
                 (constant number)                                ; level 3
                 (function variable operator bracket delimiter))) ; level 4
@@ -8248,6 +8309,9 @@ and keyword are sometimes equal.  But we only want the structure node."
   (setq-local indent-region-function #'f90-ts-indent-and-complete-region)
 
   (add-hook 'xref-backend-functions #'f90-ts-xref-backend nil t)
+
+  ;;(setq-local treesit--font-lock-verbose t)
+  ;;(setq-local treesit--indent-verbose t)
 
   ;; provide a simple mode name in the modeline
   (setq-local mode-name "F90-TS"))

@@ -14,6 +14,8 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
+ - Additional font-locking for error regions added.  This can be customized by
+   `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
  - Smart end completion of coarray "change team ... end team" blocks fixed. It was
    wrongly assumed that the end statement is "end change team".
 
@@ -43,7 +45,7 @@ including syntax highlighting, indentation, navigation, and structural editing f
 ### Features
 
 - Almost all statements up to F2023
-- Syntax highlighting (font lock faces)
+- Syntax highlighting (font lock faces), including highlighting of syntactically incorrect code
 - Indentation of lines, regions, multiline statements and structure blocks
 - Alignment for multiline statements with rotation and other options
 - Smart end completion
