@@ -14,8 +14,8 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
- - Add About, README and MANUAL entries in the fortran and transient
-   popup menu to view information about the mode.
+ - About, README and MANUAL entries in the fortran and transient
+   popup menu to view information about the mode added.
  - Additional font-locking for error regions added.  This can be customized by
    `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
  - Smart end completion of coarray "change team ... end team" blocks fixed. It was

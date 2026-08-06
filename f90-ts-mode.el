@@ -32,15 +32,18 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [08-2026] Add About, README and MANUAL entries in the fortran and transient
-;;             popup menu to view information about the mode.
+;;   [08-2026] About, README and MANUAL entries in the fortran and transient
+;;             popup menu to view information about the mode added.
 ;;   [08-2026] Additional font-locking for error regions added.  This can be
-;;             customized by `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
-;;   [08-2026] Smart end completion of coarray "change team ... end team" blocks fixed.
-;;             It was wrongly assumed that the end statement is "end change team".
+;;             customized by `f90-ts-font-lock-error' and
+;;             `f90-ts-font-lock-error-face'.
+;;   [08-2026] Smart end completion of coarray "change team ... end team"
+;;             blocks fixed.  It was wrongly assumed that the end statement is
+;;             "end change team".
 ;;
 ;;   [07-2026] Inherit attribute of some font lock faces fixed.
-;;   [07-2026] Alignment of unary expressions with leading minus or plus improved.
+;;   [07-2026] Alignment of unary expressions with leading minus or plus
+;;             improved.
 ;;
 ;;   [06-2026] Fill line and region operations added.
 ;;   [06-2026] Defcustom group f90-ts-comment added.
@@ -133,8 +136,8 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
-- Add About, README and MANUAL entries in the fortran menu
-  to view information about the mode.
+- About, README and MANUAL entries in the fortran and transient
+  popup menu to view information about the mode added.
 - Additional font-locking for error regions added.  This can be
   customized by `f90-ts-font-lock-error' and
   `f90-ts-font-lock-error-face'.
