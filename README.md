@@ -14,6 +14,8 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
+ - Add About, README and MANUAL entries in the fortran and transient
+   popup menu to view information about the mode.
  - Additional font-locking for error regions added.  This can be customized by
    `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
  - Smart end completion of coarray "change team ... end team" blocks fixed. It was
@@ -161,6 +163,12 @@ It will automatically be loaded when opening a file with extension `.f90`.
          ("A-]"           . #'f90-ts-mark-region-next-sibling)
          ("A-}"           . #'f90-ts-mark-region-last-sibling)))
 ```
+
+*Remark:*
+The readme and manual documents can be easily loaded from github and opened via the fortran menu
+or the transient popup keybinding.
+For easily viewing `README.md` and `MANUAL.md` in a buffer instead of a browser,
+install the package `markdown-mode`, whose view mode is used if installed.
 
 
 ## Customization

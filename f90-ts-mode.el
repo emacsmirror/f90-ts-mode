@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.3.0
+;; Version: 0.3.0-snapshot
 ;; Package-Requires: ((emacs "30.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] Add About, README and MANUAL entries in the fortran and transient
+;;             popup menu to view information about the mode.
 ;;   [08-2026] Additional font-locking for error regions added.  This can be
 ;;             customized by `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
 ;;   [08-2026] Smart end completion of coarray "change team ... end team" blocks fixed.
@@ -108,6 +110,54 @@
 
 ;; hl-line is used for the navigation buffer
 (require 'hl-line)
+
+;; for loading online README and MANUAL
+(require 'url)
+
+;;;-----------------------------------------------------------------------------
+
+(defconst f90-ts-mode-version "0.3.0-snapshot"
+  "Version of f90-ts-mode.")
+
+
+(defconst f90-ts--github-url
+  "https://github.com/mscfd/emacs-f90-ts-mode")
+
+
+(defconst f90-ts--about-text
+  "
+f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer)
+source files, based on Emacs's built-in tree-sitter support
+(requires Emacs 30+).
+
+Recently changed, added or improved:
+
+[08-2026]
+- Add About, README and MANUAL entries in the fortran menu
+  to view information about the mode.
+- Additional font-locking for error regions added.  This can be
+  customized by `f90-ts-font-lock-error' and
+  `f90-ts-font-lock-error-face'.
+- Smart end completion of coarray \"change team ... end team\"
+  blocks fixed.  It was wrongly assumed that the end statement is
+  \"end change team\".
+
+[07-2026]
+- Inherit attribute of some font-lock faces fixed.
+- Alignment of unary expressions with leading minus or plus improved.
+
+[06-2026]
+- Fill line and region operations added.
+- Defcustom group `f90-ts-comment' added.
+- Indentation of lines after a structure beginning line with
+  statement label fixed.
+- Indentation within and after preprocessor blocks fixed.
+- Trailing blank part removed from
+  `f90-ts-comment-prefix-regexp' and
+  `f90-ts-openmp-prefix-regexp'.  If customized, please adjust.
+- Mark region operations complemented.
+")
+
 
 ;;;-----------------------------------------------------------------------------
 
@@ -873,7 +923,11 @@ seem to make much sense."
     (">"   "Go forward"                 xref-go-forward)]
    ["Side panel (alpha!)"
     ("B"   "Open nav buffer"            f90-ts-nav-buffer-open)
-    ("F"   "Focus nav buffer"           f90-ts-nav-buffer-focus)]])
+    ("F"   "Focus nav buffer"           f90-ts-nav-buffer-focus)]
+   ["About & Doc"
+    ("C-h a" "About"                    f90-ts-mode-about)
+    ("C-h r" "README"                   f90-ts--browse-readme)
+    ("C-h m" "MANUAL"                   f90-ts--browse-manual)]])
 
 
 ;;;-----------------------------------------------------------------------------
@@ -8185,6 +8239,114 @@ and keyword are sometimes equal.  But we only want the structure node."
 
 
 ;;;-----------------------------------------------------------------------------
+;;; about and documentation for menu
+
+(defun f90-ts--snapshot-version-p ()
+  "Return non-nil if this is a snapshot version."
+  (string-suffix-p "-snapshot" f90-ts-mode-version))
+
+
+(defun f90-ts--github-raw-url ()
+  "Return the github url for raw content."
+  (string-replace "github.com" "raw.githubusercontent.com" f90-ts--github-url))
+
+
+(defun f90-ts--git-ref ()
+  "Return the git reference used for online documentation.
+For snapshot version use the main branch (which might be out of sync with
+current version), otherwise use the tag derived from version.
+The tag is version string prefixed by \"v\"."
+  (if (f90-ts--snapshot-version-p)
+      "main"
+    (concat "v" f90-ts-mode-version)))
+
+
+(defun f90-ts--strip-markdown-links ()
+  "Replace Markdown links [text](url) by plain text.
+This is done as neither internal nor external links currently work
+in markdown-view-mode."
+  (goto-char (point-min))
+  (while (re-search-forward
+          "\\[\\([^]]+\\)\\](\\([^)]*\\))"
+          nil t)
+    (replace-match "\\1" t nil)))
+
+
+(defun f90-ts--browse-doc (doc-name)
+  "Open the online document DOC-NAME from the github repository.
+If `markdown-view-mode' or github variant `gfm-view-mode' from the
+package `markdown-mode' are available, then use these."
+  (when (f90-ts--snapshot-version-p)
+    (message "Opening %s from the current development branch main." doc-name))
+
+  (let ((md-view-mode (cond
+                       ((fboundp 'gfm-view-mode)      'gfm-view-mode)
+                       ((fboundp 'markdown-view-mode) 'markdown-view-mode))))
+    (if md-view-mode
+      (let ((url (format "%s/%s/%s"
+                         (f90-ts--github-raw-url)
+                         (f90-ts--git-ref)
+                         doc-name))
+            (buffer-name (format "*f90-ts-mode %s*" doc-name)))
+        (with-current-buffer (get-buffer-create buffer-name)
+          (erase-buffer)
+          (url-insert-file-contents url)
+          (f90-ts--strip-markdown-links)
+          ;; use markdown-mode if available
+          (funcall md-view-mode)
+          (pop-to-buffer (current-buffer))))
+      ;; open browser
+      (message "Install markdown-mode to view %s directly in a buffer." doc-name)
+      (browse-url
+       (format "%s/blob/%s/%s"
+               f90-ts--github-url
+               (f90-ts--git-ref)
+               doc-name)))))
+
+
+(defun f90-ts--browse-readme ()
+  "Open the online document \"README.md\" from the github repository."
+  (interactive)
+  (f90-ts--browse-doc "README.md"))
+
+
+(defun f90-ts--browse-manual ()
+  "Open the online document \"MANUAL.md\" from the github repository."
+  (interactive)
+  (f90-ts--browse-doc "MANUAL.md"))
+
+
+(defun f90-ts-mode-about ()
+  "Display information about f90-ts-mode."
+  (interactive)
+  (with-help-window "*About f90-ts-mode*"
+    (princ (format "f90-ts-mode %s\n\n" f90-ts-mode-version))
+    (princ f90-ts--about-text)
+    (princ "\nRepository:\n")
+    (princ f90-ts--github-url)
+
+    (insert "\n\nDocumentation")
+    (insert
+     (if (f90-ts--snapshot-version-p)
+         "  (current development branch: main)\n\n"
+       (format "  (release %s)\n\n" f90-ts-mode-version)))
+
+    (insert-text-button
+     "Open README from github"
+     'follow-link t
+     'action (lambda (_)
+               (f90-ts--browse-doc "README.md")))
+    (insert "\n")
+
+    (insert-text-button
+     "Open MANUAL from github"
+     'follow-link t
+     'action (lambda (_)
+               (f90-ts--browse-doc "MANUAL.md")))
+    (insert "\n")))
+
+
+;;;-----------------------------------------------------------------------------
 ;;; menu definition
 
 (easy-menu-define f90-ts-mode-menu f90-ts-mode-map
@@ -8252,7 +8414,10 @@ and keyword are sometimes equal.  But we only want the structure node."
      :visible f90-ts-menu-show-navigate
      :filter (lambda (menu) (f90-ts--nav-menu-tree menu)))
     "---"
-    ["Customize f90-ts" (customize-group 'f90-ts) :active t]))
+    ["Customize f90-ts"  (customize-group 'f90-ts) :active t]
+    ["About f90-ts-mode" f90-ts-mode-about t]
+    ["README (GitHub)"   f90-ts--browse-readme t]
+    ["MANUAL (GitHub)"   f90-ts--browse-manual t]))
 
 
 ;;;-----------------------------------------------------------------------------
