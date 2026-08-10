@@ -180,6 +180,32 @@ subroutine sub_ext_3()
 end subroutine sub_ext_3
 =-=-=
 
+Name: mark extend enlarge region 4
+=-=
+module mod_ext_4
+
+use other
+
+contains
+
+|subroutine sub()@
+   call something()
+end subroutine sub
+
+end module mod_ext_4
+=-=
+module mod_ext_4
+
+use other
+
+contains
+
+|subroutine sub()
+   call something()
+end subroutine sub@
+
+end module mod_ext_4
+=-=-=
 
 Code:
   (lambda ()
@@ -189,13 +215,13 @@ Code:
 
 Name: mark extend enlarge region 5
 =-=
-subroutine sub_ext_4()
+subroutine sub_ext_5()
   @print *,'hello'|
-end subroutine sub_ext_4
+end subroutine sub_ext_5
 =-=
-|subroutine sub_ext_4()
+|subroutine sub_ext_5()
   print *,'hello'
-end subroutine sub_ext_4@
+end subroutine sub_ext_5@
 =-=-=
 
 
@@ -205,15 +231,15 @@ Code:
     (let ((f90-ts-mark-region-order 'preserve))
       (f90-ts-mode-test--mark-region-modify #'f90-ts-mark-region-enlarge)))
 
-Name: mark extend enlarge region 5
+Name: mark extend enlarge region 6
 =-=
-subroutine sub_ext_5()
+subroutine sub_ext_6()
   |print *,'hello'@
-end subroutine sub_ext_5
+end subroutine sub_ext_6
 =-=
-|subroutine sub_ext_5()
+|subroutine sub_ext_6()
   print *,'hello'
-end subroutine sub_ext_5@
+end subroutine sub_ext_6@
 =-=-=
 
 Code:
