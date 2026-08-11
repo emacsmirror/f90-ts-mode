@@ -14,6 +14,10 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
+ - Mark region operations fixed: always consider trimmed region of nodes.
+   Some nodes like a whole `subroutine..end subroutine` block contains a trailing
+   newline, which should not be considered. Not consequently trimming all spans
+   broke some mark region operations.
  - About, README and MANUAL entries in the fortran and transient
    popup menu to view information about the mode added.
  - Additional font-locking for error regions added.  This can be customized by
@@ -198,8 +202,16 @@ The following list provides features planned for implementation (somewhat ordere
 - Fill operations with lower column width (before joining).
 - Fill operation similar to `f90-fill-paragraph`. In conjunction with mark operations: determine interesting
   nodes within tree as region (like: statements, structure block, subroutine/function level).
+- Node based sibling walk operations (like goto trimmed beginning or trimmed end of next sibling). This would
+  complement the mark region operations to easily extend an existing region.
 - Support for (context-aware) `completion-at-point-function` (capf).
 - More list contexts for alignment in continued lines.
   There are a number of list like contexts, which are not yet supported, but for which proper
   alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.
+- Indentation for labeled do loops, like:
+  do 123 i = 1,10
+     do 123 j = 1,10
+        print *, i, j
+  123 end do
+  (Remark: the end do statement has one real and one virtual node to match the number of nested loops.)

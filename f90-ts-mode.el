@@ -32,6 +32,11 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] Mark region operations fixed: always consider trimmed region
+;;             of nodes.  Some nodes like a whole "subroutine..end subroutine"
+;;             block contains a trailing newline, which should not be
+;;             considered.  Not consequently trimming all spans broke some mark
+;;             region operations.
 ;;   [08-2026] About, README and MANUAL entries in the fortran and transient
 ;;             popup menu to view information about the mode added.
 ;;   [08-2026] Additional font-locking for error regions added.  This can be
@@ -136,6 +141,11 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
+- Mark region operations fixed: always consider trimmed region
+  of nodes. Some nodes like a whole `subroutine..end subroutine`
+  block contains a trailing newline, which should not be
+  considered. Not consequently trimming all spans broke some mark
+  region operations.
 - About, README and MANUAL entries in the fortran and transient
   popup menu to view information about the mode added.
 - Additional font-locking for error regions added.  This can be
@@ -6884,18 +6894,26 @@ is at end of region."
     (f90-ts--mark-region-node node-or-extent region-order)))
 
 
-(defun f90-ts--smallest-named-node-containing-region (beg end)
+(defun f90-ts--smallest-named-node-containing-region (beg end trim)
   "Return the smallest named node fully containing region from BEG to END.
-The node must be strictly larger than the region (BEG END)."
+The node must be strictly larger than the region (BEG END).
+If TRIM is non-nil, then use trimmed span of named nodes for comparison
+with BEG..END region."
   (when-let* ((node (treesit-node-on beg end))
               (cover (treesit-parent-until
                       node
                       (lambda (n)
-                        (and (treesit-node-check n 'named)
-                             (<= (treesit-node-start n) beg)
-                             (>= (treesit-node-end n) end)
-                             (< (- end beg)
-                                (- (treesit-node-end n) (treesit-node-start n)))))
+                        (let ((nb (if trim
+                                      (f90-ts--node-start-trimmed n)
+                                    (treesit-node-start n)))
+                              (ne (if trim
+                                      (f90-ts--node-end-trimmed n)
+                                    (treesit-node-end n))))
+                          (and (treesit-node-check n 'named)
+                               (<= nb beg)
+                               (>= ne end)
+                               (< (- end beg)
+                                  (- ne nb)))))
                       t)))
     (f90-ts--largest-node-same-span cover)))
 
@@ -6934,8 +6952,9 @@ If NAMED is non-nil, consider only named nodes."
   (when-let* ((node (f90-ts--node-on-pos beg 'right named)))
     (treesit-parent-while
      node
-     (lambda (n) (and (=  beg (f90-ts--node-start-trimmed n))
-                      (<= (treesit-node-end n) end))))))
+     (lambda (n)
+       (and (=  beg (f90-ts--node-start-trimmed n))
+            (<= (f90-ts--node-end-trimmed n) end))))))
 
 
 (defun f90-ts--node-aligned-at-end (beg end named)
@@ -6944,14 +6963,15 @@ If NAMED is non-nil, consider only named nodes."
   (when-let* ((node (f90-ts--node-on-pos end 'left named)))
     (treesit-parent-while
      node
-     (lambda (n) (and (<= beg (treesit-node-start n))
-                      (= (f90-ts--node-end-trimmed n) end))))))
+     (lambda (n)
+       (and (<= beg (f90-ts--node-start-trimmed n))
+            (= (f90-ts--node-end-trimmed n) end))))))
 
 
 (defun f90-ts--group-block-p (node-beg node-end)
   "Check whether NODE-BEG and NODE-END are within a node group.
-This is the case if both are sibling (have the same parent),
-belong to the same group, and all sibling in between the two
+This is the case if both are siblings (have the same parent),
+belong to the same group, and all siblings in between the two
 nodes also belong to the same group."
   (and node-beg
        node-end
@@ -7034,13 +7054,13 @@ If at least one group is nil, return value is nil as well."
                  (ext-last  (cdr extent)))
             (if (treesit-node-eq ext-first ext-last)
                 ;; block is just one line, fall through to tree-sitter ascent
-                (if-let ((node (f90-ts--smallest-named-node-containing-region beg end)))
+                (if-let ((node (f90-ts--smallest-named-node-containing-region beg end 'trim)))
                     (f90-ts--mark-region-node node f90-ts-mark-region-order)
                   (message "no tree-sitter node found enlarging current region"))
               (f90-ts--mark-region (f90-ts--node-start-trimmed ext-first)
                                    (f90-ts--node-end-trimmed   ext-last)
                                    f90-ts-mark-region-order)))
-        (if-let ((node (f90-ts--smallest-named-node-containing-region beg end)))
+        (if-let ((node (f90-ts--smallest-named-node-containing-region beg end 'trim)))
             (f90-ts--mark-region-node node f90-ts-mark-region-order)
           (message "no tree-sitter node found enlarging current region"))))))
 
