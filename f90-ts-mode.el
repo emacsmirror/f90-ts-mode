@@ -5711,8 +5711,14 @@ no abort mechanism for `treesit-search-foward'."
              do (let ((node-start (treesit-node-start node)))
                   (f90-ts--complete-smart-end-node node)
                   (goto-char node-start)
-                  (forward-line 1)
-                  (setq pos (point)))))
+                  (let ((line (line-number-at-pos)))
+                    ;; that a bit difficult, if at end of buffer, `forward-line'
+                    ;; does not progress a line, but still reports success, so we
+                    ;; explicitly check line numbers
+                    (forward-line 1)
+                    (if (= line (line-number-at-pos))
+                        (throw 'f90-ts--past-end nil)
+                      (setq pos (point)))))))
           ;; after finishing move to end of region
           (goto-char end-marker))
       (set-marker end-marker nil))))
