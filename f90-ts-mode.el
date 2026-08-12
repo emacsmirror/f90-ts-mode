@@ -1749,33 +1749,67 @@ Take virtual ampersand nodes into account, these are not returned by
           node)))))
 
 
-(defun f90-ts--find-first-ampersand (first)
-  "Find the first ampersand if at a ampersand-comment*-ampersand sequence.
+(defun f90-ts--skip-comments-to-ampersand (node sibling-fn)
+  "Return final ampersand after a sequence of comment nodes.
+Walk from NODE via SIBLING-FN across comment nodes, and return
+the ampersand node reached once comments end.  Return nil if NODE
+is nil, not a comment, or if the node reached after skipping comments
+is not an ampersand."
+  (cl-loop for n = node then (funcall sibling-fn n)
+           while (f90-ts--node-type-p n "comment")
+           finally return (and (f90-ts--node-ampersand-p n) n)))
+
+
+(defun f90-ts--find-ampersand-boundary (node sibling-fn)
+  "Find the ampersand at the far end of an &-comment*-& sequence.
+
+Walking siblings is done via SIBLING-FN, which determines the direction of
+the walk \(`treesit-node-prev-sibling' or `treesit-node-next-sibling'\).
+
+If NODE is an ampersand or a comment that is part of such a sequence, return
+the ampersand at the far end of it.  Otherwise, including if NODE is
+of any other type, return nil."
+  (cond
+   ((f90-ts--node-ampersand-p node)
+    ;; try to skip subsequent comments, otherwise return node,
+    ;; which is already the boundary ampersand
+    (or (f90-ts--skip-comments-to-ampersand
+         (funcall sibling-fn node) sibling-fn)
+        node))
+   ((f90-ts--node-type-p node "comment")
+    (f90-ts--skip-comments-to-ampersand node sibling-fn))
+   (t nil)))
+
+
+(defun f90-ts--sibling-skip-continuation (node sibling-fn)
+  "Return NODE's sibling, skipping a &-comment*-& sequence if present.
+
+Walking siblings is done via SIBLING-FN, which determines the direction of
+the walk \(`treesit-node-prev-sibling' or `treesit-node-next-sibling'\).
+
+If sibling of NODE is an ampersand or comment that is part of such a sequence,
+return the node directly following the sequence's second ampersand (nil if
+there is no such sibling).  Otherwise return the sibling of NODE itself."
+  (when-let ((nsib (funcall sibling-fn node)))
+    (if-let ((amp2 (f90-ts--find-ampersand-boundary
+                    nsib #'treesit-node-next-sibling)))
+        (treesit-node-next-sibling amp2)
+      nsib)))
+
+
+(defun f90-ts--skip-continuation-forward (node)
+  "Return NODE's next sibling, skipping a &-comment*-& sequence if present.
+See `f90-ts--sibling-skip-continuation'."
+  (f90-ts--sibling-skip-continuation node #'treesit-node-next-sibling))
+
+
+(defun f90-ts--find-first-ampersand (node)
+  "Find the first ampersand if at a &-comment*-& sequence.
 In continued lines, continuation symbol ampersands appears in
-sequences like &, (comment)*, &.  This routines checks whether node
-FIRST is any of those ampersand or comment nodes, and returns the first
-ampersand node of this sequence.  FIRST is assumed to be the first node
-on its line!"
-  (when-let ((nprev
-              (cond
-               ((f90-ts--node-ampersand-p first)
-                ;; go one step back to first ampersand or sequence
-                ;; of comments
-                (treesit-node-prev-sibling first))
-
-               ((f90-ts--node-type-p first "comment")
-                first)
-
-               (t
-                ;; in all other cases, we are not on a continued line
-                nil))))
-    ;; if necessary skip comments (but only comments) to find the first ampersand,
-    ;; if we are in a sequence of comments not being part of a continued line,
-    ;; then the final non-comment node is not an ampersand and we return nil
-    (cl-loop for node = nprev then (treesit-node-prev-sibling node)
-             while (f90-ts--node-type-p node "comment")
-             finally return (and (f90-ts--node-ampersand-p node)
-                                 node))))
+sequences like &, (comment)*, &.  This routines checks whether NODE
+is any of those ampersand or comment nodes, and returns the first
+ampersand node of this sequence."
+  (f90-ts--find-ampersand-boundary node #'treesit-node-prev-sibling))
 
 
 (defun f90-ts--first-node-of-stmt (node)
