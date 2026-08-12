@@ -36,5 +36,20 @@ subroutine sub()
             do while (cond)
           x = x + 1
      end do name
+
+     select_x: &
+            ! comment
+            select case (x)
+     case (1)
+          print *, 'hallo'
+     end select select_x
+
+     if: &
+            ! several comments
+            ! several comments
+            ! several comments
+            if (cond) then
+          x = x + 1
+     end if if
 end subroutine sub
 =-=-=

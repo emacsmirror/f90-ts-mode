@@ -4468,15 +4468,17 @@ This is the maximal node for any further subtree searches."
   (let* ((pos (alist-get 'pos loc))
          (line (alist-get 'line loc))
          (ps-key (f90-ts--indent-prev-stmt-keyword))
-         (stmt-root (treesit-node-on (treesit-node-start ps-key)
-                                     pos)))
-    (treesit-search-subtree
-     stmt-root
-     (lambda (n)
-       (and (<= (f90-ts--node-line n) line)
-            (<= line (line-number-at-pos (treesit-node-end n)))
-            (assoc (treesit-node-type n)
-                   f90-ts--align-list-context-properties))))))
+         (stmt-beg (treesit-node-start ps-key))
+         (stmt-root (when (<= stmt-beg pos)
+                      (treesit-node-on (treesit-node-start ps-key) pos))))
+    (when stmt-root
+      (treesit-search-subtree
+       stmt-root
+       (lambda (n)
+         (and (<= (f90-ts--node-line n) line)
+              (<= line (line-number-at-pos (treesit-node-end n)))
+              (assoc (treesit-node-type n)
+                     f90-ts--align-list-context-properties)))))))
 
 
 (defun f90-ts--align-list-context-op-expr (loc parent)
