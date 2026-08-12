@@ -1346,6 +1346,45 @@ Note that the parse uses identifier not just for variables, but for types etc."
                     (treesit-node-text node))))
 
 
+(defun f90-ts--node-block-label-ancestor (node)
+  "Return block_label_start_expression ancestor of leaf NODE if there is one.
+NODE is assumed to be the leaf node at the start of a line.  The function
+checks whether it is part of a \"block_label_start_expression\"."
+  ;; Unfortunately, this comes in two variants (as a label name, which is a language
+  ;; keyword parses slightly differently):
+  ;;
+  ;;   (block_label_start_expression
+  ;;    'label'
+  ;;    :)
+  ;;
+  ;; and if the label is a reserved keyword:
+  ;;
+  ;;   (block_label_start_expression
+  ;;    'label'
+  ;;     keyword
+  ;;    :)
+  ;;
+  ;; In both cases, 'label' is an anonymous node.  In the second case, it has the
+  ;; child keyword.
+  ;; In any case, the function should return \"block_label_start_expression\",
+  ;; or nil.
+  (cl-assert (or (not node)
+                 (zerop (treesit-node-child-count node nil)))
+             nil "node is not a leaf node: %s" node)
+  (let* ((parent (and node (treesit-node-parent node)))
+         (grandparent (and parent (treesit-node-parent parent))))
+    (cond
+     ((and (f90-ts--node-type-p node "label")
+           (f90-ts--node-type-p parent
+                                "block_label_start_expression"))
+      parent)
+     ((and (f90-ts--node-type-p parent "label")
+           (f90-ts--node-type-p grandparent
+                                "block_label_start_expression"))
+      grandparent)
+     (t nil))))
+
+
 (defun f90-ts--node-preproc-p (node)
   "Check if NODE is a preprocessor node and has the '#' prefix."
     (let ((type (treesit-node-type node)))
@@ -1908,59 +1947,19 @@ example on empty lines)."
 (defun f90-ts--previous-stmt-keyword-by-first (first)
   "Return keyword of previous statement.
 Use node FIRST which provides the very first leaf node of previous statement.
+This might be a \"block_label_start_expression\", which needs to be skipped.
+
 Auxiliary function for `f90-ts--previous-stmt-keyword' or when
 first statement is known."
-  ;; block structure statements like if, do, associate etc. can start
-  ;; with a label, if a (optional) label is present, skip it and extract
-  ;; the keyword node;
-  ;; in general, the AST looks like:
-  ;;
-  ;; (do_loop
-  ;;  (block_label_start_expression
-  ;;   'label'
-  ;;   :)
-  ;;  (do_statement do
-  ;;  ...))
-  ;;
-  ;; but if label is a reserved keyword, it becomes
-  ;;
-  ;; (do_loop
-  ;;  (block_label_start_expression
-  ;;   'label'
-  ;;    keyword
-  ;;   :)
-  ;;  (do_statement do
-  ;;  ...))
-  ;;
-  ;; in both cases 'label' is an anonymous node;
-  ;; in the second case, it has a child,
-  ;;
-  ;; we want to extract the anonymous node "do" of the statement
-  ;; following the block_label_start expression,
-  ;; so first check we are within a block_label_start_expression
-  (let* ((parent (and first (treesit-node-parent first)))
-         (grandparent (and parent (treesit-node-parent parent)))
-         (block-label (cond
-                       ((and (f90-ts--node-type-p first "label")
-                             (f90-ts--node-type-p parent
-                                                  "block_label_start_expression"))
-                        parent)
-                       ((and (f90-ts--node-type-p parent "label")
-                             (f90-ts--node-type-p grandparent
-                                                  "block_label_start_expression"))
-                      grandparent)
-                       (t nil))))
-    (if block-label
-	    (let ((fp-next (treesit-node-next-sibling block-label)))
-          ;; next sibling is a statement label, we descend to find
-          ;; first leaf
-          (cl-loop
-           for n = fp-next then child
-           for child = (treesit-node-child n 0)
-           while child
-           finally return n))
-      ;; not a label expression, just return first
-      first)))
+  (if-let ((block-label (f90-ts--node-block-label-ancestor first)))
+	  (let ((fp-next (treesit-node-next-sibling block-label)))
+        (cl-loop
+         for n = fp-next then child
+         for child = (treesit-node-child n 0)
+         while child
+         finally return n))
+    ;; not a label expression, just return first
+    first))
 
 
 (defun f90-ts--previous-stmt-keyword (node parent)
