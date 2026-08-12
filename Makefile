@@ -99,6 +99,11 @@ test-checkdoc:
 	@for file in $(SRCS); do \
 		$(EMACS) $(EMACSFLAGS) \
 			--eval "(require 'checkdoc)" \
+			--eval "(progn \
+			  (require 'treesit) \
+			  (setq treesit-language-source-alist nil) \
+			  (add-to-list 'treesit-extra-load-path \"~/.emacs.d/tree-sitter\"))" \
+			-l f90-ts-mode.el \
 			--eval "(with-current-buffer (find-file-noselect \"$$file\") \
 			  (checkdoc-current-buffer t))" \
 			--eval "(when (get-buffer checkdoc-diagnostic-buffer) \
