@@ -47,6 +47,18 @@ endef
 
 
 # ----------------------------------------------------------------------
+# test all targets
+# ----------------------------------------------------------------------
+
+.PHONY: test-all
+test-all: test-checkdoc test-byte-compile test-ert-all
+	@echo "test-all: all checks passed"
+
+.PHONY: test-all-parallel
+test-all-parallel: test-checkdoc test-byte-compile test-ert-parallel
+	@echo "test-all-parallel: all checks passed"
+
+# ----------------------------------------------------------------------
 # test discovery  (all tests, one target each)
 # ----------------------------------------------------------------------
 
