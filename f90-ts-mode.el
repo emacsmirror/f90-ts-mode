@@ -1951,13 +1951,13 @@ This might be a \"block_label_start_expression\", which needs to be skipped.
 
 Auxiliary function for `f90-ts--previous-stmt-keyword' or when
 first statement is known."
-  (if-let ((block-label (f90-ts--node-block-label-ancestor first)))
-	  (let ((fp-next (treesit-node-next-sibling block-label)))
-        (cl-loop
-         for n = fp-next then child
-         for child = (treesit-node-child n 0)
-         while child
-         finally return n))
+  (if-let* ((block-label (f90-ts--node-block-label-ancestor first))
+	        (next (f90-ts--skip-continuation-forward block-label)))
+      (cl-loop
+       for n = next then child
+       for child = (treesit-node-child n 0)
+       while child
+       finally return n)
     ;; not a label expression, just return first
     first))
 
