@@ -125,7 +125,7 @@
 ;;;-----------------------------------------------------------------------------
 
 (defconst f90-ts-mode-version "0.3.0-snapshot"
-  "Version of f90-ts-mode.")
+  "Version of `f90-ts-mode'.")
 
 
 (defconst f90-ts--github-url
@@ -180,7 +180,7 @@ Recently changed, added or improved:
 
 
 (defgroup f90-ts-font-lock nil
-  "Font-locking options used by f90-ts-mode.
+  "Font-locking options used by `f90-ts-mode'.
 This group defines additional faces used for F90-specific syntax.
 Standard font-lock faces are used as well."
   :prefix "f90-ts-"
@@ -188,19 +188,19 @@ Standard font-lock faces are used as well."
 
 
 (defgroup f90-ts-indent nil
-  "Indentation options used by f90-ts-mode."
+  "Indentation options used by `f90-ts-mode'."
   :prefix "f90-ts-"
   :group  'f90-ts)
 
 
 (defgroup f90-ts-comment nil
-  "Comment and openmp options used by f90-ts-mode."
+  "Comment and openmp options used by `f90-ts-mode'."
   :prefix "f90-ts-"
   :group  'f90-ts)
 
 
 (defgroup f90-ts-nav nil
-  "Navigation options used by f90-ts-mode."
+  "Navigation options used by `f90-ts-mode'."
   :prefix "f90-ts-"
   :group  'f90-ts)
 
@@ -8304,7 +8304,7 @@ The tag is version string prefixed by \"v\"."
 (defun f90-ts--strip-markdown-links ()
   "Replace Markdown links [text](url) by plain text.
 This is done as neither internal nor external links currently work
-in markdown-view-mode."
+in `markdown-view-mode'."
   (goto-char (point-min))
   (while (re-search-forward
           "\\[\\([^]]+\\)\\](\\([^)]*\\))"
@@ -8357,7 +8357,7 @@ package `markdown-mode' are available, then use these."
 
 
 (defun f90-ts-mode-about ()
-  "Display information about f90-ts-mode."
+  "Display information about `f90-ts-mode'."
   (interactive)
   (with-help-window "*About f90-ts-mode*"
     (princ (format "f90-ts-mode %s\n\n" f90-ts-mode-version))

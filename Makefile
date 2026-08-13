@@ -47,6 +47,18 @@ endef
 
 
 # ----------------------------------------------------------------------
+# test all targets
+# ----------------------------------------------------------------------
+
+.PHONY: test-all
+test-all: test-checkdoc test-byte-compile test-ert-all
+	@echo "test-all: all checks passed"
+
+.PHONY: test-all-parallel
+test-all-parallel: test-checkdoc test-byte-compile test-ert-parallel
+	@echo "test-all-parallel: all checks passed"
+
+# ----------------------------------------------------------------------
 # test discovery  (all tests, one target each)
 # ----------------------------------------------------------------------
 
@@ -87,6 +99,11 @@ test-checkdoc:
 	@for file in $(SRCS); do \
 		$(EMACS) $(EMACSFLAGS) \
 			--eval "(require 'checkdoc)" \
+			--eval "(progn \
+			  (require 'treesit) \
+			  (setq treesit-language-source-alist nil) \
+			  (add-to-list 'treesit-extra-load-path \"~/.emacs.d/tree-sitter\"))" \
+			-l f90-ts-mode.el \
 			--eval "(with-current-buffer (find-file-noselect \"$$file\") \
 			  (checkdoc-current-buffer t))" \
 			--eval "(when (get-buffer checkdoc-diagnostic-buffer) \
