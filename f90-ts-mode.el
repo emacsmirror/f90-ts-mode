@@ -32,6 +32,7 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] `f90-ts-shift-line-break' as combined break/join function added.
 ;;   [08-2026] Defcustom `f90-ts-font-lock-error` replaced by
 ;;             `f90-ts-font-lock-error-show'.  Errors are now always fontified
 ;;             by `f90-ts-font-lock-error-face'.  The new defcustom
@@ -149,6 +150,7 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
+- `f90-ts-shift-line-break' as combined break/join function added.
 - Defcustom `f90-ts-font-lock-error' replaced by `f90-ts-font-lock-error-show'.
   Errors are now always fontified by f90-ts-font-lock-error-face.
   The new defcustom `f90-ts-font-lock-error-show' can be used to turn ERROR
@@ -921,7 +923,8 @@ seem to make much sense."
     ("E"   "Smart end complete region"  f90-ts-complete-smart-end-region)
     ("b"   "Break line"                 f90-ts-break-line)
     ("j"   "Join with previous line"    f90-ts-join-line-prev)
-    ("J"   "Join with next line"        f90-ts-join-line-next)]
+    ("J"   "Join with next line"        f90-ts-join-line-next)
+    ("C-s" "Shift line break"           f90-ts-shift-line-break)]
    ["Mark and (un)comment region"
     ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
     ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
@@ -6253,6 +6256,25 @@ If continued line has comments (at end, next line etc.) joining is not done."
     (when (and (called-interactively-p 'interactive)
                (eq action 'failed-comment-within-string))
       (message "join failed: joining not possible"))))
+
+
+(defun f90-ts-shift-line-break ()
+  "Shift the break point of current line to point.
+It breaks line at point and then joins the trailing part with the next line.
+If point is at end of line, then it does not nothing except to move point to
+indentation of next line."
+  (interactive)
+  (if (save-excursion
+        (skip-chars-forward " \t")
+        (eolp))
+      (when (zerop (forward-line 1))
+        (back-to-indentation)
+        (let ((node (treesit-node-at (point))))
+          (when (f90-ts--node-type-p node "comment")
+            (f90-ts--comment-forward-prefix node)
+            (skip-chars-forward " \t"))))
+    (f90-ts-break-line)
+    (f90-ts-join-line-next)))
 
 
 ;;;-----------------------------------------------------------------------------
