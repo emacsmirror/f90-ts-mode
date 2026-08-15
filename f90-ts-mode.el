@@ -1386,10 +1386,14 @@ checks whether it is part of a \"block_label_start_expression\"."
 
 
 (defun f90-ts--node-preproc-p (node)
-  "Check if NODE is a preprocessor node and has the '#' prefix."
-    (let ((type (treesit-node-type node)))
-      (or (string-prefix-p "#" type)
-          (string-match-p "^preproc_" type))))
+  "Check if NODE is a preprocessor directive node.
+This is done by checking whether the node text starts with a \"#\".
+For indentation, only these directive nodes are relevant.
+This function should cover both anonymous leaf nodes as well as named nodes.
+Hence checking the type of the node works only partially."
+    (let ((start (treesit-node-start node)))
+      ;; only fetch the first character instead of the whole node text
+      (eq (char-after start) ?#)))
 
 
 (defconst f90-ts--preproc-block-keyword-regexp
