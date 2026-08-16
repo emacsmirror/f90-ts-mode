@@ -2574,8 +2574,11 @@ append to a determined font lock face."
      ((ERROR) @f90-ts--fontify-error))))
 
 
-(defvar f90-ts-font-lock-rules
-  (list
+(defun f90-ts-font-lock-rules ()
+  "Return list of font-lock rules.
+Internally, some rules are selected depending on grammar properties, like
+changes in how string_literal is parsed and whether it is decomposed."
+  (append
    (f90-ts--font-lock-rules-comment)
    (f90-ts--font-lock-rules-intrinsic)
    (f90-ts--font-lock-rules-keyword)
@@ -2589,9 +2592,7 @@ append to a determined font lock face."
    (f90-ts--font-lock-rules-variable)
    (f90-ts--font-lock-rules-value)
    (f90-ts--font-lock-rules-delimiter)
-   (f90-ts--font-lock-rules-error))
-  "List of font-lock rules.")
-
+   (f90-ts--font-lock-rules-error)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Xref backend
@@ -8518,35 +8519,31 @@ package `markdown-mode' are available, then use these."
              "Run `M-x treesit-install-language-grammar RET fortran RET' "
              "or ensure treesit-language-source-alist points to a built grammar.")))
 
-  ;; font-lock feature list controls what features are enabled for highlighting
+  ;; set font-lock feature list
   (setq-local treesit-font-lock-feature-list
               '((comment preproc error)                          ; level 1
                 (builtin keyword string type)                    ; level 2
                 (constant number)                                ; level 3
                 (function variable operator bracket delimiter))) ; level 4
 
-  ;; use the pre-defined font-lock rules variable
-  (setq-local treesit-font-lock-settings
-              (apply #'append f90-ts-font-lock-rules))
-
-  ;; use the pre-defined indentation rules variable
+  ;; set font-lock and indentation rules
+  (setq-local treesit-font-lock-settings (f90-ts-font-lock-rules))
   (setq-local treesit-simple-indent-rules (f90-ts-indent-rules))
 
-  ;; Imenu Setup
+  ;; set Imenu
   (setq-local imenu-create-index-function #'f90-ts-simple-imenu)
 
-  ;; Defun
+  ;; set Defun stuff
   (setq-local treesit-defun-type-regexp f90-ts--thing-defun-regexp-pred)
   (setq-local treesit-defun-name-function #'f90-ts--defun-name)
   (setq-local treesit-defun-tactic 'nested)  ; or 'top-level?
   (setq-local treesit-thing-settings f90-ts--thing-settings)
 
-  ;; basic setup helper provided by emacs for tree-sitter powered modes,
-  ;; this must be called after setting setq-local variables above!
+  ;; this setup function must be called after setting variables above
   (treesit-major-mode-setup)
 
   ;; set indentation functions (both add smart end completion before
-  ;; indentation, so no hook available); this must be done AFTER
+  ;; indentation, so no hook available); this must be done after
   ;; calling treesit-major-mode-setup
   (setq-local indent-line-function #'f90-ts-indent-and-complete-line)
   (setq-local indent-region-function #'f90-ts-indent-and-complete-region)
@@ -8556,7 +8553,7 @@ package `markdown-mode' are available, then use these."
   ;;(setq-local treesit--font-lock-verbose t)
   ;;(setq-local treesit--indent-verbose t)
 
-  ;; provide a simple mode name in the modeline
+  ;; provide mode name
   (setq-local mode-name "F90-TS"))
 
 
