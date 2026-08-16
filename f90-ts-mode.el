@@ -4633,10 +4633,10 @@ the continued line matcher."
 ;; simple indentation rules: expansion with f90-ts-- prefix
 
 (defmacro f90-ts--map-rule (matcher anchor offset)
-  "Map an indent rule triple with f90-ts-- prefix prepended were applicable.
+  "Map an indent rule triple with f90-ts-- prefix prepended where applicable.
 MATCHER is either a bare symbol (direct matcher function) or a list
 whose car is a constructor name.  ANCHOR and OFFSET are bare symbols or
-literals.  Any symbol present in an internal list are prefixed, the rest is
+literals.  Any symbol present in an internal list is prefixed, the rest is
 passed through unchanged."
   (let ((prefix-syms '(;; matcher constructor
                        nopp-parent-is
@@ -4680,21 +4680,39 @@ passed through unchanged."
                       (t offset))))
         `(list ,m ,a ,o)))))
 
-
 (defmacro f90-ts--with-map-rules (&rest triples)
   "Build a list of treesit indent rule triples.
-Each element of TRIPLES is a (MATCHER ANCHOR OFFSET) form as accepted
-by `f90-ts--map-rule'.  Returns a list of all expanded triples suitable for
-use as the body of a `defvar' ruleset.
-As a special case, (log-state MSG) is expanded to the
-triple ((f90-ts-log-indent-print-state MSG) parent 0) directly."
-  `(list ,@(mapcar (lambda (triple)
-                     (if (eq (car triple) 'log-state)
-                         `(list '(f90-ts-log-indent-print-state ,(nth 1 triple)) 'parent 0)
-                       `(f90-ts--map-rule ,(nth 0 triple)
-                                          ,(nth 1 triple)
-                                          ,(nth 2 triple))))
-                   triples)))
+Each element of TRIPLES is in most cases a (MATCHER ANCHOR OFFSET) form as
+accepted by `f90-ts--map-rule'.  Returns a list of all expanded
+triples suitable for the treesit simple indentation engine.
+
+The first exception is (log-state MSG), which expands to the
+triple ((f90-ts-log-indent-print-state MSG) parent 0) directly.
+
+The second exception are conditional triples of the
+form (when COND (MATCHER ANCHOR OFFSET))
+and (unless COND (MATCHER ANCHRO OFFSET)).
+COND is evaluated at runtime, and the entry contributes its triple only when
+COND is non-nil (when) or nil (unless).  As the condition is evaluated after
+the grammar is loaded, it can be used to adjust for grammar variants (like
+`f90-ts--string-literal-decomposed-p', which checks for string_literal
+parser variant)."
+ `(cl-loop
+   for rule in (list ,@(mapcar
+                        (lambda (entry)
+                          (pcase entry
+                            (`(log-state ,msg)
+                             `(list '(f90-ts-log-indent-print-state ,msg) 'parent 0))
+                            (`(when ,cond-form (,matcher ,anchor ,offset))
+                             `(when ,cond-form
+                                (f90-ts--map-rule ,matcher ,anchor ,offset)))
+                            (`(unless ,cond-form (,matcher ,anchor ,offset))
+                             `(unless ,cond-form
+                                (f90-ts--map-rule ,matcher ,anchor ,offset)))
+                            (`(,matcher ,anchor ,offset)
+                             `(f90-ts--map-rule ,matcher ,anchor ,offset))))
+                          triples))
+   when rule collect rule))
 
 
 ;;++++++++++++++
