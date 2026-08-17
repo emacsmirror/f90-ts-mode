@@ -512,3 +512,33 @@ subroutine sub()|
      ! comment1 comment2
 end subroutine sub
 =-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((fill-column 40)
+          (inhibit-message t)
+          (f90-ts-fill-select-breakpoint-by 'interactive))
+      (f90-ts-mode-test--with-mocked-keys
+       '[left return delete ?r return delete ?r right return return]
+        (call-interactively #'f90-ts-fill-at-line))))
+
+Name: fill line interactive 5
+=-=
+module mod
+type :: t
+|   integer :: var1, var2, var3, var4, &
+              var5, var6, var7, var8, &
+              var9, var10, var11, var12
+end type t
+end module mod
+=-=
+module mod
+type :: t
+|   integer :: var1, var2, var3, &
+              var4, var5, var6, var7, &
+              var8, var9, var10, var11, &
+              var12
+end type t
+end module mod
+=-=-=

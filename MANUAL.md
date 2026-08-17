@@ -646,7 +646,7 @@ This behavior is controlled by the customizable variable `f90-ts-fill-select-bre
                 a `%` component selection) unless strictly necessary.
 * `interactive`: Pauses the fill operation and allows to manually rotate through possible valid breakpoints
                  using an interactive break and join session. The mode allows to break lines beyond fill-column.
-    * `left`, `right`, `home`, `end`, `C-p` and `C-n` to walk through breakpoints with the cursor.
+    * `left`, `right`, `home`, `end`, `r`, `C-p` and `C-n` to walk through breakpoints with the cursor.
     * `RET` to confirm the break.
     * `BACKSPACE` to perform a normal join with the previous line.
     * `DEL` to perform a normal a normal join with the next line.

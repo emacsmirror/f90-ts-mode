@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] Jump-to-rightmost-position added to interactive fill operation
+;;             added.
 ;;   [08-2026] Mark region operations fixed: always consider trimmed region
 ;;             of nodes.  Some nodes like a whole "subroutine..end subroutine"
 ;;             block contains a trailing newline, which should not be
@@ -141,6 +143,7 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
+- Jump-to-rightmost-position added to interactive fill operation added.
 - Mark region operations fixed: always consider trimmed region
   of nodes. Some nodes like a whole `subroutine..end subroutine`
   block contains a trailing newline, which should not be
@@ -6431,24 +6434,43 @@ conditions to reduce the tree to only contain preferred break points."
    (lambda (n) (f90-ts--find-breakpoints-for-node n fill-col))))
 
 
-(defun f90-ts--find-breakpoint-read-key (idx num-pos at-end)
-  "Read one key and return (IDX ACTION) for NUM-POS candidates.
+(defun f90-ts--find-breakpoint-rightmost-idx (positions fill-col)
+  "Return index in POSITIONS of the rightmost candidate within FILL-COL.
+A candidate satisfies the constraint according to
+`f90-ts--breakpoint-pos-within-fill-col-p'.  Return nil if no candidate
+in POSITIONS satisfies it."
+  (when-let* ((target (cl-loop
+                        for p in positions
+                        when (f90-ts--breakpoint-pos-within-fill-col-p p fill-col)
+                        maximize p)))
+    (cl-position target positions)))
+
+
+(defun f90-ts--find-breakpoint-read-key (idx positions fill-col at-end)
+  "Read one key and return (IDX ACTION) for candidate POSITIONS.
 ACTION is nil to continue, or a symbol: `confirm', `join', `skip',
 `abort', `continue'.  AT-END controls whether SPC is is just a skip
-line operation or whether it extends the region by one line."
+line operation or whether it extends the region by one line.
+FILL-COL is used to determine the target position for the \"r\" key,
+which jumps to the rightmost candidate at or before FILL-COL."
   (let ((prompt (concat "Select break point: left/right/home/end or C-p/C-n, "
+                        "r rightmost, "
                         "BACKSPACE/DEL join, RET confirm"
                         (if at-end
                             ", q skip, SPC skip and extend region"
                           ", q/SPC skip")
                         ", C-g abort")))
     (message prompt))
-  (let ((key (read-key)))
+  (let ((key (read-key))
+        (num-pos (length positions)))
     (cond
      ((or (eq key 'left)  (eq key ?\C-p)) (list (mod (1- idx) num-pos) nil))
      ((or (eq key 'right) (eq key ?\C-n)) (list (mod (1+ idx) num-pos) nil))
      ((eq key 'home)                      (list 0                      nil))
      ((eq key 'end)                       (list (1- num-pos)           nil))
+     ((eq key ?r)
+      (list (or (f90-ts--find-breakpoint-rightmost-idx positions fill-col) idx)
+            nil))
      ((memq key '(return ?\r ?\n))        (list idx                    'confirm))
      ((eq key ?\d)                        (list idx                    'join-prev))
      ((eq key 'deletechar)                (list idx                    'join-next))
@@ -6519,7 +6541,6 @@ some improvements."
                                ;; use smallest position available as fallback
                                (car positions)))
               (idx (cl-position initial-pos positions))
-              (num-pos (length positions))
               (orig-point (point))
               (orig-cursor cursor-type))
     (unwind-protect
@@ -6528,7 +6549,7 @@ some improvements."
           (setq cursor-type (cons 'bar (max 2 (/ (frame-char-width) 3))))
           (goto-char (nth idx positions))
           (cl-loop
-           for (new-idx action) = (f90-ts--find-breakpoint-read-key idx num-pos
+           for (new-idx action) = (f90-ts--find-breakpoint-read-key idx positions fill-col
                                                                     allow-continue)
            do (setq idx new-idx)
            until action
