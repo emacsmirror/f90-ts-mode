@@ -14,7 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
- - Jump-to-rightmost-position added to interactive fill operation added.
+ - Jump-to-rightmost-position to interactive fill operation added.
  - Mark region operations fixed: always consider trimmed region of nodes.
    Some nodes like a whole `subroutine..end subroutine` block contains a trailing
    newline, which should not be considered. Not consequently trimming all spans
