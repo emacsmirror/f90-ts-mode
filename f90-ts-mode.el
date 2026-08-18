@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] Jump-to-rightmost-position added to interactive fill operation
+;;             added.
 ;;   [08-2026] Mark region operations fixed: always consider trimmed region
 ;;             of nodes.  Some nodes like a whole "subroutine..end subroutine"
 ;;             block contains a trailing newline, which should not be
@@ -141,6 +143,7 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
+- Jump-to-rightmost-position added to interactive fill operation added.
 - Mark region operations fixed: always consider trimmed region
   of nodes. Some nodes like a whole `subroutine..end subroutine`
   block contains a trailing newline, which should not be
@@ -1386,10 +1389,14 @@ checks whether it is part of a \"block_label_start_expression\"."
 
 
 (defun f90-ts--node-preproc-p (node)
-  "Check if NODE is a preprocessor node and has the '#' prefix."
-    (let ((type (treesit-node-type node)))
-      (or (string-prefix-p "#" type)
-          (string-match-p "^preproc_" type))))
+  "Check if NODE is a preprocessor directive node.
+This is done by checking whether the node text starts with a \"#\".
+For indentation, only these directive nodes are relevant.
+This function should cover both anonymous leaf nodes as well as named nodes.
+Hence checking the type of the node works only partially."
+    (let ((start (treesit-node-start node)))
+      ;; only fetch the first character instead of the whole node text
+      (eq (char-after start) ?#)))
 
 
 (defconst f90-ts--preproc-block-keyword-regexp
@@ -2574,8 +2581,11 @@ append to a determined font lock face."
      ((ERROR) @f90-ts--fontify-error))))
 
 
-(defvar f90-ts-font-lock-rules
-  (list
+(defun f90-ts-font-lock-rules ()
+  "Return list of font-lock rules.
+Internally, some rules are selected depending on grammar properties, like
+changes in how string_literal is parsed and whether it is decomposed."
+  (append
    (f90-ts--font-lock-rules-comment)
    (f90-ts--font-lock-rules-intrinsic)
    (f90-ts--font-lock-rules-keyword)
@@ -2589,9 +2599,7 @@ append to a determined font lock face."
    (f90-ts--font-lock-rules-variable)
    (f90-ts--font-lock-rules-value)
    (f90-ts--font-lock-rules-delimiter)
-   (f90-ts--font-lock-rules-error))
-  "List of font-lock rules.")
-
+   (f90-ts--font-lock-rules-error)))
 
 ;;;-----------------------------------------------------------------------------
 ;;; Xref backend
@@ -4632,10 +4640,10 @@ the continued line matcher."
 ;; simple indentation rules: expansion with f90-ts-- prefix
 
 (defmacro f90-ts--map-rule (matcher anchor offset)
-  "Map an indent rule triple with f90-ts-- prefix prepended were applicable.
+  "Map an indent rule triple with f90-ts-- prefix prepended where applicable.
 MATCHER is either a bare symbol (direct matcher function) or a list
 whose car is a constructor name.  ANCHOR and OFFSET are bare symbols or
-literals.  Any symbol present in an internal list are prefixed, the rest is
+literals.  Any symbol present in an internal list is prefixed, the rest is
 passed through unchanged."
   (let ((prefix-syms '(;; matcher constructor
                        nopp-parent-is
@@ -4679,38 +4687,57 @@ passed through unchanged."
                       (t offset))))
         `(list ,m ,a ,o)))))
 
-
 (defmacro f90-ts--with-map-rules (&rest triples)
   "Build a list of treesit indent rule triples.
-Each element of TRIPLES is a (MATCHER ANCHOR OFFSET) form as accepted
-by `f90-ts--map-rule'.  Returns a list of all expanded triples suitable for
-use as the body of a `defvar' ruleset.
-As a special case, (log-state MSG) is expanded to the
-triple ((f90-ts-log-indent-print-state MSG) parent 0) directly."
-  `(list ,@(mapcar (lambda (triple)
-                     (if (eq (car triple) 'log-state)
-                         `(list '(f90-ts-log-indent-print-state ,(nth 1 triple)) 'parent 0)
-                       `(f90-ts--map-rule ,(nth 0 triple)
-                                          ,(nth 1 triple)
-                                          ,(nth 2 triple))))
-                   triples)))
+Each element of TRIPLES is in most cases a (MATCHER ANCHOR OFFSET) form as
+accepted by `f90-ts--map-rule'.  Returns a list of all expanded
+triples suitable for the treesit simple indentation engine.
+
+The first exception is (log-state MSG), which expands to the
+triple ((f90-ts-log-indent-print-state MSG) parent 0) directly.
+
+The second exception are conditional triples of the
+form (when COND (MATCHER ANCHOR OFFSET))
+and (unless COND (MATCHER ANCHRO OFFSET)).
+COND is evaluated at runtime, and the entry contributes its triple only when
+COND is non-nil (when) or nil (unless).  As the condition is evaluated after
+the grammar is loaded, it can be used to adjust for grammar variants (like
+`f90-ts--string-literal-decomposed-p', which checks for string_literal
+parser variant)."
+ `(cl-loop
+   for rule in (list ,@(mapcar
+                        (lambda (entry)
+                          (pcase entry
+                            (`(log-state ,msg)
+                             `(list '(f90-ts-log-indent-print-state ,msg) 'parent 0))
+                            (`(when ,cond-form (,matcher ,anchor ,offset))
+                             `(when ,cond-form
+                                (f90-ts--map-rule ,matcher ,anchor ,offset)))
+                            (`(unless ,cond-form (,matcher ,anchor ,offset))
+                             `(unless ,cond-form
+                                (f90-ts--map-rule ,matcher ,anchor ,offset)))
+                            (`(,matcher ,anchor ,offset)
+                             `(f90-ts--map-rule ,matcher ,anchor ,offset))))
+                          triples))
+   when rule collect rule))
 
 
 ;;++++++++++++++
 ;; simple indentation rules
 
-(defvar f90-ts--indent-rules-start
+(defun f90-ts--indent-rules-start ()
+  "Indentation rules executed at start.
+The main purpose is to fill the indentation cache for a new run."
   (f90-ts--with-map-rules
    ;; populate cache and then always fail
    (populate-cache parent 0)
    ;; info rules needs populated cache
    ;;(log-state "start")
-   )
-  "Indentation rules executed at start.
-The main purpose is to fill the indentation cache for a new run.")
+   ))
 
 
-(defvar f90-ts--indent-rules-comments
+(defun f90-ts--indent-rules-comments ()
+  "Indentation rules for comments (excluding OpenMP statements)."
   (f90-ts--with-map-rules
    ;; there are special comments in `f90-ts-special-comment-rules',
    ;; distinguish between default and these special comments
@@ -4730,21 +4757,21 @@ The main purpose is to fill the indentation cache for a new run.")
    ;; indent separator comments like their parent nodes
    ;; this check is after the region check, hence previous sibling
    ;; is not a comment of same kind
-   (special-comment-is cached-anchor cached-offset))
-  "Indentation rules for comments (excluding OpenMP statements).")
+   (special-comment-is cached-anchor cached-offset)))
 
 
-(defvar f90-ts--indent-rules-preproc
+(defun f90-ts--indent-rules-preproc ()
+  "Indentation rules for preprocessor directives."
   (f90-ts--with-map-rules
    ;; indent preprocessor directive
    ;; directive itself: no indent
    ;; otherwise, skip preproc nodes as if they are not present
    ;; (this is done by the nopp=no-preproc mechanics)
-   (preproc-node-is column-0 0))
-  "Indentation rules for preprocessor directives.")
+   (preproc-node-is column-0 0)))
 
 
-(defvar f90-ts--indent-rules-continued
+(defun f90-ts--indent-rules-continued ()
+  "Indentation rules for continued lines."
   (f90-ts--with-map-rules
    ;; handle continued lines
    ;; if on first line of a continued statement, reset the continued-line cache
@@ -4761,22 +4788,22 @@ The main purpose is to fill the indentation cache for a new run.")
    ;; it is easy to see whether we are on a continued line (not the first line
    ;; of a multiline statement, only subsequent lines), but handling specific
    ;; cases is not possible with just some simple n-p-gp pattern,
-   (continued-subsequent-line-is f90-ts--continued-line-anchor cached-offset))
-  "Indentation rules for continued lines.")
+   (continued-subsequent-line-is f90-ts--continued-line-anchor cached-offset)))
 
 
-(defvar f90-ts--indent-rules-internal-proc
+(defun f90-ts--indent-rules-internal-proc ()
+  "Indentation rules for internal_proc node.
+This node occurs in conjunction with \"contain\" statements."
   (f90-ts--with-map-rules
    ;; contains statements in modules, programs, subroutines or functions,
    ;; no indentation for contains
    ((node-is         "internal_procedures")         nopp-parent 0)
    ((nopp-parent-is  "internal_procedures")         nopp-parent toplevel-offset)
-   ((nopp-n-p-gp nil "ERROR" "internal_procedures") nopp-parent toplevel-offset))
-  "Indentation rules for internal_proc node.
-This node occurs in conjunction with \"contain\" statements.")
+   ((nopp-n-p-gp nil "ERROR" "internal_procedures") nopp-parent toplevel-offset)))
 
 
-(defvar f90-ts--indent-rules-prog-mod
+(defun f90-ts--indent-rules-prog-mod ()
+  "Indentation rules for program and module nodes."
   (f90-ts--with-map-rules
    ;; program or module interface part (before contains) and end statement
    ;; in all cases: first match node with end_xyz_statement, and then only
@@ -4793,11 +4820,11 @@ This node occurs in conjunction with \"contain\" statements.")
 
    ((node-is             "end_submodule_statement")      nopp-parent 0)
    ((nopp-parent-is      "^submodule\\(_statement\\)?$") nopp-parent toplevel-offset)
-   ((nopp-n-p-pstmtk nil "ERROR" "^submodule$")          nopp-parent toplevel-offset))
-  "Indentation rules for program and module nodes.")
+   ((nopp-n-p-pstmtk nil "ERROR" "^submodule$")          nopp-parent toplevel-offset)))
 
 
-(defvar f90-ts--indent-rules-function
+(defun f90-ts--indent-rules-function ()
+  "Indentation rules for functions and subroutines."
   (f90-ts--with-map-rules
    ;; functions and subroutine bodies
    ((node-is         "end_subroutine_statement")         nopp-parent 0)
@@ -4808,11 +4835,13 @@ This node occurs in conjunction with \"contain\" statements.")
    ((nopp-parent-is  "module_procedure")                 nopp-parent f90-ts-indent-block)
    ((nopp-n-p-pstmtk nil nil "subroutine")               nopp-parent f90-ts-indent-block)
    ((nopp-n-p-pstmtk nil nil "function")                 nopp-parent f90-ts-indent-block)
-   ((nopp-n-p-pstmtk nil nil "module_procedure")         nopp-parent f90-ts-indent-block))
-  "Indentation rules for functions and subroutines.")
+   ((nopp-n-p-pstmtk nil nil "module_procedure")         nopp-parent f90-ts-indent-block)))
 
 
-(defvar f90-ts--indent-rules-translation-unit
+(defun f90-ts--indent-rules-translation-unit ()
+  "Indentation rules related to root node translation_unit.
+These occur for functions and subroutines not within a \"contains\" section,
+and in case of ERROR nodes with incomplete code."
   (f90-ts--with-map-rules
    ;; statements related to toplevel subroutine or function statements,
    ;; and ERROR cases (might or might not be toplevel)
@@ -4835,22 +4864,20 @@ This node occurs in conjunction with \"contain\" statements.")
    ;; as module procedure statements are only allowed within contains section
 
    ((n-p-ch-psibp nil "ERROR"            nil "module_procedure_statement") nopp-parent f90-ts-indent-block)
-   ((nopp-parent-is "translation_unit") column-0 0))
-  "Indentation rules related to root node translation_unit.
-These occur for functions and subroutines not within a \"contains\" section,
-and in case of ERROR nodes with incomplete code.")
+   ((nopp-parent-is "translation_unit") column-0 0)))
 
 
-(defvar f90-ts--indent-rules-interface
+(defun f90-ts--indent-rules-interface ()
+  "Indentation rules for interface blocks."
   (f90-ts--with-map-rules
    ;; (abstract) interface bodies
    ((node-is         "end_interface_statement") nopp-parent 0)
    ((nopp-parent-is  "interface")               nopp-parent f90-ts-indent-block)
-   ((nopp-n-p-pstmtk nil "ERROR" "interface")   nopp-parent f90-ts-indent-block))
-  "Indentation rules for interface blocks.")
+   ((nopp-n-p-pstmtk nil "ERROR" "interface")   nopp-parent f90-ts-indent-block)))
 
 
-(defvar f90-ts--indent-rules-dtype-enum
+(defun f90-ts--indent-rules-dtype-enum ()
+  "Indentation rules for derived type and enumeration type statements."
   (f90-ts--with-map-rules
    ;; derived type definitions
    ((nopp-n-p-gp        "end_type_statement"      "derived_type_definition" nil)                      nopp-parent 0)
@@ -4865,11 +4892,11 @@ and in case of ERROR nodes with incomplete code.")
    ((node-is         "end_enum_statement")                    nopp-parent 0)
    ((node-is         "end_enumeration_type_statement")        nopp-parent 0)
    ((nopp-parent-is  "^enum\\(eration_type\\)?$")             nopp-parent f90-ts-indent-block)
-   ((nopp-n-p-pstmtk nil "ERROR" "^enum\\(eration_type\\)?$") nopp-parent f90-ts-indent-block))
-  "Indentation rules for derived type and enumeration type statements.")
+   ((nopp-n-p-pstmtk nil "ERROR" "^enum\\(eration_type\\)?$") nopp-parent f90-ts-indent-block)))
 
 
-(defvar f90-ts--indent-rules-if
+(defun f90-ts--indent-rules-if ()
+  "Indentation rules for if-then-else statements."
   (f90-ts--with-map-rules
    ;; if-then-else statements
    ;; this must be first, as its parent is an if-statement
@@ -4897,11 +4924,11 @@ and in case of ERROR nodes with incomplete code.")
    ((nopp-n-p-pstmtk nil                "ERROR" "^if$")     previous-stmt-anchor f90-ts-indent-block) ; empty line after if
    ((nopp-n-p-pstmtk nil                "ERROR" "^elseif$") previous-stmt-anchor f90-ts-indent-block) ; empty line after elseif
    ((nopp-n-p-pstmtk nil                "ERROR" "^else$")   previous-stmt-anchor f90-ts-indent-block) ; empty line after else
-   )
-  "Indentation rules for if-then-else statements.")
+   ))
 
 
-(defvar f90-ts--indent-rules-where
+(defun f90-ts--indent-rules-where ()
+  "Indentation rules for else-elsewhere statements."
   (f90-ts--with-map-rules
    ;; where-elsewhere statements
    ((nopp-n-p-gp     "end_where_statement" "where_statement"  nil)         nopp-parent 0)
@@ -4918,11 +4945,12 @@ and in case of ERROR nodes with incomplete code.")
 
    ((nopp-n-p-pstmtk nil                "ERROR" "where")     previous-stmt-anchor f90-ts-indent-block) ; empty line after where
    ((nopp-n-p-pstmtk nil                "ERROR" "elsewhere") previous-stmt-anchor f90-ts-indent-block) ; empty line after elsewhere
-   )
-  "Indentation rules for else-elsewhere statements.")
+   ))
 
 
-(defvar f90-ts--indent-rules-single-region
+(defun f90-ts--indent-rules-single-region ()
+  "Indentation rules for single region structures.
+These are do loops, block statements, associate construct and forall statements."
   (f90-ts--with-map-rules
    ;; structures with a single region block and linear execution
    ((nopp-n-p-gp     "end_do_loop" "do_loop"      nil)  nopp-parent 0)
@@ -4940,12 +4968,11 @@ and in case of ERROR nodes with incomplete code.")
 
    ((nopp-n-p-gp "end_forall_statement"        "forall_statement" nil)      nopp-parent          0)
    ((nopp-n-p-pstmtk nil                       "forall_statement" "forall") nopp-parent          f90-ts-indent-block)
-   ((nopp-n-p-pstmtk nil                       "ERROR"            "forall") previous-stmt-anchor f90-ts-indent-block))
-  "Indentation rules for single region structures.
-These are do loops, block statements, associate construct and forall statements.")
+   ((nopp-n-p-pstmtk nil                       "ERROR"            "forall") previous-stmt-anchor f90-ts-indent-block)))
 
 
-(defvar f90-ts--indent-rules-select
+(defun f90-ts--indent-rules-select ()
+  "Indentation rules for select statements (case and type)."
   (f90-ts--with-map-rules
    ;; control statements
    ((nopp-n-p-gp     "end_select_statement" "select_case_statement" nil)              nopp-parent 0)
@@ -4972,11 +4999,11 @@ These are do loops, block statements, associate construct and forall statements.
    ((nopp-n-p-pstmtk nil                    "rank_statement"        "rank")           nopp-parent f90-ts-indent-block)
    ((nopp-n-p-gp     "ERROR"                "select_rank_statement" nil)              nopp-parent f90-ts-indent-block)
    ((nopp-n-p-gp     nil                    "ERROR"                 "rank_statement") nopp-grandparent f90-ts-indent-block)
-   ((nopp-parent-is                         "select_rank_statement")                  nopp-parent 0))
-  "Indentation rules for select statements (case and type).")
+   ((nopp-parent-is                         "select_rank_statement")                  nopp-parent 0)))
 
 
-(defvar f90-ts--indent-rules-coarray
+(defun f90-ts--indent-rules-coarray ()
+  "Indentation rules for coarray statements."
   (f90-ts--with-map-rules
    ;; structures with a single region block and linear execution
    ((nopp-n-p-gp     "end_coarray_critical_statement" "coarray_critical_statement" nil)        nopp-parent 0)
@@ -4985,37 +5012,39 @@ These are do loops, block statements, associate construct and forall statements.
 
    ((nopp-n-p-gp     "end_coarray_team_statement" "coarray_team_statement" nil)      nopp-parent 0)
    ((nopp-n-p-pstmtk nil                          "coarray_team_statement" "change") nopp-parent f90-ts-indent-block)
-   ((nopp-n-p-pstmtk nil                          "ERROR"                  "change") previous-stmt-anchor f90-ts-indent-block))
-  "Indentation rules for coarray statements.")
+   ((nopp-n-p-pstmtk nil                          "ERROR"                  "change") previous-stmt-anchor f90-ts-indent-block)))
 
 
-(defvar f90-ts--indent-rules-catch-all
+(defun f90-ts--indent-rules-catch-all ()
+  "Final indentation rule to handle unmatched cases."
   (f90-ts--with-map-rules
    ;; final catch-all rule
    ;;(log-state "catch all")
-   (catch-all catch-all-anchor 0))
-  "Final indentation rule to handle unmatched cases.")
+   (catch-all catch-all-anchor 0)))
 
 
-(defvar f90-ts-indent-rules
+(defun f90-ts-indent-rules ()
+  "List of all indentation rules.
+Rules are evaluated in the given order, which is important in some cases.
+In particular, comments and continued lines must be dealt with before most
+other rules."
   `((fortran
-     ,@f90-ts--indent-rules-start
-     ,@f90-ts--indent-rules-preproc
-     ,@f90-ts--indent-rules-comments
-     ,@f90-ts--indent-rules-continued
-     ,@f90-ts--indent-rules-internal-proc
-     ,@f90-ts--indent-rules-prog-mod
-     ,@f90-ts--indent-rules-function
-     ,@f90-ts--indent-rules-translation-unit
-     ,@f90-ts--indent-rules-interface
-     ,@f90-ts--indent-rules-dtype-enum
-     ,@f90-ts--indent-rules-if
-     ,@f90-ts--indent-rules-where
-     ,@f90-ts--indent-rules-single-region
-     ,@f90-ts--indent-rules-select
-     ,@f90-ts--indent-rules-coarray
-     ,@f90-ts--indent-rules-catch-all))
-  "List of all indentation rules in its proper sequence.")
+     ,@(f90-ts--indent-rules-start)
+     ,@(f90-ts--indent-rules-preproc)
+     ,@(f90-ts--indent-rules-comments)
+     ,@(f90-ts--indent-rules-continued)
+     ,@(f90-ts--indent-rules-internal-proc)
+     ,@(f90-ts--indent-rules-prog-mod)
+     ,@(f90-ts--indent-rules-function)
+     ,@(f90-ts--indent-rules-translation-unit)
+     ,@(f90-ts--indent-rules-interface)
+     ,@(f90-ts--indent-rules-dtype-enum)
+     ,@(f90-ts--indent-rules-if)
+     ,@(f90-ts--indent-rules-where)
+     ,@(f90-ts--indent-rules-single-region)
+     ,@(f90-ts--indent-rules-select)
+     ,@(f90-ts--indent-rules-coarray)
+     ,@(f90-ts--indent-rules-catch-all))))
 
 
 ;;;-----------------------------------------------------------------------------
@@ -6405,24 +6434,43 @@ conditions to reduce the tree to only contain preferred break points."
    (lambda (n) (f90-ts--find-breakpoints-for-node n fill-col))))
 
 
-(defun f90-ts--find-breakpoint-read-key (idx num-pos at-end)
-  "Read one key and return (IDX ACTION) for NUM-POS candidates.
+(defun f90-ts--find-breakpoint-rightmost-idx (positions fill-col)
+  "Return index in POSITIONS of the rightmost candidate within FILL-COL.
+A candidate satisfies the constraint according to
+`f90-ts--breakpoint-pos-within-fill-col-p'.  Return nil if no candidate
+in POSITIONS satisfies it."
+  (when-let* ((target (cl-loop
+                        for p in positions
+                        when (f90-ts--breakpoint-pos-within-fill-col-p p fill-col)
+                        maximize p)))
+    (cl-position target positions)))
+
+
+(defun f90-ts--find-breakpoint-read-key (idx positions fill-col at-end)
+  "Read one key and return (IDX ACTION) for candidate POSITIONS.
 ACTION is nil to continue, or a symbol: `confirm', `join', `skip',
 `abort', `continue'.  AT-END controls whether SPC is is just a skip
-line operation or whether it extends the region by one line."
+line operation or whether it extends the region by one line.
+FILL-COL is used to determine the target position for the \"r\" key,
+which jumps to the rightmost candidate at or before FILL-COL."
   (let ((prompt (concat "Select break point: left/right/home/end or C-p/C-n, "
+                        "r rightmost, "
                         "BACKSPACE/DEL join, RET confirm"
                         (if at-end
                             ", q skip, SPC skip and extend region"
                           ", q/SPC skip")
                         ", C-g abort")))
     (message prompt))
-  (let ((key (read-key)))
+  (let ((key (read-key))
+        (num-pos (length positions)))
     (cond
      ((or (eq key 'left)  (eq key ?\C-p)) (list (mod (1- idx) num-pos) nil))
      ((or (eq key 'right) (eq key ?\C-n)) (list (mod (1+ idx) num-pos) nil))
      ((eq key 'home)                      (list 0                      nil))
      ((eq key 'end)                       (list (1- num-pos)           nil))
+     ((eq key ?r)
+      (list (or (f90-ts--find-breakpoint-rightmost-idx positions fill-col) idx)
+            nil))
      ((memq key '(return ?\r ?\n))        (list idx                    'confirm))
      ((eq key ?\d)                        (list idx                    'join-prev))
      ((eq key 'deletechar)                (list idx                    'join-next))
@@ -6493,7 +6541,6 @@ some improvements."
                                ;; use smallest position available as fallback
                                (car positions)))
               (idx (cl-position initial-pos positions))
-              (num-pos (length positions))
               (orig-point (point))
               (orig-cursor cursor-type))
     (unwind-protect
@@ -6502,7 +6549,7 @@ some improvements."
           (setq cursor-type (cons 'bar (max 2 (/ (frame-char-width) 3))))
           (goto-char (nth idx positions))
           (cl-loop
-           for (new-idx action) = (f90-ts--find-breakpoint-read-key idx num-pos
+           for (new-idx action) = (f90-ts--find-breakpoint-read-key idx positions fill-col
                                                                     allow-continue)
            do (setq idx new-idx)
            until action
@@ -8515,35 +8562,31 @@ package `markdown-mode' are available, then use these."
              "Run `M-x treesit-install-language-grammar RET fortran RET' "
              "or ensure treesit-language-source-alist points to a built grammar.")))
 
-  ;; font-lock feature list controls what features are enabled for highlighting
+  ;; set font-lock feature list
   (setq-local treesit-font-lock-feature-list
               '((comment preproc error)                          ; level 1
                 (builtin keyword string type)                    ; level 2
                 (constant number)                                ; level 3
                 (function variable operator bracket delimiter))) ; level 4
 
-  ;; use the pre-defined font-lock rules variable
-  (setq-local treesit-font-lock-settings
-              (apply #'append f90-ts-font-lock-rules))
+  ;; set font-lock and indentation rules
+  (setq-local treesit-font-lock-settings (f90-ts-font-lock-rules))
+  (setq-local treesit-simple-indent-rules (f90-ts-indent-rules))
 
-  ;; use the pre-defined indentation rules variable
-  (setq-local treesit-simple-indent-rules f90-ts-indent-rules)
-
-  ;; Imenu Setup
+  ;; set Imenu
   (setq-local imenu-create-index-function #'f90-ts-simple-imenu)
 
-  ;; Defun
+  ;; set Defun stuff
   (setq-local treesit-defun-type-regexp f90-ts--thing-defun-regexp-pred)
   (setq-local treesit-defun-name-function #'f90-ts--defun-name)
   (setq-local treesit-defun-tactic 'nested)  ; or 'top-level?
   (setq-local treesit-thing-settings f90-ts--thing-settings)
 
-  ;; basic setup helper provided by emacs for tree-sitter powered modes,
-  ;; this must be called after setting setq-local variables above!
+  ;; this setup function must be called after setting variables above
   (treesit-major-mode-setup)
 
   ;; set indentation functions (both add smart end completion before
-  ;; indentation, so no hook available); this must be done AFTER
+  ;; indentation, so no hook available); this must be done after
   ;; calling treesit-major-mode-setup
   (setq-local indent-line-function #'f90-ts-indent-and-complete-line)
   (setq-local indent-region-function #'f90-ts-indent-and-complete-region)
@@ -8553,7 +8596,7 @@ package `markdown-mode' are available, then use these."
   ;;(setq-local treesit--font-lock-verbose t)
   ;;(setq-local treesit--indent-verbose t)
 
-  ;; provide a simple mode name in the modeline
+  ;; provide mode name
   (setq-local mode-name "F90-TS"))
 
 
