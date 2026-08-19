@@ -32,8 +32,7 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [08-2026] Jump-to-rightmost-position added to interactive fill operation
-;;             added.
+;;   [08-2026] Jump-to-rightmost-position to interactive fill operation added.
 ;;   [08-2026] Mark region operations fixed: always consider trimmed region
 ;;             of nodes.  Some nodes like a whole "subroutine..end subroutine"
 ;;             block contains a trailing newline, which should not be
@@ -143,7 +142,7 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
-- Jump-to-rightmost-position added to interactive fill operation added.
+- Jump-to-rightmost-position to interactive fill operation added.
 - Mark region operations fixed: always consider trimmed region
   of nodes. Some nodes like a whole `subroutine..end subroutine`
   block contains a trailing newline, which should not be
@@ -274,7 +273,7 @@ associate ...) etc."
 
 
 (defcustom f90-ts-indent-list-region 'keep-or-primary
-  "Select indentation column for continued lines in list-like context.
+  "Method to select indentation column for continued lines in list-like context.
 Used as default setting in `indent-region' and similar operations."
   :type (f90-ts--indent-make-radio-type f90-ts--indent-region-options-alist)
   :safe (lambda (val) (memq val f90-ts--indent-region-values))
@@ -282,7 +281,7 @@ Used as default setting in `indent-region' and similar operations."
 
 
 (defcustom f90-ts-indent-list-line 'rotate
-  "Select indentation column for continued lines in list-like context.
+  "Method to select indentation column for continued lines in list-like context.
 Used as default setting in `indent-for-tab-command' and similar
 operations (indentation of a single line)."
   :type (f90-ts--indent-make-radio-type f90-ts--indent-options-alist)
@@ -291,7 +290,7 @@ operations (indentation of a single line)."
 
 
 (defcustom f90-ts-indent-list-line-2 'continued-line
-  "Select indentation column for continued lines in list-like context.
+  "Method to select indentation column for continued lines in list-like context.
 Used as secondary setting in `indent-for-tab-command'.  Can be be bound
 to <backtab> (S-<tab>), A-<tab>, C-S-<tab> or other."
   :type (f90-ts--indent-make-radio-type f90-ts--indent-options-alist)
@@ -300,7 +299,7 @@ to <backtab> (S-<tab>), A-<tab>, C-S-<tab> or other."
 
 
 (defcustom f90-ts-indent-list-line-3 'primary
-  "Select indentation column for continued lines in list-like context.
+  "Method to select indentation column for continued lines in list-like context.
 Used as ternary setting in `indent-for-tab-command'.  Can be be bound
 to <backtab> (S-<tab>), A-<tab>, C-S-<tab> or other."
   :type (f90-ts--indent-make-radio-type f90-ts--indent-options-alist)
@@ -343,12 +342,13 @@ opening parenthesis plus `f90-ts-indent-paren-close'."
 This is applied for alignment with symbol \"=\" for all items
 except for associative operators.
 
-Example:
+Example (with offset 2, which aligns some_expr two columns to the right of =):
 x =      & ! some comment
-    some_expression
+    some_expr
 
-Primary alignment column for the second line column of assignment plus
-`f90-ts-indent-expr-assign-default' for non-operators."
+Primary alignment column for the second line is column of assignment \"=\" plus
+`f90-ts-indent-expr-assign-default'.  Applied to all nodes except associate
+operators, which are handled by `f90-ts-indent-expr-assign-assoc-op'."
   :type  'integer
   :safe  #'integerp
   :group 'f90-ts-indent)
@@ -359,12 +359,13 @@ Primary alignment column for the second line column of assignment plus
 This is applied for alignment with symbol \"=\" for all associative
 operators (logical_expression, math_expression).
 
-Example:
+Example (with offset 0, which aligns = and + at the same colum):
 x = value1 &
-  + some_expression
+  + some_expr
 
-Primary alignment column for the second line column of assignment plus
-`f90-ts-indent-expr-assign-assoc-op' for associative operators."
+Primary alignment column for the second line is column of assignment \"=\" plus
+`f90-ts-indent-expr-assign-assoc-op' for associative operators.
+All other cases are handled by `f90-ts-indent-expr-assign-default'."
   :type  'integer
   :safe  #'integerp
   :group 'f90-ts-indent)
