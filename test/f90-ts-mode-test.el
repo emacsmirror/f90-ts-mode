@@ -148,7 +148,7 @@ without final newline."
     (f90-ts-fill-select-breakpoint-by . rightmost)
     (f90-ts-stmt-label-column . (left . 0))
     (f90-ts-special-comment-rules . ,f90-ts-mode-test--special-comment-rules)
-    (f90-ts-font-lock-error . f90-ts-font-lock-error-face)
+    (f90-ts-font-lock-error-show . all)
     (f90-ts-comment-prefix-regexp . "!\\S-*")
     (f90-ts-comment-prefix-separator-regexp . "\\s-")
     (f90-ts-openmp-prefix-regexp . "!\\$\\(?:omp\\)?")
@@ -211,30 +211,37 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
 
 
 ;;;###autoload
-(defmacro f90-ts-mode-test-with-custom-testing (&rest body)
-  "Bind test settings dynamically using `cl-progv', then call BODY."
-  `(let ((vars (mapcar #'car f90-ts-mode-test-custom-settings))
-         (vals (mapcar #'cdr f90-ts-mode-test-custom-settings))
-         ;; save current buffer-local values for variables that have one
-         (saved-locals (cl-loop
-                        for (var . _ ) in f90-ts-mode-test-custom-settings
-                        when (local-variable-p var)
-                        collect (cons var
-                                      (buffer-local-value var (current-buffer))))))
+(defmacro f90-ts-mode-test-with-custom-testing (extras &rest body)
+  "Bind test settings dynamically using `cl-progv', then call BODY.
+EXTRAS is an alist of (VAR . VALUE) pairs that take precedence over
+`f90-ts-mode-test-custom-settings', and can overwrite default
+test values for specific tests."
+  (declare (indent 1))
+  `(let* (;; bind the value to a variable, otherwise the byte-compiler
+          ;; gives unsed-car-value warnings in the cl-remove-if line below
+          (extras-list ,extras)
+          (settings (append extras-list
+                            (cl-remove-if
+                             (lambda (pair) (assq (car pair) extras-list))
+                             f90-ts-mode-test-custom-settings)))
+          (vars (mapcar #'car settings))
+          (vals (mapcar #'cdr settings))
+          (saved-locals (cl-loop
+                         for (var . val) in settings
+                         do (message "%s, %s" var val)
+                         when (local-variable-p var)
+                         collect (cons var
+                                       (buffer-local-value var (current-buffer))))))
      (cl-progv vars vals
-       ;; also set buffer-local values where needed
-       (cl-loop for (var . val) in f90-ts-mode-test-custom-settings
+       (cl-loop for (var . val) in settings
                 when (local-variable-p var)
                 do (set var val))
        (unwind-protect
            (progn
-             ;; treesit-font-lock-level requires a recompute
              (treesit-font-lock-recompute-features nil nil 'fortran)
              (progn ,@body))
-         ;; restore buffer-local values on exit
          (cl-loop for (var . val) in saved-locals
                   do (set var val))
-         ;; treesit-font-lock-level requires a recompute
          (treesit-font-lock-recompute-features nil nil 'fortran)))))
 
 
@@ -242,7 +249,7 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
   "Run BODY-FN on FILE with custom values for testing.
 For example, use different indentation values for each indentation type,
 so that selection of indentation rules is tested properly."
-  (f90-ts-mode-test-with-custom-testing
+  (f90-ts-mode-test-with-custom-testing nil
    (with-temp-buffer
      (insert-file-contents file)
      (f90-ts-mode)
@@ -448,7 +455,7 @@ can be observed and checked."
                   (with-temp-buffer
                     (insert code)
                     (f90-ts-mode)
-                    (f90-ts-mode-test-with-custom-testing
+                    (f90-ts-mode-test-with-custom-testing nil
                      (if update-fn
                          (funcall update-fn)
                        (let ((f90-ts-indent-list-region indent-variant))
@@ -492,7 +499,7 @@ PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
    do (eval
        `(ert-deftest ,test-name ()
           (skip-unless (treesit-ready-p 'fortran))
-          (f90-ts-mode-test-with-custom-testing
+          (f90-ts-mode-test-with-custom-testing nil
            (f90-ts-mode-test-erts-with-diff
             (ert-test-erts-file (ert-resource-file ,file))))))))
 
@@ -533,7 +540,7 @@ PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
                   (skip-unless (treesit-ready-p 'fortran))
                   (ert-info
                    (,info-text)
-                   (f90-ts-mode-test-with-custom-testing
+                   (f90-ts-mode-test-with-custom-testing nil
                     (let ((f90-ts-mode-test--prepare-fn ',prep-fn)
                           (f90-ts-mode-test--action-fn ',action-fn))
                       (f90-ts-mode-test-erts-with-diff
@@ -626,7 +633,7 @@ starting with ! followed by optional spaces and carets).
 For other lines, generate annotations."
   (interactive
    (list (y-or-n-p "With adding face annotations? (n = only remove)?")))
-  (f90-ts-mode-test-with-custom-testing
+  (f90-ts-mode-test-with-custom-testing nil
    (let* ((pos (point))
           (pos-min (point-min))
           (pos-max (point-max))
@@ -668,11 +675,19 @@ For other lines, generate annotations."
 
 (defun f90-ts-mode-test--font-lock-register (prefix files)
   "Dynamically generate ert-tests for all FILES.
-FILES are assumed to contain fortran code face assertions as special comments.
+FILES are assumed to contain fortran code face assertions as special
+comments.  Each element of FILES is either a filename string, or a
+cons (FILENAME . SETTINGS), where SETTINGS is an alist
+of (defcustom-var . value).  This overrides default test values, but
+only for this specific test file.  All test values are set by the
+macro `f90-ts-mode-test-with-custom-testing'.
+
 PREFIX is the prefix of the test file name, either \"f90-ts-mode\"
 or \"f90-ts-mode-extra\"."
   (cl-loop
-   for file in files
+   for entry in files
+   for file = (if (consp entry) (car entry) entry)
+   for settings = (if (consp entry) (cdr entry) nil)
    for name-base = (string-replace
                     "_" "-" (string-remove-prefix
                              "font_lock_"
@@ -684,10 +699,10 @@ or \"f90-ts-mode-extra\"."
    do (eval
        `(ert-deftest ,test-name ()
           (skip-unless (treesit-ready-p 'fortran))
-          (f90-ts-mode-test-with-custom-testing
-           (ert-font-lock-test-file
-            (ert-resource-file ,file)
-            'f90-ts-mode))))))
+          (f90-ts-mode-test-with-custom-testing ',settings
+            (ert-font-lock-test-file
+             (ert-resource-file ,file)
+             'f90-ts-mode))))))
 
 
 ;; -----------------------------
@@ -825,7 +840,7 @@ PREFIX is the test name prefix, usually \"f90-ts-mode-test-std\"."
    do (eval
        `(ert-deftest ,test-name ()
           (skip-unless (treesit-ready-p 'fortran))
-          (f90-ts-mode-test-with-custom-testing
+          (f90-ts-mode-test-with-custom-testing nil
            (f90-ts-mode-test--xref-run-file ,file))))))
 
 
@@ -1037,7 +1052,14 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "font_lock_coarray.f90"
    "font_lock_value.f90"
    "font_lock_special_var.f90"
-   "font_lock_error.f90"))
+   "font_lock_error1.f90"
+   "font_lock_error2.f90"
+   "font_lock_error3.f90"
+   "font_lock_error4.f90"
+   ;; note that assertions are also part of the fontified buffer,
+   ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
+   ;; which is what we want to see in font_lock_error5
+   ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))))
 
 
 ;; xref tests
