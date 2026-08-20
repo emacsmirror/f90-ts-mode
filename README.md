@@ -14,7 +14,12 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
- - Jump-to-rightmost-position to interactive fill operation added.
+ - Defcustom `f90-ts-font-lock-error` replaced by `f90-ts-font-lock-error-show`.
+   Errors are now always fontified by f90-ts-font-lock-error-face.
+   The new defcustom `f90-ts-font-lock-error-show` can be used to turn ERROR node
+   highlighting on and off, or the number of lines to be highlighted for each ERROR node.
+ - Jump-to-rightmost-position (within fill-column) to the interactive
+   fill operation added.
  - Mark region operations fixed: always consider trimmed region of nodes.
    Some nodes like a whole `subroutine..end subroutine` block contains a trailing
    newline, which should not be considered. Not consequently trimming all spans

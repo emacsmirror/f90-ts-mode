@@ -32,7 +32,14 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [08-2026] Jump-to-rightmost-position to interactive fill operation added.
+;;   [08-2026] Defcustom `f90-ts-font-lock-error` replaced by
+;;             `f90-ts-font-lock-error-show'.  Errors are now always fontified
+;;             by `f90-ts-font-lock-error-face'.  The new defcustom
+;;             `f90-ts-font-lock-error-show' can be used to turn ERROR node
+;;             highlighting on and off, or the number of lines to be highlighted
+;;             for each ERROR node.
+;;   [08-2026] Jump-to-rightmost-position (within fill-column) to the
+;;             interactive fill operation added.
 ;;   [08-2026] Mark region operations fixed: always consider trimmed region
 ;;             of nodes.  Some nodes like a whole "subroutine..end subroutine"
 ;;             block contains a trailing newline, which should not be
@@ -142,7 +149,13 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
-- Jump-to-rightmost-position to interactive fill operation added.
+- Defcustom `f90-ts-font-lock-error' replaced by `f90-ts-font-lock-error-show'.
+  Errors are now always fontified by f90-ts-font-lock-error-face.
+  The new defcustom `f90-ts-font-lock-error-show' can be used to turn ERROR
+  node highlighting on and off, or the number of lines to be highlighted for
+  each ERROR node.
+- Jump-to-rightmost-position (within fill-column) to the interactive
+  fill operation added.
 - Mark region operations fixed: always consider trimmed region
   of nodes. Some nodes like a whole `subroutine..end subroutine`
   block contains a trailing newline, which should not be
@@ -483,13 +496,28 @@ underline, or a subtle background."
   :group 'f90-ts-font-lock)
 
 
-(defcustom f90-ts-font-lock-error 'f90-ts-font-lock-error-face
-  "Additional face properties appended to Tree-sitter ERROR nodes.
+(defcustom f90-ts-font-lock-error-show 'all
+  "Extent of highlighting applied to tree-sitter ERROR nodes.
 
-If nil, do not apply any additional highlighting to ERROR nodes."
+The value controls how much of an ERROR node is highlighted:
+- nil, do not apply any additional highlighting to ERROR nodes
+- symbol `all' highlight the complete span of the ERROR
+- positive integer: highlight this many lines from the start of the ERROR node
+
+Highlighting uses the face `f90-ts-font-lock-error-face'.
+
+- nil: do not apply any additional highlighting to ERROR nodes.
+- the symbol `all': highlight the whole ERROR node.
+- a positive integer: highlight only that many lines from the start
+  of the ERROR node."
   :type '(choice
           (const :tag "Disabled" nil)
-          (face :tag "Face"))
+          (const :tag "Whole node" all)
+          (integer :tag "Number of lines from start"))
+  :safe (lambda (val)
+          (or (null val)
+              (eq val 'all)
+              (and (integerp val) (> val 0))))
   :group 'f90-ts-font-lock)
 
 
@@ -2186,13 +2214,13 @@ rule but not for matched keywords, which are enforced with override=t."
 
 (defun f90-ts--fontify-error (node _override _start _end &rest _)
   "Add error fontification for span of NODE if enabled and applicable.
-If `f90-ts-font-lock-error' is non-nil, and NODE of type \"ERROR\" has no other
-error node has descendant, then the function appends
+If `f90-ts-font-lock-error-show' is non-nil, and NODE of type \"ERROR\" has
+no other error node has descendant, then the function appends
 `f90-ts-font-lock-error-face' to existing font-lock face.
 Often an error results in several \"ERROR\" nodes in the chain towards the root.
 Only the smallest error nodes should be marked.  Moreover, the span is trimmed
 to exclude leading and trailing blanks, which are sometimes part of ERROR nodes."
-  (when (and f90-ts-font-lock-error
+  (when (and f90-ts-font-lock-error-show
              (let ((sparse-tree (treesit-induce-sparse-tree node "^ERROR$")))
                ;; if the sparse-tree has only one node (node itself),
                ;; it has the shape "(nil (node))"
@@ -2200,9 +2228,23 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
                     (null (cdr (cadr sparse-tree))))))
 
     (cl-destructuring-bind (start . end) (f90-ts--node-span-trimmed node)
-      (treesit-fontify-with-override start end
-                                     f90-ts-font-lock-error
-                                     'append))))
+      (let ((end-err (if (eq f90-ts-font-lock-error-show 'all)
+                         end
+                       (cl-assert (and (integerp f90-ts-font-lock-error-show)
+                                       (> f90-ts-font-lock-error-show 0))
+                                  nil
+                                  "invalid value f90-ts-font-lock-error-show: %s"
+                                  f90-ts-font-lock-error-show)
+                       ;; go f90-ts-font-lock-error-show minus one line forward and
+                       ;; then trim to last character of that line
+                       (save-excursion
+                         (goto-char start)
+                         (end-of-line f90-ts-font-lock-error-show)
+                         (skip-chars-backward " \t")
+                         (point)))))
+        (treesit-fontify-with-override start end-err
+                                       'f90-ts-font-lock-error-face
+                                       'append)))))
 
 
 ;;;-----------------------------------------------------------------------------

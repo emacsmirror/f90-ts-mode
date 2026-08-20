@@ -322,8 +322,11 @@ Additionally to the usual faces, there are some extra custom faces:
 #### Syntax highlighting of error regions
 
 The syntax highlighting of error regions (spanned by an `ERROR` node) can be enabled or disabled by
-`f90-ts-font-lock-error'. If nil, it is switched off, otherwise the variable provides the face to apply
-(with default value `f90-ts-font-lock-error-face`).
+`f90-ts-font-lock-error-show`. If nil, it is switched off. If it equals symbol `all`, the whole span
+of the error node is fontified. Otherwise it should contain a positive integer for the number of lines,
+to which the fontified span is limited, in case it spans more lines than the given maximum.
+This is done in case error recovery of the tree-sitter parser does not work well and there are ERROR
+nodes with a big span.
 
 
 #### Special variables
