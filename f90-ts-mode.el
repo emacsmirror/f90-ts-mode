@@ -856,23 +856,21 @@ seem to make much sense."
 ;;;-----------------------------------------------------------------------------
 ;;; keymap
 
-(defvar f90-ts-mode-map
-  (let ((map (make-sparse-keymap)))
-    ;; TAB commands
-    (define-key map (kbd "C-<tab>")           #'f90-ts-indent-and-complete-stmt)
-    (define-key map (kbd "<backtab>")         #'f90-ts-indent-for-tab-command-2) ; S-<tab>
-    (define-key map (kbd "C-S-<iso-lefttab>") #'f90-ts-indent-for-tab-command-3) ; Linux
-    (define-key map (kbd "C-<backtab>")       #'f90-ts-indent-for-tab-command-3) ; Windows?
+(defvar-keymap f90-ts-mode-map
+  :doc "Keymap for `f90-ts-mode'."
+  ;; TAB commands
+  "C-<tab>"           #'f90-ts-indent-and-complete-stmt
+  "<backtab>"         #'f90-ts-indent-for-tab-command-2 ; S-<tab>
+  "C-S-<iso-lefttab>" #'f90-ts-indent-for-tab-command-3 ; Linux
+  "C-<backtab>"       #'f90-ts-indent-for-tab-command-3 ; Windows?
 
-    ;; other keybindings inspired by f90-mode
-    (define-key map (kbd "C-<return>") #'f90-ts-break-line)
-    (define-key map (kbd "C-c ;")      #'f90-ts-comment-region-default)
-    (define-key map (kbd "C-c '")      #'f90-ts-comment-region-custom)
+  ;; other keybindings inspired by f90-mode
+  "C-<return>" #'f90-ts-break-line
+  "C-c ;"      #'f90-ts-comment-region-default
+  "C-c '"      #'f90-ts-comment-region-custom
 
-    ;; C-c C-f prefix for the transient menu
-    (define-key map (kbd "C-c C-f") #'f90-ts-transient)
-    map)
-  "Keymap for `f90-ts-mode'.")
+  ;; C-c C-f prefix for the transient menu
+  "C-c C-f" #'f90-ts-transient)
 
 
 (transient-define-infix f90-ts-transient--indent-list-line ()
@@ -7897,17 +7895,15 @@ and itself SPARSE-NODES."
   "The Fortran source buffer this nav panel was spawned from.")
 
 
-(defvar f90-ts-nav-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") #'f90-ts-nav-buffer-jump)
-    (define-key map (kbd "SPC") #'f90-ts-nav-buffer-preview)
-    (define-key map (kbd "n")   #'next-line)
-    (define-key map (kbd "p")   #'previous-line)
-    (define-key map (kbd "g")   #'f90-ts-nav-buffer-refresh)
-    (define-key map (kbd "q")   #'f90-ts-nav-buffer-quit)
-    (define-key map (kbd "C-g") #'f90-ts-nav-buffer-quit)
-    map)
-  "Keymap for `f90-ts-nav-mode'.")
+(defvar-keymap f90-ts-nav-mode-map
+  :doc "Keymap for `f90-ts-nav-mode'."
+  "RET" #'f90-ts-nav-buffer-jump
+  "SPC" #'f90-ts-nav-buffer-preview
+  "n"   #'next-line
+  "p"   #'previous-line
+  "g"   #'f90-ts-nav-buffer-refresh
+  "q"   #'f90-ts-nav-buffer-quit
+  "C-g" #'f90-ts-nav-buffer-quit)
 
 
 ;;;-----------------------------------------------------------------------------
