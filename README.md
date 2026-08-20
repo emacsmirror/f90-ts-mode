@@ -199,6 +199,8 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
+- Provide code folding: add support for hideshow `hs-minor-mode`, `outline-mode` (both provided by emacs core)
+  and external `treesit-fold` package.
 - Complement alignment options for strings on continued lines. Refine font locking for string, using
   different faces for quotes, continuation symbols and the string itself.
   Allow comments within continued strings.
