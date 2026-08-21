@@ -14,6 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **08-2026**
+ - `f90-ts-shift-line-break` as combined break/join function added.
  - Defcustom `f90-ts-font-lock-error` replaced by `f90-ts-font-lock-error-show`.
    Errors are now always fontified by f90-ts-font-lock-error-face.
    The new defcustom `f90-ts-font-lock-error-show` can be used to turn ERROR node
@@ -199,6 +200,8 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
+- Provide code folding: add support for hideshow `hs-minor-mode`, `outline-mode` (both provided by emacs core)
+  and external `treesit-fold` package.
 - Complement alignment options for strings on continued lines. Refine font locking for string, using
   different faces for quotes, continuation symbols and the string itself.
   Allow comments within continued strings.

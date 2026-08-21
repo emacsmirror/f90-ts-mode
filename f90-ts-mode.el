@@ -32,6 +32,7 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [08-2026] `f90-ts-shift-line-break' as combined break/join function added.
 ;;   [08-2026] Defcustom `f90-ts-font-lock-error` replaced by
 ;;             `f90-ts-font-lock-error-show'.  Errors are now always fontified
 ;;             by `f90-ts-font-lock-error-face'.  The new defcustom
@@ -149,6 +150,7 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [08-2026]
+- `f90-ts-shift-line-break' as combined break/join function added.
 - Defcustom `f90-ts-font-lock-error' replaced by `f90-ts-font-lock-error-show'.
   Errors are now always fontified by f90-ts-font-lock-error-face.
   The new defcustom `f90-ts-font-lock-error-show' can be used to turn ERROR
@@ -856,23 +858,21 @@ seem to make much sense."
 ;;;-----------------------------------------------------------------------------
 ;;; keymap
 
-(defvar f90-ts-mode-map
-  (let ((map (make-sparse-keymap)))
-    ;; TAB commands
-    (define-key map (kbd "C-<tab>")           #'f90-ts-indent-and-complete-stmt)
-    (define-key map (kbd "<backtab>")         #'f90-ts-indent-for-tab-command-2) ; S-<tab>
-    (define-key map (kbd "C-S-<iso-lefttab>") #'f90-ts-indent-for-tab-command-3) ; Linux
-    (define-key map (kbd "C-<backtab>")       #'f90-ts-indent-for-tab-command-3) ; Windows?
+(defvar-keymap f90-ts-mode-map
+  :doc "Keymap for `f90-ts-mode'."
+  ;; TAB commands
+  "C-<tab>"           #'f90-ts-indent-and-complete-stmt
+  "<backtab>"         #'f90-ts-indent-for-tab-command-2 ; S-<tab>
+  "C-S-<iso-lefttab>" #'f90-ts-indent-for-tab-command-3 ; Linux
+  "C-<backtab>"       #'f90-ts-indent-for-tab-command-3 ; Windows?
 
-    ;; other keybindings inspired by f90-mode
-    (define-key map (kbd "C-<return>") #'f90-ts-break-line)
-    (define-key map (kbd "C-c ;")      #'f90-ts-comment-region-default)
-    (define-key map (kbd "C-c '")      #'f90-ts-comment-region-custom)
+  ;; other keybindings inspired by f90-mode
+  "C-<return>" #'f90-ts-break-line
+  "C-c ;"      #'f90-ts-comment-region-default
+  "C-c '"      #'f90-ts-comment-region-custom
 
-    ;; C-c C-f prefix for the transient menu
-    (define-key map (kbd "C-c C-f") #'f90-ts-transient)
-    map)
-  "Keymap for `f90-ts-mode'.")
+  ;; C-c C-f prefix for the transient menu
+  "C-c C-f" #'f90-ts-transient)
 
 
 (transient-define-infix f90-ts-transient--indent-list-line ()
@@ -923,7 +923,8 @@ seem to make much sense."
     ("E"   "Smart end complete region"  f90-ts-complete-smart-end-region)
     ("b"   "Break line"                 f90-ts-break-line)
     ("j"   "Join with previous line"    f90-ts-join-line-prev)
-    ("J"   "Join with next line"        f90-ts-join-line-next)]
+    ("J"   "Join with next line"        f90-ts-join-line-next)
+    ("C-s" "Shift line break"           f90-ts-shift-line-break)]
    ["Mark and (un)comment region"
     ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
     ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
@@ -6257,6 +6258,25 @@ If continued line has comments (at end, next line etc.) joining is not done."
       (message "join failed: joining not possible"))))
 
 
+(defun f90-ts-shift-line-break ()
+  "Shift the break point of current line to point.
+It breaks line at point and then joins the trailing part with the next line.
+If point is at end of line, then it does not nothing except to move point to
+indentation of next line."
+  (interactive)
+  (if (save-excursion
+        (skip-chars-forward " \t")
+        (eolp))
+      (when (zerop (forward-line 1))
+        (back-to-indentation)
+        (let ((node (treesit-node-at (point))))
+          (when (f90-ts--node-type-p node "comment")
+            (f90-ts--comment-forward-prefix node)
+            (skip-chars-forward " \t"))))
+    (f90-ts-break-line)
+    (f90-ts-join-line-next)))
+
+
 ;;;-----------------------------------------------------------------------------
 ;;; fill operations
 ;;; the code is inspired and partially copied from the f90-mode.el in emacs core
@@ -7897,17 +7917,15 @@ and itself SPARSE-NODES."
   "The Fortran source buffer this nav panel was spawned from.")
 
 
-(defvar f90-ts-nav-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "RET") #'f90-ts-nav-buffer-jump)
-    (define-key map (kbd "SPC") #'f90-ts-nav-buffer-preview)
-    (define-key map (kbd "n")   #'next-line)
-    (define-key map (kbd "p")   #'previous-line)
-    (define-key map (kbd "g")   #'f90-ts-nav-buffer-refresh)
-    (define-key map (kbd "q")   #'f90-ts-nav-buffer-quit)
-    (define-key map (kbd "C-g") #'f90-ts-nav-buffer-quit)
-    map)
-  "Keymap for `f90-ts-nav-mode'.")
+(defvar-keymap f90-ts-nav-mode-map
+  :doc "Keymap for `f90-ts-nav-mode'."
+  "RET" #'f90-ts-nav-buffer-jump
+  "SPC" #'f90-ts-nav-buffer-preview
+  "n"   #'next-line
+  "p"   #'previous-line
+  "g"   #'f90-ts-nav-buffer-refresh
+  "q"   #'f90-ts-nav-buffer-quit
+  "C-g" #'f90-ts-nav-buffer-quit)
 
 
 ;;;-----------------------------------------------------------------------------
