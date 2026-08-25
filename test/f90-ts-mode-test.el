@@ -228,7 +228,6 @@ test values for specific tests."
           (vals (mapcar #'cdr settings))
           (saved-locals (cl-loop
                          for (var . val) in settings
-                         do (message "%s, %s" var val)
                          when (local-variable-p var)
                          collect (cons var
                                        (buffer-local-value var (current-buffer))))))
