@@ -1046,7 +1046,7 @@ This is used by the Makefile to run ert tests during development."
   (error "Function f90-ts-log-msg not available: load f90-ts-log.el first")))
 
 
-(defun f90-ts-log-line (_category _msg &optional _pos)
+(defun f90-ts-log-line (_category _msg &optional _pos-marker _pos)
   "Logging stub.
 Load f90-ts-log.el to enable logging.  This function is replaced by the real
 implementation when the logging package is loaded.
