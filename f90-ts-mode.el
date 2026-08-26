@@ -2266,8 +2266,6 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
   (treesit-font-lock-rules
    :language 'fortran
    :feature 'builtin
-   :language 'fortran
-   :feature 'builtin
    `((call_expression
       (identifier) @font-lock-builtin-face
       (:pred f90-ts--builtin-function-p @font-lock-builtin-face))
