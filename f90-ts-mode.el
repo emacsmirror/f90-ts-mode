@@ -8319,104 +8319,31 @@ and keyword are sometimes equal.  But we only want the structure node."
   "List of things with regexp and predicates to identify relevant nodes.")
 
 
-;; keep this: it has been resolved by adding an advice for treesit-node-parent
-;; which resolves other related cases like `treesit-beginning-of-defun'
-;;
-;; after "(treesit-major-mode-setup)" in f90-ts-mode:
-;;  (setq-local add-log-current-defun-function #'f90-ts--add-log-current-defun)
-;;
-;; (defun f90-ts--add-log-current-defun ()
-;;   "Implement add-log-current-defun taking continuation lines in to account.
-;; If point is at a virtual ampersand node, it has no parent.  Consequently,
-;; the `treesit-parent-until'-ascend used in `treesit-thing-at' (which is called
-;; by `treesit-add-log-current-defun') fails.  To avoid this, we move point to
-;; a position where a proper node is obtained by `treesit-node-at'."
-;;   (let* ((pos-0 (point))
-;;          (node (treesit-node-at pos-0))
-;;          (pos (if (null (treesit-node-parent node))
-;;                   (treesit-node-end node)
-;;                 pos-0)))
-;;     (save-excursion
-;;       (goto-char pos)
-;;       (treesit-add-log-current-defun))))
+(defmacro f90-ts--define-thing-commands (thing label)
+  "Define next/prev/beginning/end-of navigation commands for THING.
+LABEL is used in the generated docstrings."
+  (let ((next (intern (format "f90-ts-thing-next-%s" thing)))
+        (prev (intern (format "f90-ts-thing-prev-%s" thing)))
+        (beg  (intern (format "f90-ts-thing-beginning-of-%s" thing)))
+        (end  (intern (format "f90-ts-thing-end-of-%s" thing))))
+    `(progn
+       (defun ,next () ,(format "Move to next %s." label)
+         (interactive)
+         (when-let ((pos (treesit-navigate-thing (point) 1 'beg ',thing)))
+           (goto-char pos)))
+       (defun ,prev () ,(format "Move to previous %s." label)
+         (interactive)
+         (when-let ((pos (treesit-navigate-thing (point) -1 'beg ',thing)))
+           (goto-char pos)))
+       (defun ,beg () ,(format "Move to beginning of current %s." label)
+         (interactive) (treesit-beginning-of-thing ',thing))
+       (defun ,end () ,(format "Move to end of current %s." label)
+         (interactive) (treesit-end-of-thing ',thing)))))
 
 
-(defun f90-ts-thing-next-procedure ()
-  "Move to next procedure."
-  (interactive)
-  (when-let ((pos (treesit-navigate-thing (point) 1 'beg 'procedure)))
-    (goto-char pos)))
-
-
-(defun f90-ts-thing-prev-procedure ()
-  "Move to previous procedure."
-  (interactive)
-  (when-let ((pos (treesit-navigate-thing (point) -1 'beg 'procedure)))
-    (goto-char pos)))
-
-
-(defun f90-ts-thing-beginning-of-procedure ()
-  "Move to beginning of current procedure."
-  (interactive)
-  (treesit-beginning-of-thing 'procedure))
-
-
-(defun f90-ts-thing-end-of-procedure ()
-  "Move to end of current procedure."
-  (interactive)
-  (treesit-end-of-thing 'procedure))
-
-
-(defun f90-ts-thing-next-type ()
-  "Move to next derived type."
-  (interactive)
-  (when-let ((pos (treesit-navigate-thing (point) 1 'beg 'type)))
-    (goto-char pos)))
-
-
-(defun f90-ts-thing-prev-type ()
-  "Move to previous derived type."
-  (interactive)
-  (when-let ((pos (treesit-navigate-thing (point) -1 'beg 'type)))
-    (goto-char pos)))
-
-
-(defun f90-ts-thing-beginning-of-type ()
-  "Move to beginning of current derived type."
-  (interactive)
-  (treesit-beginning-of-thing 'type))
-
-
-(defun f90-ts-thing-end-of-type ()
-  "Move to end of current derived type."
-  (interactive)
-  (treesit-end-of-thing 'type))
-
-
-(defun f90-ts-thing-next-interface ()
-  "Move to next interface."
-  (interactive)
-  (when-let ((pos (treesit-navigate-thing (point) 1 'beg 'interface)))
-    (goto-char pos)))
-
-
-(defun f90-ts-thing-prev-interface ()
-  "Move to previous interface."
-  (interactive)
-  (when-let ((pos (treesit-navigate-thing (point) -1 'beg 'interface)))
-    (goto-char pos)))
-
-
-(defun f90-ts-thing-beginning-of-interface ()
-  "Move to beginning of current interface."
-  (interactive)
-  (treesit-beginning-of-thing 'interface))
-
-
-(defun f90-ts-thing-end-of-interface ()
-  "Move to end of current interface."
-  (interactive)
-  (treesit-end-of-thing 'interface))
+(f90-ts--define-thing-commands procedure "procedure")
+(f90-ts--define-thing-commands type "derived type")
+(f90-ts--define-thing-commands interface "interface")
 
 
 ;;;-----------------------------------------------------------------------------
