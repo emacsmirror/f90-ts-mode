@@ -5258,8 +5258,8 @@ not happen, as `f90-ts--complete-end-structs' lists all supported structures."
               "End")
              (t
               "end"))))
-    (string-join (delq nil (list end construct construct2 name))
-                 " "))))
+      (string-join (delq nil (list end construct construct2 name))
+                   " "))))
 
 
 (defun f90-ts--complete-smart-end-show (node-struct)
