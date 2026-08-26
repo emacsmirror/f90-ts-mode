@@ -1090,6 +1090,12 @@ This is used by the Makefile to run ert tests during development."
   (line-number-at-pos (treesit-node-start node)))
 
 
+(defun f90-ts--node-before-line-p (node line)
+  "Return non-nil if NODE is on a line strictly before LINE.
+NODE may be nil, in which case the result is nil."
+  (and node (< (f90-ts--node-line node) line)))
+
+
 (defun f90-ts--node-column (node)
   "Determine column number of start position of NODE."
   (f90-ts--column-number-at-pos (treesit-node-start node)))
@@ -4548,21 +4554,23 @@ nil).  But we do not need to ascend further."
          (psib-expr (and root-expr
                          (f90-ts--prev-sibling-proper root-expr))))
     (cond
-     ((and psib-expr
-           (< (f90-ts--node-line psib-expr) line)
+     ;; note: unlike the second and third clauses below, this one does
+     ;; not require root-expr itself to be before LINE; that is because an
+     ;; assignment or opening parenthesis immediately preceding the expression
+     ;; is a valid head even when the expression starts on the current line
+     ;; (for example the first continued line after "x = a + &").
+     ((and (f90-ts--node-before-line-p psib-expr line)
            (f90-ts--node-type-p psib-expr '("=" "(")))
       (cons root-expr psib-expr))
 
-     ((and (< (f90-ts--node-line root-expr) line)
-           psib-expr
-           (< (f90-ts--node-line psib-expr) line)
+     ((and (f90-ts--node-before-line-p root-expr line)
+           (f90-ts--node-before-line-p psib-expr line)
            (f90-ts--node-type-p psib-expr ","))
       ;; if root-expr is on the same line, there must be a more appropriate
       ;; list context the commata belongs to, use commata as head
       (cons root-expr psib-expr))
 
-     ((and root-expr
-           (< (f90-ts--node-line root-expr) line))
+     ((f90-ts--node-before-line-p root-expr line)
       (cons root-expr nil)))))
 
 
