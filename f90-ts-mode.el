@@ -1519,7 +1519,7 @@ node."
 ;; case-sensitive, but the emacs regexp engine itself is case-insensitive.
 ;; So plugging (:match ,(regexp-opt f90-ts--builtin-functions 'symbols) ...)
 ;; into the font lock rule, as was originally done, does not work if the
-;; function name in the node contains some uppercase letters."
+;; function name in the node contains some uppercase letters.
   (cl-assert (f90-ts--node-type-p node "identifier")
              nil "builtin-function-p: identifier expected")
   (let ((text (treesit-node-text node))
