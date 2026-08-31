@@ -82,11 +82,12 @@ The installation can be verified with:
 ```
 
 **NOTE**:
-The Fortran grammar should be compiled with Tree-sitter version `0.25.x`, as Emacs
+With Emacs 30.x the Fortran grammar should be compiled with Tree-sitter version `0.25.x`, as Emacs
 (including 30.2) does not yet support the `0.26` branch correctly.
 For example, queries are not translated as expected by the `0.26` branch.
+Emacs 31 added support for tree-sitter 0.26 and the mode has been tested with it.
 
-The master branch at `mscfd/tree-sitter-fortran` mentioned above provides the parser generated with `0.25.10`.
+The master branch at `mscfd/tree-sitter-fortran` mentioned above provides the parser generated with `0.25.10` if required.
 
 The following can be used to check whether versions are correct:
 
@@ -94,11 +95,11 @@ The following can be used to check whether versions are correct:
 
 * with `M-:` `(treesit-library-abi-version)` should be `15`
 * with `M-:` `(treesit-language-abi-version 'fortran)` should be `15`
-* `ldd bin_path_to_emacs/emacs | grep libtree-sitter` should show `libtree-sitter.so.0.25`
+* emacs 30.x: `ldd bin_path_to_emacs/emacs | grep libtree-sitter` should show `libtree-sitter.so.0.25`
 
 **Note**:
 The parser generator step `tree-sitter generate` done with Tree-Sitter `0.26` seems to be
-compatible with Emacs, but the library and ABI versions listed above must match.
+compatible with Emacs 30.x, but the library and ABI versions listed above must match in any case.
 This generator step of creating the parser source files is not necessary in general, as the
 parser source files are already provided in the grammar repositories.
 

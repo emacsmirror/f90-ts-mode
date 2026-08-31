@@ -13,6 +13,9 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
 ### Recently added, changed or improved
 
+**09-2026**
+ - Tested with emacs 31.1 and tree-sitter 0.26.
+
 **08-2026**
  - `f90-ts-shift-line-break` as combined break/join function added.
  - Defcustom `f90-ts-font-lock-error` replaced by `f90-ts-font-lock-error-show`.
@@ -35,19 +38,6 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 **07-2026**
  - Inherit attribute of some font lock faces fixed.
  - Alignment of unary expressions with leading minus or plus improved.
-
-**06-2026**
- - Fill line and region operations added
- - Defcustom group f90-ts-comment added.
- - Indentation of lines after a structure beginning line with statement label fixed.
- - Indentation within and after preprocessor blocks fixed
- - Trailing blank part "\\(\\s-+\\|$\\)" in defcustom regexps
-   `f90-ts-comment-prefix-regexp` and `f90-ts-openmp-prefix-regexp`
-   removed from the defcustom definitions and added as
-   `f90-ts-comment-prefix-separator-regexp`.  If the regexp
-   variables have been customized, please adjust.
-   (See [MANUAL.md](MANUAL.md#comment-prefix) for details.)
- - Mark region operations complemented
 
 
 ## Overview
@@ -100,12 +90,13 @@ For the full keybinding reference see the
 ## Installation
 
 This mode requires **Emacs 30+** and a compatible Tree-sitter Fortran grammar.
-In particular tree-sitter ABI version 15 and tree-sitter library version 0.25.x
-are mandatory.
+In particular tree-sitter ABI version 15 and tree-sitter library version 0.25.x for Emacs 30.x.
+Emacs 31 supports tree-sitter 0.26.
+
 Detailed technical requirements and troubleshooting can be found
 in [MANUAL.md](MANUAL.md#installation).
 
-Once available, the mode can be installed through melpa as outlined below.
+The mode can be installed through melpa as outlined below.
 Alternatively, the repository can be cloned and setup by hand.
 For more details see [MANUAL.md](MANUAL.md#installation).
 
