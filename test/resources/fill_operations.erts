@@ -1,3 +1,5 @@
+note   double end marker =-=-= required due to a bug in erts in conjunction with skip clause, fixed in emacs 31
+
 Point-Char: |
 
 Code:
@@ -541,4 +543,58 @@ type :: t
               var12
 end type t
 end module mod
+=-=-=
+
+Skip: (not (f90-ts--string-literal-decomposed-p))
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((fill-column 40)
+          (inhibit-message t)
+          (f90-ts-fill-select-breakpoint-by 'interactive))
+      (f90-ts-mode-test--with-mocked-keys
+       '[right right right ?r return right right right return left left left return return]
+        (call-interactively #'f90-ts-fill-at-line))))
+
+Name: fill line interactive 5
+=-=
+subroutine break_anywhere()
+|     s = '0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefhijklmnopqrstuvwxyz0123456789abcdefhijklmnopqrstuvwxyz'
+end subroutine break_anywhere
+=-=
+subroutine break_anywhere()
+|     s = '0123456789abcdefghijklmnopqrs&
+         &tuvwxyz0123456789abcdefhijklmnop&
+         &qrstuvwxyz0123456789abcdef&
+         &hijklmnopqrstuvwxyz'
+end subroutine break_anywhere
+=-=-=
+=-=-=
+
+Skip: (not (f90-ts--string-literal-decomposed-p))
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((fill-column 40)
+          (inhibit-message t)
+          (f90-ts-fill-select-breakpoint-by 'interactive))
+      (f90-ts-mode-test--with-mocked-keys
+       '[right right right ?r return left left return right right return space return return]
+        (call-interactively #'f90-ts-fill-at-line))))
+
+Name: fill line interactive 6
+=-=
+subroutine break_anywhere_if_necessary()
+|     s = '0123456789abcdefghijklmnopqrstuvw xyz0123456789abcdefhij+klmnopqrstuvwxyz0123456789abcdefhijklmnopqrstuv wxyz'
+end subroutine break_anywhere_if_necessary
+=-=
+subroutine break_anywhere_if_necessary()
+|     s = '0123456789abcdefghijklmnopqrs&
+         &tuvw &
+         &xyz0123456789abcdefhij+klmnopqrstuvwxyz0123456789abcdefhijklmnopqrstuv &
+         &wxyz'
+end subroutine &
+       break_anywhere_if_necessary
+=-=-=
 =-=-=

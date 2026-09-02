@@ -14,6 +14,17 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **09-2026**
+ - Syntax highlighting, indentation, break/join/fill etc. for string literals improved.
+   This requires a proposed (but not yet merged) tree-sitter language grammar extension.
+   See issues [Continued strings at grammar repo](https://github.com/stadelmanma/tree-sitter-fortran/issues/193)
+   and [Continued strings at mode repo](https://github.com/mscfd/emacs-f90-ts-mode/issues/127),
+   and PR [Parse parts, continuation and comments in string literals](https://github.com/stadelmanma/tree-sitter-fortran/pull/198)
+   The grammar extension can be enabled by
+   ```elisp
+   (setq treesit-language-source-alist
+     '((fortran "https://github.com/mscfd/tree-sitter-fortran" "string_literal_emacs")))
+   ```
+   It resides in the feature branch `string_literal_emacs`.
  - Tested with emacs 31.1 and tree-sitter 0.26.
 
 **08-2026**
@@ -48,7 +59,7 @@ including syntax highlighting, indentation, navigation, and structural editing f
 ### Features
 
 - Almost all statements up to F2023
-- Syntax highlighting (font lock faces), including highlighting of syntactically incorrect code
+- Syntax highlighting (font lock faces)
 - Indentation of lines, regions, multiline statements and structure blocks
 - Alignment for multiline statements with rotation and other options
 - Smart end completion
@@ -57,13 +68,13 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Join with previous and next line
 - Fill and rebalance operations for lines or regions (with rightmost breakpoint
   selection or interactive break and join session)
+- Region selection based on tree-sitter nodes
 - (Un)commenting regions with configurable prefixes and indentation rules
 - Special comments like doc strings and separators
   (syntax highlighting and indentation options)
 - Keyword highlighting in comments (like TODO, Remark etc.)
 - OpenMP and preprocessor directives
 - Coarray keywords and statements
-- Region selection based on tree-sitter nodes
 - Imenu and a Fortran menu in the menu bar
 - Navigation (defun, things, Xref, side panel tree)
 
@@ -76,12 +87,16 @@ and a **transient popup** for discoverability of all commands:
 | Key                            | Description                      |
 |--------------------------------|----------------------------------|
 | `C-c C-f`                      | Open the transient command popup |
-| `C-<tab>`                      | Indent & complete line           |
+| `<tab>`                        | Indent and complete line               |
+| `C-<tab>`                      |  Indent and complete statement (block) |
+| `<backtab>` (shift `<tab>`)    | Indent and complete line variant 2     |
+| `C-S-<iso-lefttab>` (Linux)    | Indent and complete line variant 3     |
+| `C-<backtab>`       (Windows?) | Indent and complete line variant 3     |
 | `C-<return>`                   | Break line                       |
 | `C-c ;`                        | Comment region (default prefix)  |
 | `C-c '`                        | Comment region (custom prefix)   |
 
-Pressing `C-c C-f` opens a transient popup grouping all major commands by category.
+Pressing `C-c C-f` opens a transient popup, grouping all major commands by category.
 
 For the full keybinding reference see the
 [Keybindings section in the manual](MANUAL.md#keybindings).
@@ -100,7 +115,7 @@ The mode can be installed through melpa as outlined below.
 Alternatively, the repository can be cloned and setup by hand.
 For more details see [MANUAL.md](MANUAL.md#installation).
 
-Installation step are:
+Installation steps are:
 
 1. Install a compatible Tree-sitter Fortran grammar.
 
@@ -109,8 +124,19 @@ Register the grammar repository in Emacs:
 
 ```elisp
 (setq treesit-language-source-alist
-      '((fortran "https://github.com/stadelmanma/tree-sitter-fortran")))
+      (append treesit-language-source-alist
+              '((fortran "https://github.com/stadelmanma/tree-sitter-fortran"))))
 ```
+For improved string literal parsing, use:
+```elisp
+(setq treesit-language-source-alist
+      (append treesit-language-source-alist
+              '((fortran "https://github.com/mscfd/tree-sitter-fortran" "string_literal_emacs"))))
+```
+This feature branch has not yet been merged. The mode will use the additional parser data
+to improve syntax highlighting, indentation and break/join/fill operations. It also parses
+valid syntax not handled by the official grammar.
+
 
 Then compile and install it once with:
 
@@ -151,6 +177,7 @@ It will automatically be loaded when opening a file with extension `.f90`.
          ("A-<up>"        . #'f90-ts-transient)
          ;; examples for shortcuts
          ("A-<return>"    . #'f90-ts-break-line)
+         ("C-<return>"    . #'f90-ts-shift-line-break)
          ("A-<backspace>" . #'f90-ts-join-line-prev)
          ("A-<delete>"    . #'f90-ts-join-line-next)
          ("A-l"           . (lambda () (interactive)
@@ -191,14 +218,10 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
+- Test with Emacs 31 and its new tree-sitter related features.
 - Provide code folding: add support for hideshow `hs-minor-mode`, `outline-mode` (both provided by emacs core)
   and external `treesit-fold` package.
-- Complement alignment options for strings on continued lines. Refine font locking for string, using
-  different faces for quotes, continuation symbols and the string itself.
-  Allow comments within continued strings.
-  This all requires extension of the grammar itself.
-  See issues [Continued strings at grammar repo](https://github.com/stadelmanma/tree-sitter-fortran/issues/193)
-  and [Continued strings at mode repo](https://github.com/mscfd/emacs-f90-ts-mode/issues/127)
+- Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
 - Fill operations with lower column width (before joining).
 - Fill operation similar to `f90-fill-paragraph`. In conjunction with mark operations: determine interesting
   nodes within tree as region (like: statements, structure block, subroutine/function level).
