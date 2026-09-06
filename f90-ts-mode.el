@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.3.0-snapshot
+;; Version: 0.4.0-snapshot
 ;; Package-Requires: ((emacs "30.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -8764,7 +8764,11 @@ package `markdown-mode' are available, then use these."
   "Display information about `f90-ts-mode'."
   (interactive)
   (with-help-window "*About f90-ts-mode*"
-    (princ (format "f90-ts-mode %s\n\n" f90-ts-mode-version))
+    (let ((version-line (format "version: f90-ts-mode %s" f90-ts-mode-version)))
+      (princ version-line)
+      (princ "\n")
+      (princ (make-string (string-width version-line) ?-))
+      (princ "\n"))
     (princ f90-ts--about-text)
     (princ "\nRepository:\n")
     (princ f90-ts--github-url)
