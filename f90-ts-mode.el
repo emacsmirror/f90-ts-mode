@@ -32,9 +32,12 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string literals improved.
-;;             This requires a proposed (but not yet merged) tree-sitter language grammar extension.
-;;             See README.md for more details.
+;;   [09-2026] Add (missing) option `keep-or-continued-line' to
+;;             `f90-ts--indent-options-alist' for indentation selection options.
+;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string
+;;             literals improved.  This requires a proposed (but not yet merged)
+;;             tree-sitter language grammar extension.  See README.md for more
+;;             details.
 ;;   [09-2026] Testing with Emacs 31.1 and tree-sitter 0.26 added.
 ;;
 ;;   [08-2026] `f90-ts-shift-line-break' as combined break/join function added.
@@ -72,8 +75,8 @@
 ;;   - Smart end completion
 ;;   - Configurable leading ampersand and statement label positions
 ;;   - Breaking and joining of continued lines
-;;   - Fill and rebalance operations for lines or regions (with rightmost breakpoint
-;;     selection or interactive break and join session)
+;;   - Fill and rebalance operations for lines or regions (with rightmost
+;;     breakpoint selection or interactive break and join session)
 ;;   - Region selection based on tree-sitter nodes
 ;;   - (Un)commenting regions with configurable prefixes and indentation rules
 ;;   - Special comments like doc strings and separators
@@ -137,6 +140,8 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
+- Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
+  for indentation selection options.
 - Improve syntax highlighting, indentation and break/join/fill for string
   literals.  This requires a proposed (but not yet merged) tree-sitter
   language grammar extension.  See README.md for more details.
@@ -237,11 +242,12 @@ associate ...) etc."
 
 
 (defconst f90-ts--indent-options-alist
-  '(("keep if aligned or align to primary column" . keep-or-primary)
-    ("keep if aligned or rotate to next column" . keep-or-rotate)
+  '(("indent to first line of statement with offset `f90-ts-indent-continued'" . continued-line)
+    ("keep if aligned or indent to first line of statement with offset `f90-ts-indent-continued'" . keep-or-continued-line)
     ("align with primary column" . primary)
-    ("indent to first line of statement with offset `f90-ts-indent-continued'" . continued-line)
-    ("rotate columns" . rotate))
+    ("keep if aligned or align to primary column" . keep-or-primary)
+    ("rotate columns" . rotate)
+    ("keep if aligned or rotate to next column" . keep-or-rotate))
   "Options for indentation of list like structures on continued lines.")
 
 
@@ -3191,11 +3197,11 @@ Cache is reverese ordered, so we can simply return the last entry."
 
 
 (defun f90-ts--continued-line-cache-update (first-pos)
-  "Check whether first line at FIRST-POS has been flush.
+  "Check whether first line at FIRST-POS was flushed.
 This is the case if current bol and cached bol are different.
-If it has, update the entry and apply delta to all other cached lines.
+If it was, update the entry and apply delta to all other cached lines.
 Argument FIRST-POS is used to jump to this line efficiently (jumping
-to a line is more expensive)."
+to a line by line number is far more expensive)."
   (unless f90-ts--align-continued-variant-tab
     (let* ((first (f90-ts--continued-line-cache-get-first))
            (first-line (car first))
@@ -4501,23 +4507,27 @@ selected."
             (cdar col-pos-off))))
 
      ;; cases: (not-aligned, keep-or-primary),
+     ;;        (not-aligned, keep-or-continued-line),
      ;;        (aligned, primary), (not-aligned, primary)
      ((or (not aligned-at)
           (eq variant 'primary))
+      ;; not that for keep-or-continued-line, primary is forced to continued line offset
       (cdr primary-col-pos-off))
 
      ;; cases: (aligned, keep-or-primary)
      ;;        (aligned, keep-or-rotate)
+     ;;        (aligned, keep-or-continued-line)
      ((and aligned-at
            (member variant '(keep-or-primary
-                             keep-or-rotate)))
+                             keep-or-rotate
+                             keep-or-continued-line)))
       ;; aligned, keep current column, but use proper element from col-pos-off
       ;; as anchor, otherwise indent-region does not take indentation of anchor
       ;; position into account
       (cdr aligned-at))
 
      (t
-      ;; all eight cases plus node before minimal column are covered above
+      ;; all ten cases plus node before minimal column are covered above
       (cl-assert col-pos-off nil "cond logic not complete")
       (cdr primary-col-pos-off)))))
 
@@ -4601,9 +4611,12 @@ Finally use VARIANT to select one pair to align with."
          ;; always add default continued offset position as anchor
          (anoff-continued (f90-ts--align-list-pstmt1-anoff))
          ;; anoff-primary is used as 'primary' in keep-or-primary, primary etc.
-         ;; if anoff-other is empty (should not happen), then use anoff-continued as fallback
-         (anoff-primary (or (car anoff-other)
-                            anoff-continued))
+         ;; if anoff-other is empty (should not happen) or variant is 'keep-or-continued-line,
+         ;; then use anoff-continued as primary anchor
+         (anoff-primary (if (eq variant 'keep-or-continued-line)
+                            anoff-continued
+                          (or (car anoff-other)
+                              anoff-continued)))
          ;; final list of anchors (which are nodes or pairs (position offset))
          (anoff-final (append (and anoff-continued (list anoff-continued))
                               anoff-other

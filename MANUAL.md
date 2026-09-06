@@ -401,10 +401,10 @@ call sub_with_many_arguments(argx, another, one_more, &
                              argy, just_this, &
                              argz)
 ```
-Five options are currently implemented: `continued-line`,  `primary`, `rotate`, `keep-or-primary`
-and `keep-or-next`. Primary column is some outstanding column with respect to the context (like
+Six options are currently implemented: `continued-line`,  `primary`, `rotate`, `keep-or-continued-line`,
+`keep-or-primary` and `keep-or-rotate`. Primary column is some outstanding column with respect to the context (like
 the smallest column of arguments in the example above, or the column just right to the opening parenthesis).
-The last three options `rotate`, `keep-or-primary` and `keep-or-next`, which collect and offer several
+The options `rotate`, `keep-or-primary` and `keep-or-rotate`, which collect and offer several
 alignment columns, always include the continued line position among the set of columns.
 
 Behaviour of indentation of a region and of a line are controlled by `f90-ts-indent-list-region`
