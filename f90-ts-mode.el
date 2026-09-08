@@ -32,6 +32,9 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [09-2026] Fix indentation after uncommenting lines in comment-region
+;              operation executed on commented lines of code, with leading
+;;             ampersand or statement label.
 ;;   [09-2026] Add (missing) option `keep-or-continued-line' to
 ;;             `f90-ts--indent-options-alist' for indentation selection options.
 ;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string
@@ -140,6 +143,8 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
+- Fix indentation after uncommenting lines in comment-region operation executed
+  on commented lines of code, with leading ampersand or statement label.
 - Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
   for indentation selection options.
 - Improve syntax highlighting, indentation and break/join/fill for string
@@ -5825,8 +5830,9 @@ VEC is a vector as returned by
 
 (defun f90-ts--indent-line-aux (&optional variant)
   "Indent a single line.
-This is the default function for indentation of a single line.  Smart end
-completion or other extra stuff is not executed by this function.
+This is the default wrapper to invoke `treesit-indent' for indentation of a
+single line.  Smart end completion or other extra stuff is not executed by
+this function.
 If provided VARIANT is the variant symbol for how to compute alignment in
 multi-line statements.  Default value is `f90-ts-indent-list-line'.
 Optional leading ampersands on continuation lines are temporarily
@@ -5842,6 +5848,25 @@ column determined by `f90-ts-leading-ampersand-style'."
     ;; is non-nil)
     (save-excursion
       (f90-ts--indent-restore-leading-amp-or-label-line amp-or-label))))
+
+
+(defun f90-ts--indent-region-aux (beg-marker end-marker)
+  "Indent region from BEG-MARKER to END-MARKER.
+This is the default wrapper to invoke `treesit-indent-region' for indentation
+of a region.  Smart end completion or other extra stuff is not executed by
+this function.
+
+Optional leading ampersands on continuation lines are temporarily
+removed before calling `treesit-indent' and then restored at the
+column determined by `f90-ts-leading-ampersand-style'."
+  (let ((vec (f90-ts--indent-blank-leading-amp-or-label-region
+              beg-marker end-marker)))
+    (treesit-indent-region beg-marker end-marker)
+    ;; restore ampersands or labels: beg-marker still points to the
+    ;; first line (insertion-type nil keeps it before any text
+    ;; treesit-indent may have inserted at the start).
+    (f90-ts--indent-restore-leading-amp-or-label-region
+     beg-marker vec)))
 
 
 (defun f90-ts--indent-and-complete-line-aux (variant indent-struct)
@@ -5860,20 +5885,27 @@ completion."
   "Apply indent region from begin of line at BEG to end of line at END.
 Return true if the region was already properly indented (nothing was
 changed)."
-  (let ((beg-reg (save-excursion
-                   (goto-char beg)
-                   (line-beginning-position)))
-        (end-reg (save-excursion
-                   (goto-char end)
-                   (line-end-position))))
-    (let ((old-text (buffer-substring-no-properties beg-reg end-reg))
-          (vec (f90-ts--indent-blank-leading-amp-or-label-region beg-reg end-reg)))
-      (treesit-indent-region beg-reg end-reg)
-      (f90-ts--indent-restore-leading-amp-or-label-region beg-reg vec)
-      ;; place point properly on last line, but where does treesit-indent-region and
-      ;; the restore function (which uses a save-excursion) put point?
-      (skip-chars-forward "& \t")
-      (string= old-text (buffer-substring-no-properties beg-reg end-reg)))))
+  (let (beg-marker end-marker)
+    (unwind-protect
+        (progn
+          ;; beg marker should stay before inserted text
+          ;; end marker should stay after inserted text
+          (let ((beg-reg (save-excursion
+                           (goto-char beg)
+                           (line-beginning-position)))
+                (end-reg (save-excursion
+                           (goto-char end)
+                           (line-end-position))))
+            (setq beg-marker (copy-marker beg-reg))
+            (setq end-marker (copy-marker end-reg t))
+            (let ((old-text (buffer-substring-no-properties beg-reg end-reg)))
+              (f90-ts--indent-region-aux beg-marker end-marker)
+              ;; place point properly on last line, but where does treesit-indent-region and
+              ;; the restore function (which uses a save-excursion) put point?
+              (skip-chars-forward "& \t")
+              (string= old-text (buffer-substring-no-properties beg-marker end-marker)))))
+      (when beg-marker (set-marker beg-marker nil))
+      (when end-marker (set-marker end-marker nil)))))
 
 
 (defun f90-ts--indent-and-complete-region-aux (beg end)
@@ -5890,15 +5922,7 @@ completion for a region, like indent-stmt operations on an end struct line."
           (setq end-marker (copy-marker end t))
           (f90-ts--with-check-modified-region beg-marker end-marker
             (f90-ts-complete-smart-end-region beg-marker end-marker)
-            ;; remove leading ampersands, saving which lines had them
-            (let ((vec (f90-ts--indent-blank-leading-amp-or-label-region
-                        beg-marker end-marker)))
-              (treesit-indent-region beg-marker end-marker)
-              ;; restore ampersands or labels: beg-marker still points to the
-              ;; first line (insertion-type nil keeps it before any text
-              ;; treesit-indent may have inserted at the start).
-              (f90-ts--indent-restore-leading-amp-or-label-region
-               beg-marker vec))))
+            (f90-ts--indent-region-aux beg-marker end-marker)))
       (when beg-marker (set-marker beg-marker nil))
       (when end-marker (set-marker end-marker nil)))))
 
@@ -7826,20 +7850,21 @@ If the prefix is already present, then remove it and uncomment the line.
 
 Note that prefixes are allowed to have trailing blanks.  These are inserted
 as well.  However, for uncommenting, the trimmed prefix is used."
-  (let ((beg (copy-marker beg-region))
-        (end (copy-marker end-region t)))
+  (let (beg-marker end-marker)
     (unwind-protect
         (progn
+          (setq beg-marker (copy-marker beg-region))
+          (setq end-marker (copy-marker end-region t))
           ;; pass 1 (insert/delete comment prefix)
-          (f90-ts--comment-region-ins-del beg end prefix)
+          (f90-ts--comment-region-ins-del beg-marker end-marker prefix)
           ;; pass 2
-          (treesit-indent-region beg end)
+          (f90-ts--indent-region-aux beg-marker end-marker)
           ;; pass 3 (adjust indentation within commented part)
-          (f90-ts--comment-region-adjust beg end prefix)
+          (f90-ts--comment-region-adjust beg-marker end-marker prefix)
 
-          (goto-char end))
-      (set-marker beg nil)
-      (set-marker end nil))))
+          (goto-char end-marker))
+      (set-marker beg-marker nil)
+      (set-marker end-marker nil))))
 
 
 (defun f90-ts-comment-region-default (beg-region end-region)

@@ -14,6 +14,9 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **09-2026**
+- Fix indentation after uncommenting lines in comment-region
+  operation executed on commented lines of code, with leading
+  ampersand or statement label.
 - Add (missing) option `keep-or-continued-line` to `f90-ts--indent-options-alist`
   for indentation selection options.
 - Syntax highlighting, indentation, break/join/fill etc. for string literals improved.

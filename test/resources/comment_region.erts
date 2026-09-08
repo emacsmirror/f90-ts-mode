@@ -509,3 +509,59 @@ subroutine xxx()
      y = 5
 |end subroutine xxx
 =-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-comment-region-custom 169 220 "!!$ "))
+
+Name: uncomment region with label
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading label and to reinsert it after indentation
+subroutine sub()
+     do while (flag)
+!!$        a = 4
+!!$ 123    b = 5
+!!$        c = 6
+|     end do
+end subroutine sub
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading label and to reinsert it after indentation
+subroutine sub()
+     do while (flag)
+          a = 4
+123       b = 5
+          c = 6
+|     end do
+end subroutine sub
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-comment-region-custom 152 268 "!!$ "))
+
+Name: uncomment region with leading ampersand
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading ampersand and to reinsert it after indentation
+subroutine sub()
+!!$  call foo(arg1, &
+!!$     &       arg2, &
+!!$             arg3, &
+!!$     &       arg4, &
+!!$             arg5)
+|end subroutine sub
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading ampersand and to reinsert it after indentation
+subroutine sub()
+     call foo(arg1, &
+        &     arg2, &
+              arg3, &
+        &     arg4, &
+              arg5)
+|end subroutine sub
+=-=-=
