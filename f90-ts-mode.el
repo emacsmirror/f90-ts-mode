@@ -7797,45 +7797,45 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
 (defun f90-ts--comment-region-adjust (beg end prefix)
   "Adjust indentation of code between BEG and END commented by PREFIX.
 After pasting PREFIX and indenting the commented region, the commented code
-is adjusted to preserve original indentation as far as possible.  This also
-depends on option `f90-ts-comment-prefix-keep-indent'.  This also takes into
+is adjusted to preserve original indentation as far as possible.
+This depends on option `f90-ts-comment-prefix-keep-indent'.  It also takes into
 account, that different types of prefixes might be indented differently,
 depending on `f90-ts-special-comment-rules'."
-    (goto-char end)
-    ;; if end marker is at end of line, skip that line
-    (if (bolp)
-        (forward-line -1)
-      (beginning-of-line))
+  (goto-char end)
+  ;; if end marker is at end of line, skip that line
+  (if (bolp)
+      (forward-line -1)
+    (beginning-of-line))
 
-    (let* ((prefix-re (regexp-quote prefix))
-           (adjust-re (concat "\\(?1:\\(?2:\\s-*\\)" prefix-re "\\)\\(?3:\\s-*\\)"))
-           (min-len-after
-            ;; determine maximal number of blanks we can delete in each line safely,
-            ;; using the same number for each line preserves relative indentation
-            (cl-loop
-             do (beginning-of-line)
-             if (looking-at adjust-re)
-             minimize (let* ((cap-group-before (if f90-ts-comment-prefix-keep-indent 1 2))
-                             (len-before (length (match-string cap-group-before)))
-                             (after (match-string 3)))
-                        (min len-before (length after)))
-             while (and (> (point) beg)
-                        (zerop (forward-line -1))))))
+  (let* ((prefix-re (regexp-quote prefix))
+         (adjust-re (concat "\\(?1:\\(?2:\\s-*\\)" prefix-re "\\)\\(?3:\\s-*\\)"))
+         (min-len-after
+          ;; determine maximal number of blanks we can delete in each line safely,
+          ;; using the same number for each line preserves relative indentation
+          (cl-loop
+           do (beginning-of-line)
+           if (looking-at adjust-re)
+           minimize (let* ((cap-group-before (if f90-ts-comment-prefix-keep-indent 1 2))
+                           (len-before (length (match-string cap-group-before)))
+                           (after (match-string 3)))
+                      (min len-before (length after)))
+           while (and (> (point) beg)
+                      (zerop (forward-line -1))))))
 
-      ;; delete blanks uniformly in a second pass, but only
-      ;; if blanks can be removed at all
-      (when (and min-len-after
-                 (> min-len-after 0))
-        (goto-char end)
-        (if (bolp)
-            (forward-line -1)
-          (beginning-of-line))
-        (cl-loop
-         do (when (looking-at adjust-re)
-              (delete-region (match-beginning 3)
-                             (+ (match-beginning 3) min-len-after)))
-         while (and (> (point) beg)
-                    (zerop (forward-line -1)))))))
+    ;; delete blanks uniformly in a second pass,
+    ;; but only if blanks can be removed at all
+    (when (and min-len-after
+               (> min-len-after 0))
+      (goto-char end)
+      (if (bolp)
+          (forward-line -1)
+        (beginning-of-line))
+      (cl-loop
+       do (when (looking-at adjust-re)
+            (delete-region (match-beginning 3)
+                           (+ (match-beginning 3) min-len-after)))
+       while (and (> (point) beg)
+                  (zerop (forward-line -1)))))))
 
 
 ;; The following code was originally adapted from `f90.el' (part of GNU Emacs).
