@@ -565,3 +565,32 @@ subroutine sub()
               arg5)
 |end subroutine sub
 =-=-=
+
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-comment-region-custom 163 206 "!!$ "))
+
+Name: uncomment region partial continued line 1
+=-=
+! first two lines are not part of the region, which needs
+! special care in the continued line cache
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+!!$           arg3, &
+!!$           arg4, &
+              arg5)
+end subroutine sub
+=-=
+! first two lines are not part of the region, which needs
+! special care in the continued line cache
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+              arg3, &
+              arg4, &
+              arg5)
+end subroutine sub
+=-=-=

@@ -135,3 +135,83 @@ subroutine foo
 |end
 
 =-=-=
+
+Name: continued line partially 1
+=-=
+! first line is missing
+subroutine sub()
+     call foo(arg1, &
+|   arg2, &
+@              arg3)
+end subroutine sub
+=-=
+! first line is missing
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+|              arg3)
+end subroutine sub
+=-=-=
+
+Name: continued line partially 2
+=-=
+! first and second line are missing
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+|   arg2, &
+    arg3, &
+@              arg5)
+end subroutine sub
+=-=
+! first and second line are missing
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+              arg2, &
+              arg3, &
+|              arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partially 3
+=-=
+! keep alignment even if outside of marked region
+subroutine sub()
+     call foo(arg1, &
+                arg2, &
+|   arg3, &
+                arg4, &
+@              arg5)
+end subroutine sub
+=-=
+! keep alignment even if outside of marked region
+subroutine sub()
+     call foo(arg1, &
+                arg2, &
+              arg3, &
+                arg4, &
+|              arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partially 4
+=-=
+! keep leading ampersand
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+|   &arg2, &
+    &arg3, &@
+   &           arg5)
+end subroutine sub
+=-=
+! keep leading ampersand
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+        &     arg2, &
+        &     arg3, &
+   &           arg5)
+end subroutine sub
+=-=-=

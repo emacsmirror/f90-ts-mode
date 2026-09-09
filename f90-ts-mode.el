@@ -3150,6 +3150,18 @@ whether `indent-region' or a line variant is in use.  The cache is
 required only if `indent-region' with buffering is done.")
 
 
+(defun f90-ts--continued-line-cache-lookup (pos)
+  "Return entry associated with line at POS.
+If there is no entry, then return current indentation with DELTA=0.
+This is equivalent to no indentation at this line.  This is necessary for lines,
+which are part of a continued line but not part of the marked region currently
+processed.  For such lines, the returned value makes sense."
+  (if-let* ((line (line-number-at-pos pos))
+            (entry (assq line f90-ts--continued-line-cache)))
+      (cdr entry)
+    (list (f90-ts--indentation-at-pos pos) 0)))
+
+
 (defun f90-ts--continued-line-cache-reset ()
   "Reset the continued-line indentation cache."
   (setq f90-ts--continued-line-cache nil))
@@ -3178,10 +3190,9 @@ The delta is computed as:
   delta = delta-at-anchor-line + OFFSET,
 where delta-at-anchor-line is taken from the cache entry at the anchor line."
   (unless f90-ts--align-continued-variant-tab
-    (let* ((anchor-line (line-number-at-pos anchor))
-           (anchor-col (f90-ts--column-number-at-pos anchor))
-           (anchor-entry (cdr (assq anchor-line f90-ts--continued-line-cache)))
-           (anchor-delta (if anchor-entry (cadr anchor-entry) 0))
+    (let* ((anchor-col (f90-ts--column-number-at-pos anchor))
+           (anchor-entry (f90-ts--continued-line-cache-lookup anchor))
+           (anchor-delta (cadr anchor-entry))
            (col-current  (f90-ts--indentation-at-pos pos))
            (col-new (+ anchor-col anchor-delta offset))
            (delta (- col-new col-current))
@@ -3190,16 +3201,24 @@ where delta-at-anchor-line is taken from the cache entry at the anchor line."
             f90-ts--continued-line-cache))))
 
 
-(defun f90-ts--continued-line-cache-get-first ()
-  "Find entry for first line (smallest line number) in the cache.
-Cache is reverese ordered, so we can simply return the last entry."
+(defun f90-ts--continued-line-cache-get-first (first-pos)
+  "Find entry for line at FIRST-POS in the cache.
+This is the first line of the continued statement.
+The cache is reverese ordered, so this is the last entry, if present.
+If not present, a fake entry with current indentation at first line
+and delta=0 is returned.  This happens if the region does not contain
+the first line."
   ;; cache is constructed by push, the last entry is the first line
-  (car (last f90-ts--continued-line-cache)))
-  ;; (cl-loop for line-entry in f90-ts--continued-line-cache
-  ;;          for line-min = line-entry then (if (< (car line-entry) (car line-min))
-  ;;                                             line-entry
-  ;;                                           line-min)
-  ;;          finally return line-min)
+  (let ((first-line (line-number-at-pos first-pos))
+        (entry (car (last f90-ts--continued-line-cache))))
+    (if (and entry
+             (= (car entry) first-line))
+        ;; first line has been processed and is in the cache
+        entry
+      ;; construct a fake entry signalling that first line of continued
+      ;; statement keeps it current indentation
+      (cons first-line
+            (list (f90-ts--indentation-at-pos first-pos) 0)))))
 
 
 (defun f90-ts--continued-line-cache-update (first-pos)
@@ -3209,7 +3228,7 @@ If it was, update the entry and apply delta to all other cached lines.
 Argument FIRST-POS is used to jump to this line efficiently (jumping
 to a line by line number is far more expensive)."
   (unless f90-ts--align-continued-variant-tab
-    (let* ((first (f90-ts--continued-line-cache-get-first))
+    (let* ((first (f90-ts--continued-line-cache-get-first first-pos))
            (first-line (car first))
            (first-col-cached (cadr first))
            (first-col-current (f90-ts--indentation-at-pos first-pos))
@@ -3250,8 +3269,7 @@ otherwise return column as is."
     (if f90-ts--align-continued-variant-tab
         ;; line based indentation, no caching
         col
-      (let* ((line (line-number-at-pos pos))
-             (entry (cdr (assq line f90-ts--continued-line-cache)))
+      (let* ((entry (f90-ts--continued-line-cache-lookup pos))
              (delta (cadr entry))
              (col-cached (car entry))
              (col-current (f90-ts--indentation-at-pos pos)))
@@ -3262,7 +3280,7 @@ otherwise return column as is."
         (cl-assert entry
                    nil
                    "no entry for line in cache, line=%s, cache=%s"
-                   line f90-ts--continued-line-cache)
+                   (line-number-at-pos pos) f90-ts--continued-line-cache)
         (if (= col-cached col-current)
             ;; not yet flushed
             (+ col delta)
@@ -5859,9 +5877,13 @@ this function.
 
 Optional leading ampersands on continuation lines are temporarily
 removed before calling `treesit-indent' and then restored at the
-column determined by `f90-ts-leading-ampersand-style'."
+column determined by `f90-ts-leading-ampersand-style'.
+
+Internally the continued-line cache is reset, so that regions, which cover only
+part of a continued line, can be indented correctly."
   (let ((vec (f90-ts--indent-blank-leading-amp-or-label-region
               beg-marker end-marker)))
+    (f90-ts--continued-line-cache-reset)
     (treesit-indent-region beg-marker end-marker)
     ;; restore ampersands or labels: beg-marker still points to the
     ;; first line (insertion-type nil keeps it before any text
