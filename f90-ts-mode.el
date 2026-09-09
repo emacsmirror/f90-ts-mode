@@ -3110,7 +3110,7 @@ Use cached value or compute using cached node and parent."
 
 (defvar-local f90-ts--continued-line-cache nil
   "Cache for continued-line anchor indentation.
-The cache is an alist with entries (LINE . (BOL-COL DELTA))
+The cache is an alist with entries (LINE . (COL-CACHED DELTA))
 for already indented lines of a continued statement.
 
 For alignment operations, we need node column numbers of nodes on
@@ -3125,14 +3125,14 @@ the delta is not known and initially stored as DELTA=0.  Once we detect a
 flush, we can compute the delta and add it to all cached lines.  This is
 necessary to have consistent indentation across all previous lines
 
-The cache also stores BOL-COL to detect, whether internal indentation
+The cache also stores COL-CACHED to detect, whether internal indentation
 buffer of `treesit-indent-region' has already been flushed for a line.
 
-As mentioned above, the cache is an alist (LINE . (BOL-COL DELTA)),
-mapping buffer LINE numbers to BOL-COL and DELTA, where:
-  BOL-COL: indentation column at cache time, used as flush detector:
-           if current indentation at line == BOL-COL, line is not yet
-           flushed
+As mentioned above, the cache is an alist (LINE . (COL-CACHED DELTA)),
+mapping buffer LINE numbers to COL-CACHED and DELTA, where:
+  COL-CACHED: indentation column at cache time, used as flush detector:
+              if current indentation at line == COL-CACHED, line is not yet
+              flushed
   DELTA:   delta of original to new indentation, if line is not
            flushed, then the column after applying indentation is
            column number of node + DELTA,
@@ -3140,7 +3140,7 @@ mapping buffer LINE numbers to BOL-COL and DELTA, where:
            column
 
 The first line of the statement initially is stored with DELTA=0 and
-current BOL-COL.  For each new line, the current indentation of the
+current COL-CACHED.  For each new line, the current indentation of the
 first line is checked and if a buffer flush is detected, the applied
 delta is computed and added to the delta of all subsequent cached
 lines.
@@ -3155,37 +3155,38 @@ required only if `indent-region' with buffering is done.")
   (setq f90-ts--continued-line-cache nil))
 
 
-(defun f90-ts--continued-line-cache-put-first (bol)
+(defun f90-ts--continued-line-cache-put-first (pos)
   "Store a cache entry for the first line of a continued statement.
-BOL is the beginning of that line.  Always store DELTA=0.
-If a flush is detected (actual BOL is different from cached BOL),
-the DELTA is computed and added to all other cached line."
+POS is a position within that line.  Always store DELTA=0.
+
+If later on a flush is detected (actual column at indentation is different
+from COL-CACHED), the DELTA is computed and added to all other cached line.
+This is done in `f90-ts--continued-line-cache-update'."
   (f90-ts--continued-line-cache-reset)
   (unless f90-ts--align-continued-variant-tab
-    (let* ((bol-col (save-excursion
-                      (goto-char bol)
-                      (current-indentation)))
-           (line (line-number-at-pos bol)))
+    (let* ((col-cached (f90-ts--indentation-at-pos pos))
+           (line (line-number-at-pos pos)))
       (setq f90-ts--continued-line-cache
-            (list (cons line (list bol-col 0)))))))
+            (list (cons line (list col-cached 0)))))))
 
 
-(defun f90-ts--continued-line-cache-put-subsequent (bol anchor offset)
-  "Compute and store the indent delta for a subsequent line at BOL.
+(defun f90-ts--continued-line-cache-put-subsequent (pos anchor offset)
+  "Compute and store the indent delta for a subsequent line at POS.
 ANCHOR is the anchor position returned by the anchor function.
 OFFSET is the offset from that anchor.
-Resolves delta via the anchor's cache entry:
-  delta = delta-at-anchor-line + OFFSET"
+The delta is computed as:
+  delta = delta-at-anchor-line + OFFSET,
+where delta-at-anchor-line is taken from the cache entry at the anchor line."
   (unless f90-ts--align-continued-variant-tab
     (let* ((anchor-line (line-number-at-pos anchor))
            (anchor-col (f90-ts--column-number-at-pos anchor))
            (anchor-entry (cdr (assq anchor-line f90-ts--continued-line-cache)))
            (anchor-delta (if anchor-entry (cadr anchor-entry) 0))
-           (bol-current  (f90-ts--indentation-at-pos bol))
-           (bol-new (+ anchor-col anchor-delta offset))
-           (delta (- bol-new bol-current))
-           (line (line-number-at-pos bol)))
-      (push (cons line (list bol-current delta))
+           (col-current  (f90-ts--indentation-at-pos pos))
+           (col-new (+ anchor-col anchor-delta offset))
+           (delta (- col-new col-current))
+           (line (line-number-at-pos pos)))
+      (push (cons line (list col-current delta))
             f90-ts--continued-line-cache))))
 
 
@@ -3203,28 +3204,28 @@ Cache is reverese ordered, so we can simply return the last entry."
 
 (defun f90-ts--continued-line-cache-update (first-pos)
   "Check whether first line at FIRST-POS was flushed.
-This is the case if current bol and cached bol are different.
+This is the case if current column and cached column are different.
 If it was, update the entry and apply delta to all other cached lines.
 Argument FIRST-POS is used to jump to this line efficiently (jumping
 to a line by line number is far more expensive)."
   (unless f90-ts--align-continued-variant-tab
     (let* ((first (f90-ts--continued-line-cache-get-first))
            (first-line (car first))
-           (first-bol-col (cadr first))
-           (first-bol-current (f90-ts--indentation-at-pos first-pos))
-           (first-delta (- first-bol-current first-bol-col)))
+           (first-col-cached (cadr first))
+           (first-col-current (f90-ts--indentation-at-pos first-pos))
+           (first-delta (- first-col-current first-col-cached)))
       ;; indentation of first line has been flushed, add delta to all
       ;; other lines
-      (when (/= first-bol-col first-bol-current)
+      (when (/= first-col-cached first-col-current)
         (setq f90-ts--continued-line-cache
               (seq-map (lambda (entry)
                          (let ((line (car entry))
-                               (bol-col (cadr entry))
+                               (col-cached (cadr entry))
                                (delta (caddr entry)))
                            (cons line
                                  (if (= line first-line)
-                                     (list first-bol-current 0)
-                                   (list bol-col (+ delta first-delta))))))
+                                     (list first-col-current 0)
+                                   (list col-cached (+ delta first-delta))))))
                        f90-ts--continued-line-cache))))))
 
 
@@ -3252,17 +3253,17 @@ otherwise return column as is."
       (let* ((line (line-number-at-pos pos))
              (entry (cdr (assq line f90-ts--continued-line-cache)))
              (delta (cadr entry))
-             (bol-col (car entry))
-             (bol-current (f90-ts--indentation-at-pos pos)))
+             (col-cached (car entry))
+             (col-current (f90-ts--indentation-at-pos pos)))
 
         ;;(f90-ts-log-msg :cachecol "line, entry, delta = %s, %s, %s" line entry delta)
-        ;;(f90-ts-log-msg :cachecol "bol col, current = %s, %s" bol-col bol-current)
+        ;;(f90-ts-log-msg :cachecol "col: cached, current = %s, %s" col-cached col-current)
 
         (cl-assert entry
                    nil
                    "no entry for line in cache, line=%s, cache=%s"
                    line f90-ts--continued-line-cache)
-        (if (= bol-col bol-current)
+        (if (= col-cached col-current)
             ;; not yet flushed
             (+ col delta)
           col)))))
