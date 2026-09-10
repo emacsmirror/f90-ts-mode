@@ -15,6 +15,9 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
 **09-2026**
 - Fix some issues in comment-region operations (preserve indentation, preserve
+  trailing whitespace where possible, region boundaries,
+  missing `f90-ts-indent-region').
+- Fix some issues in comment-region operations (preserve indentation, preserve
   trailing whitespace where possible).
 - Fix indentation after uncommenting lines in comment-region operation executed
   on commented lines of code, with leading ampersand or statement label.

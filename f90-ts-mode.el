@@ -33,7 +33,8 @@
 ;;
 ;; Recently changed, added or improved:
 ;;   [09-2026] Fix some issues in comment-region operations (preserve
-;;             indentation, preserve trailing whitespace where possible).
+;;             indentation, preserve trailing whitespace where possible,
+;;             region boundaries, missing `f90-ts-indent-region').
 ;;   [09-2026] Fix indentation after uncommenting lines in comment-region
 ;              operation executed on commented lines of code, with leading
 ;;             ampersand or statement label.
@@ -146,7 +147,8 @@ Recently changed, added or improved:
 
 [09-2026]
 - Fix some issues in comment-region operations (preserve indentation, preserve
-  trailing whitespace where possible).
+  trailing whitespace where possible, region boundaries,
+  missing `f90-ts-indent-region').
 - Fix indentation after uncommenting lines in comment-region operation executed
   on commented lines of code, with leading ampersand or statement label.
 - Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
@@ -5822,8 +5824,19 @@ Return a vector (one entry per line) of values as returned by
 `f90-ts--indent-blank-leading-amp-or-label-line'."
   (save-excursion
     (goto-char beg)
-    (let* ((line-beg (line-number-at-pos beg))
-           (line-end (line-number-at-pos end))
+    (when (looking-at-p "[ \t]*$")
+      (forward-line 1))
+    (let* ((line-beg (line-number-at-pos (point)))
+           (line-end-aux (line-number-at-pos end))
+           ;; if at beginning of line, this line should be excluded,
+           ;; this comes from the loop (while (< (point) end) ... (forward-line 1))
+           ;; used in indentation, but we need number of lines before hand, so we
+           ;; explicitely step back one line
+           (line-end (save-excursion
+                       (goto-char end)
+                       (if (bolp)
+                           (1- line-end-aux)
+                         line-end-aux)))
            (n-lines  (- line-end line-beg -1))
            (vec      (make-vector n-lines nil)))
       ;; after blanking loop, each element of the vector vec will be one of:
@@ -5849,7 +5862,9 @@ VEC is a vector as returned by
 `f90-ts--indent-blank-leading-amp-or-label-region'."
   (save-excursion
     (goto-char beg)
-    (let ((line-beg (line-number-at-pos beg)))
+    (when (looking-at-p "[ \t]*$")
+      (forward-line 1))
+    (let ((line-beg (line-number-at-pos (point))))
       (cl-loop
        for line from line-beg
        for amp-or-label across vec
