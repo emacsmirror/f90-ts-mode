@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
+;;   [09-2026] Fix some issues in comment-region operations (preserve
+;;             indentation, preserve trailing whitespace where possible).
 ;;   [09-2026] Fix indentation after uncommenting lines in comment-region
 ;              operation executed on commented lines of code, with leading
 ;;             ampersand or statement label.
@@ -143,6 +145,8 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
+- Fix some issues in comment-region operations (preserve indentation, preserve
+  trailing whitespace where possible).
 - Fix indentation after uncommenting lines in comment-region operation executed
   on commented lines of code, with leading ampersand or statement label.
 - Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
@@ -1156,6 +1160,16 @@ If NODE is non-nil, return line number at which start position is
 located, otherwise return line number of current point position."
   (or (and node (f90-ts--node-line node))
       (line-number-at-pos)))
+
+
+(defun f90-ts--common-prefix-length (str pos)
+  "Return length of the common prefix of STR and buffer text at POS."
+  (cl-loop
+   for i below (length str)
+   while (and (< (+ pos i) (point-max))
+              (eq (aref str i)
+                  (char-after (+ pos i))))
+   finally return i))
 
 
 (defun f90-ts--node-length (node)
@@ -7821,25 +7835,50 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
 ;;;-----------------------------------------------------------------------------
 ;;; Comment region using some prefix
 
+(defun f90-ts--comment-region-ins-del-line (prefix prefix-trimmed uncomment-re)
+  "Insert or delete comment PREFIX on the current line.
+PREFIX-TRIMMED is the trimmed PREFIX and UNCOMMENT-RE is a regexp to match
+the prefix for uncommenting the line if already commented."
+  (cond
+   ((looking-at uncomment-re)
+    (let ((m-beg (match-beginning 1)))
+      (if f90-ts-comment-prefix-keep-indent
+          ;; preserve current indentation
+          (let ((m-end (match-end 1)))
+            (delete-region m-beg m-end)
+            (goto-char m-beg)
+            (insert (make-string (- m-end m-beg) ?\s)))
+        ;; remove prefix, including trailing blanks, as best as possible
+        (let ((prefix-end (+ m-beg
+                             (f90-ts--common-prefix-length prefix m-beg))))
+          (delete-region m-beg prefix-end))))
+    ;; there is no way (in particular in conjunction with comment prefixes which
+    ;; are indented like code [option "indent"]) to preserve original amount of
+    ;; trailing blanks, to avoid build up of trailing blanks in comment-uncomment
+    ;; cycle, delete blanks on empty lines
+    (when (f90-ts--point-on-empty-line-p)
+      (delete-region (line-beginning-position) (line-end-position))))
+
+   ((= (line-beginning-position) (line-end-position))
+    ;; avoid trailing blanks on empty lines, but preserve trailing blanks
+    ;; if present
+    (insert prefix-trimmed))
+
+   (t
+    (insert prefix))))
+
+
 (defun f90-ts--comment-region-ins-del (beg end prefix)
   "Insert or delete PREFIX at each line between BEG and END."
   (let* ((prefix-trimmed (string-trim-right prefix))
          (prefix-trimmed-re (regexp-quote prefix-trimmed))
-         (uncomment-re (concat "\\s-*\\(?1:" prefix-trimmed-re "\\)")))
+         (uncomment-re (concat "[ \t]*\\(?1:" prefix-trimmed-re "\\)")))
     (goto-char beg)
     (beginning-of-line)
     (cl-loop
-     do (cond
-         ((looking-at uncomment-re)
-          (delete-region (match-beginning 1) (match-end 1))
-          (when (looking-at-p "[ \t]+$")
-            ;; after deletion, we have an empty line, remove trailing blanks
-            (delete-region (point) (line-end-position))))
-         ((looking-at-p "[ \t]*$")
-          ;; avoid trailing blanks on empty lines
-          (insert prefix-trimmed))
-         (t
-          (insert prefix)))
+     do (f90-ts--comment-region-ins-del-line prefix
+                                             prefix-trimmed
+                                             uncomment-re)
      while (and (zerop (forward-line 1))
                 (< (point) end)))))
 
