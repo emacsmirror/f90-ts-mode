@@ -1,0 +1,39 @@
+Point-Char: |
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-indent-line))
+
+Name: indent region empty line with whitespace
+=-=
+|program blank_line
+                  
+end program blank_line
+=-=-=
+
+Name: indent region trailing whitespace after code
+=-=
+|program blank_line
+ use mod         
+end program blank_line
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-indent-region (point-min) (point-max)))
+
+Name: indent region empty line with whitespace
+=-=
+|program blank_line
+                  
+end program blank_line
+=-=-=
+
+Name: indent region trailing whitespace after code
+=-=
+|program blank_line
+ use mod         
+end program blank_line
+=-=-=

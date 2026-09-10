@@ -260,7 +260,8 @@ The popup is defined as `f90-ts-transient` and covers:
 
 | Section                   | Keys                            | Commands                                          |
 |---------------------------|---------------------------------|---------------------------------------------------|
-| **Indentation**           | `TAB` `s` `I` `E`               | Indent line / statement / region / smart end      |
+| **Indentation**           | `TAB` `s` `I`   `               | Indent and complete line / statement / region     |
+|                           | `C-Tab` `C-I`                   | Indent line / region                              |
 | **Line editing**          | `b` `j` `J` `C-s`               | Break line, join with prev/next, shift line break |
 | **Filling**               | `C-f` `C-b`                     | Set fill column and fill method                   |
 |                           | `f` `M-f` `M-j` `M-J`           | fill line, region, with prev/next line            |

@@ -915,15 +915,16 @@ seem to make much sense."
   "F90 Tree-sitter Mode."
   ;; Modify
   [["Indentation, break & join"
-    ("L"   "Indent list line:"          f90-ts-transient--indent-list-line)
-    ("TAB" "Indent line"                f90-ts-indent-and-complete-line)
-    ("s"   "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
-    ("I"   "Indent & complete region"   f90-ts-indent-and-complete-region)
-    ("E"   "Smart end complete region"  f90-ts-complete-smart-end-region)
-    ("b"   "Break line"                 f90-ts-break-line)
-    ("j"   "Join with previous line"    f90-ts-join-line-prev)
-    ("J"   "Join with next line"        f90-ts-join-line-next)
-    ("C-s" "Shift line break"           f90-ts-shift-line-break)]
+    ("L"     "Indent list line:"          f90-ts-transient--indent-list-line)
+    ("TAB"   "Indent & comlete line"      f90-ts-indent-and-complete-line)
+    ("s"     "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
+    ("I"     "Indent & complete region"   f90-ts-indent-and-complete-region)
+    ("C-TAB" "Indent line"                f90-ts-indent-line)
+    ("C-I"   "Indent region"              f90-ts-indent-region)
+    ("b"     "Break line"                 f90-ts-break-line)
+    ("j"     "Join with previous line"    f90-ts-join-line-prev)
+    ("J"     "Join with next line"        f90-ts-join-line-next)
+    ("C-s"   "Shift line break"           f90-ts-shift-line-break)]
    ["Mark and (un)comment region"
     ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
     ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
@@ -5854,9 +5855,10 @@ single line.  Smart end completion or other extra stuff is not executed by
 this function.
 If provided VARIANT is the variant symbol for how to compute alignment in
 multi-line statements.  Default value is `f90-ts-indent-list-line'.
-Optional leading ampersands on continuation lines are temporarily
-removed before calling `treesit-indent' and then restored at the
-column determined by `f90-ts-leading-ampersand-style'."
+
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'."
   (let ((f90-ts--align-continued-variant-tab
          (or variant f90-ts-indent-list-line))
         (amp-or-label (f90-ts--indent-blank-leading-amp-or-label-line)))
@@ -5875,9 +5877,9 @@ This is the default wrapper to invoke `treesit-indent-region' for indentation
 of a region.  Smart end completion or other extra stuff is not executed by
 this function.
 
-Optional leading ampersands on continuation lines are temporarily
-removed before calling `treesit-indent' and then restored at the
-column determined by `f90-ts-leading-ampersand-style'.
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent-region', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'.
 
 Internally the continued-line cache is reset, so that regions, which cover only
 part of a continued line, can be indented correctly."
@@ -6073,6 +6075,31 @@ no abort mechanism for `treesit-search-foward'."
       (set-marker end-marker nil))))
 
 
+(defun f90-ts-indent-region (beg end)
+  "Indent region from BEG to END.
+It is based on the treesitter tree overlapping that region.
+
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent-region', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'."
+  (interactive
+   (if (use-region-p)
+       (list (region-beginning) (region-end))
+     (list (point-min) (point-max))))
+
+  (let (beg-marker end-marker)
+    (unwind-protect
+        (progn
+          ;; beg marker should stay before inserted text
+          ;; end marker should stay after inserted text
+          (setq beg-marker (copy-marker beg))
+          (setq end-marker (copy-marker end t))
+          (f90-ts--with-check-modified-region beg-marker end-marker
+            (f90-ts--indent-region-aux beg-marker end-marker)))
+      (when beg-marker (set-marker beg-marker nil))
+      (when end-marker (set-marker end-marker nil)))))
+
+
 (defun f90-ts-indent-and-complete-region (beg end)
   "Indent region and execute smart end completion in region from BEG to END.
 It is based on the treesitter tree overlapping that region.
@@ -6091,9 +6118,9 @@ hence indentation as well as smart end completion both work.  However,
 the keyword \"function\" after \"end\" starts a new function and muddles the
 subsequent tree.
 
-Leading ampersands on continuation lines are temporarily removed before
-calling `treesit-indent-region' and restored afterwards at the column
-determined by `f90-ts-leading-ampersand-style'."
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent-region', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'."
   (interactive
    (if (use-region-p)
        (list (region-beginning) (region-end))
