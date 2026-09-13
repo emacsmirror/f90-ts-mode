@@ -38,7 +38,7 @@
 ;;             outside of region boundaries, add missing function
 ;;             `f90-ts-indent-region').
 ;;   [09-2026] Fix indentation after uncommenting lines in comment-region
-;              operation executed on commented lines of code, with leading
+;;             operation executed on commented lines of code, with leading
 ;;             ampersand or statement label.
 ;;   [09-2026] Add (missing) option `keep-or-continued-line' to
 ;;             `f90-ts--indent-options-alist' for indentation selection options.
@@ -4512,8 +4512,19 @@ column numbers."
      offset-bounded)))
 
 
+(defun f90-ts--align-list-cpo-max-pos (cpo-list)
+  "Return the entry in CPO-LIST with the largest position.
+CPO-LIST is a non-empty list of (column position offset) triples.
+In general, the cpo item with the largest position is the most relevant,
+as it is closest to the current line."
+  (cl-reduce (lambda (cpo1 cpo2)
+               ;; extract and compare positions
+               (if (> (cadr cpo1) (cadr cpo2)) cpo1 cpo2))
+             cpo-list))
+
+
 (defun f90-ts--align-list-cpo-sort (cpo-list)
-  "Make CPO-LIST of (column position offset) triples unique by column position.
+  "Make CPO-LIST of (COLUMN POSITION OFFSET) triples unique by column position.
 For several entries with same column number, take the element with the largest
 buffer position."
   (let ((cpo-list-unique
@@ -4521,9 +4532,7 @@ buffer position."
                     ;; elements produced by seq-group-by are:
                     ;; group = (col (col pos1 offset1) (col pos2 offset2) ...)
                     ;; ((cdr group) gets rid of initial col)
-                    (cl-reduce (lambda (cpo1 cpo2)
-                                 (if (> (cadr cpo1) (cadr cpo2)) cpo1 cpo2))
-                               (cdr group)))
+                    (f90-ts--align-list-cpo-max-pos (cdr group)))
                   (seq-group-by #'car cpo-list))))
     (seq-sort (lambda (a b) (< (car a) (car b))) cpo-list-unique)))
 
@@ -4543,6 +4552,19 @@ on the flush state of the internal buffer of the treesit indent engine."
     (= col-cur col-orig)))
 
 
+(defun f90-ts--align-list-find-aligned (col-pos-off col-cur)
+  "Return the entry in COL-POS-OFF that was originally aligned at COL-CUR.
+COL-POS-OFF is an unsorted list of (COLUMN POSITION OFFSET) triples, see
+`f90-ts--align-list-aligned-p'.  If several entries were aligned at COL-CUR,
+return the one with the largest position.
+If there is no such cpo item, return nil."
+  (let ((aligned (seq-filter (lambda (cpo)
+                                (f90-ts--align-list-aligned-p cpo col-cur))
+                              col-pos-off)))
+    (when aligned
+      (f90-ts--align-list-cpo-max-pos aligned))))
+
+
 (defun f90-ts--align-list-select (variant col-cur primary items)
   "Select (anchor offset) from PRIMARY and ITEMS.
 Depending on VARIANT and current column COL-CUR, select the relevant
@@ -4559,9 +4581,8 @@ selected."
          ;; alignment check needs the unsorted list, as sorting also removes double
          ;; entries resulting in the same column AFTER indentation, but aligned-at
          ;; checks the original column
-         (aligned-at (seq-find (lambda (cpo)
-                                 (f90-ts--align-list-aligned-p cpo col-cur))
-                               col-pos-off-unsorted))
+         (aligned-at (f90-ts--align-list-find-aligned col-pos-off-unsorted
+                                                      col-cur))
          ;; sort and uniquify the list, keep only one entry per resulting column
          (col-pos-off (f90-ts--align-list-cpo-sort col-pos-off-unsorted))
          (primary-col-pos-off (f90-ts--align-list-map-col-pos-off primary)))
