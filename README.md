@@ -14,9 +14,10 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **09-2026**
-- Fix some issues in comment-region operations (preserve indentation, preserve
-  trailing whitespace where possible, region boundaries,
-  missing `f90-ts-indent-region').
+- Fix some issues in comment-region operations (preserve indentation,
+  preserve trailing whitespace where possible, keep existing alignment
+  with keep options, do not operate outside of region boundaries, add
+  missing function `f90-ts-indent-region`).
 - Fix some issues in comment-region operations (preserve indentation, preserve
   trailing whitespace where possible).
 - Fix indentation after uncommenting lines in comment-region operation executed

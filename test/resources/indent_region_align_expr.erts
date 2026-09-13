@@ -520,3 +520,44 @@ subroutine unary_minus_4()
                     -           3, 4]
 end subroutine unary_minus_4
 =-=-=
+
+Name: preserve alignment 1
+=-=
+module poly
+ real, dimension(1:3,1:12), parameter, public :: &
+       POLYHEDRON_icosahedron = reshape( &
+              [ -r,    s,    0.0, &
+                 r,    s,    0.0, &
+                -r,   -s,    0.0, &
+                 r,   -s,    0.0, &
+                 0.0, -r,    s, &
+                 0.0,  r,    s, &
+                 0.0, -r,   -s, &
+                 0.0,  r,   -s, &
+                 s,    0.0, -r, &
+                 s,    0.0,  r, &
+                -s,    0.0, -r, &
+                -s,    0.0,  r &
+                 ], &
+              [3,12])
+end module poly
+=-=
+module poly
+ real, dimension(1:3,1:12), parameter, public :: &
+        POLYHEDRON_icosahedron = reshape( &
+               [ -r,    s,    0.0, &
+                  r,    s,    0.0, &
+                 -r,   -s,    0.0, &
+                  r,   -s,    0.0, &
+                  0.0, -r,    s, &
+                  0.0,  r,    s, &
+                  0.0, -r,   -s, &
+                  0.0,  r,   -s, &
+                  s,    0.0, -r, &
+                  s,    0.0,  r, &
+                 -s,    0.0, -r, &
+                 -s,    0.0,  r &
+                  ], &
+               [3,12])
+end module poly
+=-=-=
