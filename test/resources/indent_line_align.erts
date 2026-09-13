@@ -1,13 +1,13 @@
+Point-Char: |
+
+No-Before-Newline
+No-After-Newline
+
 Code:
   (lambda ()
     (f90-ts-mode)
     (let ((f90-ts-indent-list-line 'rotate))
       (f90-ts-indent-and-complete-line)))
-
-Point-Char: |
-
-No-Before-Newline
-No-After-Newline
 
 Name: align vardecl rotate 1
 =-=

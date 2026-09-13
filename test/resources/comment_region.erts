@@ -336,7 +336,7 @@ Code:
     (f90-ts-mode)
     (f90-ts-comment-region-custom 53 119 "! "))
 
-Name: comment region custom 2
+Name: uncomment region custom 2
 =-=
 subroutine sub_custom_2()
      if (x > 1) then
@@ -434,7 +434,7 @@ Code:
     (f90-ts-mode)
     (f90-ts-comment-region-custom 29 156 "! "))
 
-Name: comment region trailing blank 1
+Name: comment region avoid trailing blank 1
 =-=
 subroutine sub_trailing_1()
      if (x > 1) then
@@ -464,7 +464,7 @@ Code:
     (f90-ts-mode)
     (f90-ts-comment-region-custom 29 166 "!!$    "))
 
-Name: comment region trailing blank 2
+Name: comment region avoid trailing blank 2
 =-=
 subroutine sub_trailing_2()
      if (x > 1) then
@@ -508,4 +508,431 @@ subroutine xxx()
 
      y = 5
 |end subroutine xxx
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-comment-region-custom 169 220 "!!$ "))
+
+Name: uncomment region with label
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading label and to reinsert it after indentation
+subroutine sub()
+     do while (flag)
+!!$        a = 4
+!!$ 123    b = 5
+!!$        c = 6
+|     end do
+end subroutine sub
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading label and to reinsert it after indentation
+subroutine sub()
+     do while (flag)
+          a = 4
+123       b = 5
+          c = 6
+|     end do
+end subroutine sub
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-comment-region-custom 152 268 "!!$ "))
+
+Name: uncomment region with leading ampersand
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading ampersand and to reinsert it after indentation
+subroutine sub()
+!!$  call foo(arg1, &
+!!$     &       arg2, &
+!!$             arg3, &
+!!$     &       arg4, &
+!!$             arg5)
+|end subroutine sub
+=-=
+! after uncommenting the region, the indent-region operation needs to remove
+! leading ampersand and to reinsert it after indentation
+subroutine sub()
+     call foo(arg1, &
+        &     arg2, &
+              arg3, &
+        &     arg4, &
+              arg5)
+|end subroutine sub
+=-=-=
+
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-comment-region-custom 163 206 "!!$ "))
+
+Name: uncomment region partial continued line 1
+=-=
+! first two lines are not part of the region, which needs
+! special care in the continued line cache
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+!!$           arg3, &
+!!$           arg4, &
+              arg5)
+end subroutine sub
+=-=
+! first two lines are not part of the region, which needs
+! special care in the continued line cache
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+              arg3, &
+              arg4, &
+              arg5)
+end subroutine sub
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 63 130 "!!$ ")
+      (f90-ts-comment-region-custom 63 142 "!!$ ")))
+
+Name: uncomment region preserve indentation non-keep 1
+=-=
+subroutine sub()
+     call foo(arg1, &
+               arg2, &
+              arg3, &
+              arg4, &
+               arg5, &
+               arg6)
+end subroutine sub
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent t))
+      (f90-ts-comment-region-custom 37 134 "!!$ ")))
+
+Name: comment region preserve trailing blank keep 1
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+          
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+!!$       a = i
+!!$       
+!!$       ! other comment with trailing blank   
+!!$       a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent t))
+      (f90-ts-comment-region-custom 37 134 "!!!")))
+
+Name: comment region preserve trailing blank keep 2
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+          
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+     !!!  a = i
+     !!!  
+     !!!  ! other comment with trailing blank   
+     !!!  a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent t))
+      (f90-ts-comment-region-custom 37 134 "!> ")))
+
+Name: comment region preserve trailing blank keep 3
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+          
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          !> a = i
+          !> 
+          !> ! other comment with trailing blank   
+          !> a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent t))
+      (f90-ts-comment-region-custom 37 134 "!!$ ")))
+
+Name: uncomment region preserve trailing blank keep 1
+=-=
+subroutine blanks()
+     do i = 1,n
+!!$       a = i
+!!$       
+!!$       ! other comment with trailing blank   
+!!$       a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent t))
+      (f90-ts-comment-region-custom 37 134 "!!!")))
+
+Name: uncomment region preserve trailing blank keep 2
+=-=
+subroutine blanks()
+     do i = 1,n
+     !!!  a = i
+     !!!  
+     !!!  ! other comment with trailing blank   
+     !!!  a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent t))
+      (f90-ts-comment-region-custom 37 146 "!> ")))
+
+Name: uncomment region preserve trailing blank keep 3
+=-=
+subroutine blanks()
+     do i = 1,n
+          !> a = i
+          !> 
+          !> ! other comment with trailing blank   
+          !> a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 37 134 "!!$ ")))
+
+Name: comment region preserve trailing blank non-keep 1
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+          
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+!!$           a = i
+!!$           
+!!$           ! other comment with trailing blank   
+!!$           a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 37 134 "!!!")))
+
+Name: comment region preserve trailing blank non-keep 2
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+          
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+     !!!     a = i
+     !!!     
+     !!!     ! other comment with trailing blank   
+     !!!     a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 37 134 "!> ")))
+
+Name: comment region preserve trailing blank non-keep 3
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+          
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          !> a = i
+          !> 
+          !> ! other comment with trailing blank   
+          !> a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 37 150 "!!$ ")))
+
+Name: uncomment region preserve trailing blank non-keep 1
+=-=
+subroutine blanks()
+     do i = 1,n
+!!$           a = i
+!!$           
+!!$           ! other comment with trailing blank   
+!!$           a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 37 146 "!!!")))
+
+Name: uncomment region preserve trailing blank non-keep 2
+=-=
+subroutine blanks()
+     do i = 1,n
+     !!!     a = i
+     !!!     
+     !!!     ! other comment with trailing blank   
+     !!!     a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-comment-prefix-keep-indent nil))
+      (f90-ts-comment-region-custom 37 146 "!> ")))
+
+Name: uncomment region preserve trailing blank non-keep 3
+=-=
+subroutine blanks()
+     do i = 1,n
+          !> a = i
+          !> 
+          !> ! other comment with trailing blank   
+          !> a = a+1   
+|     end do
+end subroutine blanks
+=-=
+subroutine blanks()
+     do i = 1,n
+          a = i
+
+          ! other comment with trailing blank   
+          a = a+1   
+|     end do
+end subroutine blanks
 =-=-=

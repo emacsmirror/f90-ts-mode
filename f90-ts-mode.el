@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.3.0-snapshot
+;; Version: 0.4.0-snapshot
 ;; Package-Requires: ((emacs "30.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,9 +32,18 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string literals improved.
-;;             This requires a proposed (but not yet merged) tree-sitter language grammar extension.
-;;             See README.md for more details.
+;;   [09-2026] Fix some issues in comment-region operations (preserve
+;;             indentation, preserve trailing whitespace where possible,
+;;             region boundaries, missing `f90-ts-indent-region').
+;;   [09-2026] Fix indentation after uncommenting lines in comment-region
+;              operation executed on commented lines of code, with leading
+;;             ampersand or statement label.
+;;   [09-2026] Add (missing) option `keep-or-continued-line' to
+;;             `f90-ts--indent-options-alist' for indentation selection options.
+;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string
+;;             literals improved.  This requires a proposed (but not yet merged)
+;;             tree-sitter language grammar extension.  See README.md for more
+;;             details.
 ;;   [09-2026] Testing with Emacs 31.1 and tree-sitter 0.26 added.
 ;;
 ;;   [08-2026] `f90-ts-shift-line-break' as combined break/join function added.
@@ -72,8 +81,8 @@
 ;;   - Smart end completion
 ;;   - Configurable leading ampersand and statement label positions
 ;;   - Breaking and joining of continued lines
-;;   - Fill and rebalance operations for lines or regions (with rightmost breakpoint
-;;     selection or interactive break and join session)
+;;   - Fill and rebalance operations for lines or regions (with rightmost
+;;     breakpoint selection or interactive break and join session)
 ;;   - Region selection based on tree-sitter nodes
 ;;   - (Un)commenting regions with configurable prefixes and indentation rules
 ;;   - Special comments like doc strings and separators
@@ -137,6 +146,13 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
+- Fix some issues in comment-region operations (preserve indentation, preserve
+  trailing whitespace where possible, region boundaries,
+  missing `f90-ts-indent-region').
+- Fix indentation after uncommenting lines in comment-region operation executed
+  on commented lines of code, with leading ampersand or statement label.
+- Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
+  for indentation selection options.
 - Improve syntax highlighting, indentation and break/join/fill for string
   literals.  This requires a proposed (but not yet merged) tree-sitter
   language grammar extension.  See README.md for more details.
@@ -237,11 +253,12 @@ associate ...) etc."
 
 
 (defconst f90-ts--indent-options-alist
-  '(("keep if aligned or align to primary column" . keep-or-primary)
-    ("keep if aligned or rotate to next column" . keep-or-rotate)
+  '(("indent to first line of statement with offset `f90-ts-indent-continued'" . continued-line)
+    ("keep if aligned or indent to first line of statement with offset `f90-ts-indent-continued'" . keep-or-continued-line)
     ("align with primary column" . primary)
-    ("indent to first line of statement with offset `f90-ts-indent-continued'" . continued-line)
-    ("rotate columns" . rotate))
+    ("keep if aligned or align to primary column" . keep-or-primary)
+    ("rotate columns" . rotate)
+    ("keep if aligned or rotate to next column" . keep-or-rotate))
   "Options for indentation of list like structures on continued lines.")
 
 
@@ -904,15 +921,16 @@ seem to make much sense."
   "F90 Tree-sitter Mode."
   ;; Modify
   [["Indentation, break & join"
-    ("L"   "Indent list line:"          f90-ts-transient--indent-list-line)
-    ("TAB" "Indent line"                f90-ts-indent-and-complete-line)
-    ("s"   "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
-    ("I"   "Indent & complete region"   f90-ts-indent-and-complete-region)
-    ("E"   "Smart end complete region"  f90-ts-complete-smart-end-region)
-    ("b"   "Break line"                 f90-ts-break-line)
-    ("j"   "Join with previous line"    f90-ts-join-line-prev)
-    ("J"   "Join with next line"        f90-ts-join-line-next)
-    ("C-s" "Shift line break"           f90-ts-shift-line-break)]
+    ("L"     "Indent list line:"          f90-ts-transient--indent-list-line)
+    ("TAB"   "Indent & comlete line"      f90-ts-indent-and-complete-line)
+    ("s"     "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
+    ("I"     "Indent & complete region"   f90-ts-indent-and-complete-region)
+    ("C-TAB" "Indent line"                f90-ts-indent-line)
+    ("C-I"   "Indent region"              f90-ts-indent-region)
+    ("b"     "Break line"                 f90-ts-break-line)
+    ("j"     "Join with previous line"    f90-ts-join-line-prev)
+    ("J"     "Join with next line"        f90-ts-join-line-next)
+    ("C-s"   "Shift line break"           f90-ts-shift-line-break)]
    ["Mark and (un)comment region"
     ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
     ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
@@ -1144,6 +1162,16 @@ If NODE is non-nil, return line number at which start position is
 located, otherwise return line number of current point position."
   (or (and node (f90-ts--node-line node))
       (line-number-at-pos)))
+
+
+(defun f90-ts--common-prefix-length (str pos)
+  "Return length of the common prefix of STR and buffer text at POS."
+  (cl-loop
+   for i below (length str)
+   while (and (< (+ pos i) (point-max))
+              (eq (aref str i)
+                  (char-after (+ pos i))))
+   finally return i))
 
 
 (defun f90-ts--node-length (node)
@@ -3099,7 +3127,7 @@ Use cached value or compute using cached node and parent."
 
 (defvar-local f90-ts--continued-line-cache nil
   "Cache for continued-line anchor indentation.
-The cache is an alist with entries (LINE . (BOL-COL DELTA))
+The cache is an alist with entries (LINE . (COL-CACHED DELTA))
 for already indented lines of a continued statement.
 
 For alignment operations, we need node column numbers of nodes on
@@ -3114,14 +3142,14 @@ the delta is not known and initially stored as DELTA=0.  Once we detect a
 flush, we can compute the delta and add it to all cached lines.  This is
 necessary to have consistent indentation across all previous lines
 
-The cache also stores BOL-COL to detect, whether internal indentation
+The cache also stores COL-CACHED to detect, whether internal indentation
 buffer of `treesit-indent-region' has already been flushed for a line.
 
-As mentioned above, the cache is an alist (LINE . (BOL-COL DELTA)),
-mapping buffer LINE numbers to BOL-COL and DELTA, where:
-  BOL-COL: indentation column at cache time, used as flush detector:
-           if current indentation at line == BOL-COL, line is not yet
-           flushed
+As mentioned above, the cache is an alist (LINE . (COL-CACHED DELTA)),
+mapping buffer LINE numbers to COL-CACHED and DELTA, where:
+  COL-CACHED: indentation column at cache time, used as flush detector:
+              if current indentation at line == COL-CACHED, line is not yet
+              flushed
   DELTA:   delta of original to new indentation, if line is not
            flushed, then the column after applying indentation is
            column number of node + DELTA,
@@ -3129,7 +3157,7 @@ mapping buffer LINE numbers to BOL-COL and DELTA, where:
            column
 
 The first line of the statement initially is stored with DELTA=0 and
-current BOL-COL.  For each new line, the current indentation of the
+current COL-CACHED.  For each new line, the current indentation of the
 first line is checked and if a buffer flush is detected, the applied
 delta is computed and added to the delta of all subsequent cached
 lines.
@@ -3139,81 +3167,101 @@ whether `indent-region' or a line variant is in use.  The cache is
 required only if `indent-region' with buffering is done.")
 
 
+(defun f90-ts--continued-line-cache-lookup (pos)
+  "Return entry associated with line at POS.
+If there is no entry, then return current indentation with DELTA=0.
+This is equivalent to no indentation at this line.  This is necessary for lines,
+which are part of a continued line but not part of the marked region currently
+processed.  For such lines, the returned value makes sense."
+  (if-let* ((line (line-number-at-pos pos))
+            (entry (assq line f90-ts--continued-line-cache)))
+      (cdr entry)
+    (list (f90-ts--indentation-at-pos pos) 0)))
+
+
 (defun f90-ts--continued-line-cache-reset ()
   "Reset the continued-line indentation cache."
   (setq f90-ts--continued-line-cache nil))
 
 
-(defun f90-ts--continued-line-cache-put-first (bol)
+(defun f90-ts--continued-line-cache-put-first (pos)
   "Store a cache entry for the first line of a continued statement.
-BOL is the beginning of that line.  Always store DELTA=0.
-If a flush is detected (actual BOL is different from cached BOL),
-the DELTA is computed and added to all other cached line."
+POS is a position within that line.  Always store DELTA=0.
+
+If later on a flush is detected (actual column at indentation is different
+from COL-CACHED), the DELTA is computed and added to all other cached line.
+This is done in `f90-ts--continued-line-cache-update'."
   (f90-ts--continued-line-cache-reset)
   (unless f90-ts--align-continued-variant-tab
-    (let* ((bol-col (save-excursion
-                      (goto-char bol)
-                      (current-indentation)))
-           (line (line-number-at-pos bol)))
+    (let* ((col-cached (f90-ts--indentation-at-pos pos))
+           (line (line-number-at-pos pos)))
       (setq f90-ts--continued-line-cache
-            (list (cons line (list bol-col 0)))))))
+            (list (cons line (list col-cached 0)))))))
 
 
-(defun f90-ts--continued-line-cache-put-subsequent (bol anchor offset)
-  "Compute and store the indent delta for a subsequent line at BOL.
+(defun f90-ts--continued-line-cache-put-subsequent (pos anchor offset)
+  "Compute and store the indent delta for a subsequent line at POS.
 ANCHOR is the anchor position returned by the anchor function.
 OFFSET is the offset from that anchor.
-Resolves delta via the anchor's cache entry:
-  delta = delta-at-anchor-line + OFFSET"
+The delta is computed as:
+  delta = delta-at-anchor-line + OFFSET,
+where delta-at-anchor-line is taken from the cache entry at the anchor line."
   (unless f90-ts--align-continued-variant-tab
-    (let* ((anchor-line (line-number-at-pos anchor))
-           (anchor-col (f90-ts--column-number-at-pos anchor))
-           (anchor-entry (cdr (assq anchor-line f90-ts--continued-line-cache)))
-           (anchor-delta (if anchor-entry (cadr anchor-entry) 0))
-           (bol-current  (f90-ts--indentation-at-pos bol))
-           (bol-new (+ anchor-col anchor-delta offset))
-           (delta (- bol-new bol-current))
-           (line (line-number-at-pos bol)))
-      (push (cons line (list bol-current delta))
+    (let* ((anchor-col (f90-ts--column-number-at-pos anchor))
+           (anchor-entry (f90-ts--continued-line-cache-lookup anchor))
+           (anchor-delta (cadr anchor-entry))
+           (col-current  (f90-ts--indentation-at-pos pos))
+           (col-new (+ anchor-col anchor-delta offset))
+           (delta (- col-new col-current))
+           (line (line-number-at-pos pos)))
+      (push (cons line (list col-current delta))
             f90-ts--continued-line-cache))))
 
 
-(defun f90-ts--continued-line-cache-get-first ()
-  "Find entry for first line (smallest line number) in the cache.
-Cache is reverese ordered, so we can simply return the last entry."
+(defun f90-ts--continued-line-cache-get-first (first-pos)
+  "Find entry for line at FIRST-POS in the cache.
+This is the first line of the continued statement.
+The cache is reverese ordered, so this is the last entry, if present.
+If not present, a fake entry with current indentation at first line
+and delta=0 is returned.  This happens if the region does not contain
+the first line."
   ;; cache is constructed by push, the last entry is the first line
-  (car (last f90-ts--continued-line-cache)))
-  ;; (cl-loop for line-entry in f90-ts--continued-line-cache
-  ;;          for line-min = line-entry then (if (< (car line-entry) (car line-min))
-  ;;                                             line-entry
-  ;;                                           line-min)
-  ;;          finally return line-min)
+  (let ((first-line (line-number-at-pos first-pos))
+        (entry (car (last f90-ts--continued-line-cache))))
+    (if (and entry
+             (= (car entry) first-line))
+        ;; first line has been processed and is in the cache
+        entry
+      ;; construct a fake entry signalling that first line of continued
+      ;; statement keeps it current indentation
+      (cons first-line
+            (list (f90-ts--indentation-at-pos first-pos) 0)))))
 
 
 (defun f90-ts--continued-line-cache-update (first-pos)
-  "Check whether first line at FIRST-POS has been flush.
-This is the case if current bol and cached bol are different.
-If it has, update the entry and apply delta to all other cached lines.
+  "Check whether first line at FIRST-POS was flushed.
+This is the case if current column and cached column are different.
+If it was, update the entry and apply delta to all other cached lines.
 Argument FIRST-POS is used to jump to this line efficiently (jumping
-to a line is more expensive)."
+to a line by line number is far more expensive)."
   (unless f90-ts--align-continued-variant-tab
-    (let* ((first (f90-ts--continued-line-cache-get-first))
+    (let* ((first (f90-ts--continued-line-cache-get-first first-pos))
            (first-line (car first))
-           (first-bol-col (cadr first))
-           (first-bol-current (f90-ts--indentation-at-pos first-pos))
-           (first-delta (- first-bol-current first-bol-col)))
+           (first-col-cached (cadr first))
+           (first-col-current (f90-ts--indentation-at-pos first-pos))
+           (first-delta (- first-col-current first-col-cached)))
       ;; indentation of first line has been flushed, add delta to all
       ;; other lines
-      (when (/= first-bol-col first-bol-current)
+      (when (/= first-col-cached first-col-current)
         (setq f90-ts--continued-line-cache
               (seq-map (lambda (entry)
                          (let ((line (car entry))
-                               (bol-col (cadr entry))
+                               (col-cached (cadr entry))
                                (delta (caddr entry)))
                            (cons line
                                  (if (= line first-line)
-                                     (list first-bol-current 0)
-                                   (list bol-col (+ delta first-delta))))))
+                                     (list first-col-current 0)
+                                   (list col-cached (+ delta first-delta))))))
                        f90-ts--continued-line-cache))))))
 
 
@@ -3238,20 +3286,19 @@ otherwise return column as is."
     (if f90-ts--align-continued-variant-tab
         ;; line based indentation, no caching
         col
-      (let* ((line (line-number-at-pos pos))
-             (entry (cdr (assq line f90-ts--continued-line-cache)))
+      (let* ((entry (f90-ts--continued-line-cache-lookup pos))
              (delta (cadr entry))
-             (bol-col (car entry))
-             (bol-current (f90-ts--indentation-at-pos pos)))
+             (col-cached (car entry))
+             (col-current (f90-ts--indentation-at-pos pos)))
 
         ;;(f90-ts-log-msg :cachecol "line, entry, delta = %s, %s, %s" line entry delta)
-        ;;(f90-ts-log-msg :cachecol "bol col, current = %s, %s" bol-col bol-current)
+        ;;(f90-ts-log-msg :cachecol "col: cached, current = %s, %s" col-cached col-current)
 
         (cl-assert entry
                    nil
                    "no entry for line in cache, line=%s, cache=%s"
-                   line f90-ts--continued-line-cache)
-        (if (= bol-col bol-current)
+                   (line-number-at-pos pos) f90-ts--continued-line-cache)
+        (if (= col-cached col-current)
             ;; not yet flushed
             (+ col delta)
           col)))))
@@ -4501,23 +4548,27 @@ selected."
             (cdar col-pos-off))))
 
      ;; cases: (not-aligned, keep-or-primary),
+     ;;        (not-aligned, keep-or-continued-line),
      ;;        (aligned, primary), (not-aligned, primary)
      ((or (not aligned-at)
           (eq variant 'primary))
+      ;; not that for keep-or-continued-line, primary is forced to continued line offset
       (cdr primary-col-pos-off))
 
      ;; cases: (aligned, keep-or-primary)
      ;;        (aligned, keep-or-rotate)
+     ;;        (aligned, keep-or-continued-line)
      ((and aligned-at
            (member variant '(keep-or-primary
-                             keep-or-rotate)))
+                             keep-or-rotate
+                             keep-or-continued-line)))
       ;; aligned, keep current column, but use proper element from col-pos-off
       ;; as anchor, otherwise indent-region does not take indentation of anchor
       ;; position into account
       (cdr aligned-at))
 
      (t
-      ;; all eight cases plus node before minimal column are covered above
+      ;; all ten cases plus node before minimal column are covered above
       (cl-assert col-pos-off nil "cond logic not complete")
       (cdr primary-col-pos-off)))))
 
@@ -4601,9 +4652,12 @@ Finally use VARIANT to select one pair to align with."
          ;; always add default continued offset position as anchor
          (anoff-continued (f90-ts--align-list-pstmt1-anoff))
          ;; anoff-primary is used as 'primary' in keep-or-primary, primary etc.
-         ;; if anoff-other is empty (should not happen), then use anoff-continued as fallback
-         (anoff-primary (or (car anoff-other)
-                            anoff-continued))
+         ;; if anoff-other is empty (should not happen) or variant is 'keep-or-continued-line,
+         ;; then use anoff-continued as primary anchor
+         (anoff-primary (if (eq variant 'keep-or-continued-line)
+                            anoff-continued
+                          (or (car anoff-other)
+                              anoff-continued)))
          ;; final list of anchors (which are nodes or pairs (position offset))
          (anoff-final (append (and anoff-continued (list anoff-continued))
                               anoff-other
@@ -5770,8 +5824,19 @@ Return a vector (one entry per line) of values as returned by
 `f90-ts--indent-blank-leading-amp-or-label-line'."
   (save-excursion
     (goto-char beg)
-    (let* ((line-beg (line-number-at-pos beg))
-           (line-end (line-number-at-pos end))
+    (when (looking-at-p "[ \t]*$")
+      (forward-line 1))
+    (let* ((line-beg (line-number-at-pos (point)))
+           (line-end-aux (line-number-at-pos end))
+           ;; if at beginning of line, this line should be excluded,
+           ;; this comes from the loop (while (< (point) end) ... (forward-line 1))
+           ;; used in indentation, but we need number of lines before hand, so we
+           ;; explicitely step back one line
+           (line-end (save-excursion
+                       (goto-char end)
+                       (if (bolp)
+                           (1- line-end-aux)
+                         line-end-aux)))
            (n-lines  (- line-end line-beg -1))
            (vec      (make-vector n-lines nil)))
       ;; after blanking loop, each element of the vector vec will be one of:
@@ -5797,7 +5862,9 @@ VEC is a vector as returned by
 `f90-ts--indent-blank-leading-amp-or-label-region'."
   (save-excursion
     (goto-char beg)
-    (let ((line-beg (line-number-at-pos beg)))
+    (when (looking-at-p "[ \t]*$")
+      (forward-line 1))
+    (let ((line-beg (line-number-at-pos (point))))
       (cl-loop
        for line from line-beg
        for amp-or-label across vec
@@ -5812,13 +5879,15 @@ VEC is a vector as returned by
 
 (defun f90-ts--indent-line-aux (&optional variant)
   "Indent a single line.
-This is the default function for indentation of a single line.  Smart end
-completion or other extra stuff is not executed by this function.
+This is the default wrapper to invoke `treesit-indent' for indentation of a
+single line.  Smart end completion or other extra stuff is not executed by
+this function.
 If provided VARIANT is the variant symbol for how to compute alignment in
 multi-line statements.  Default value is `f90-ts-indent-list-line'.
-Optional leading ampersands on continuation lines are temporarily
-removed before calling `treesit-indent' and then restored at the
-column determined by `f90-ts-leading-ampersand-style'."
+
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'."
   (let ((f90-ts--align-continued-variant-tab
          (or variant f90-ts-indent-list-line))
         (amp-or-label (f90-ts--indent-blank-leading-amp-or-label-line)))
@@ -5829,6 +5898,29 @@ column determined by `f90-ts-leading-ampersand-style'."
     ;; is non-nil)
     (save-excursion
       (f90-ts--indent-restore-leading-amp-or-label-line amp-or-label))))
+
+
+(defun f90-ts--indent-region-aux (beg-marker end-marker)
+  "Indent region from BEG-MARKER to END-MARKER.
+This is the default wrapper to invoke `treesit-indent-region' for indentation
+of a region.  Smart end completion or other extra stuff is not executed by
+this function.
+
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent-region', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'.
+
+Internally the continued-line cache is reset, so that regions, which cover only
+part of a continued line, can be indented correctly."
+  (let ((vec (f90-ts--indent-blank-leading-amp-or-label-region
+              beg-marker end-marker)))
+    (f90-ts--continued-line-cache-reset)
+    (treesit-indent-region beg-marker end-marker)
+    ;; restore ampersands or labels: beg-marker still points to the
+    ;; first line (insertion-type nil keeps it before any text
+    ;; treesit-indent may have inserted at the start).
+    (f90-ts--indent-restore-leading-amp-or-label-region
+     beg-marker vec)))
 
 
 (defun f90-ts--indent-and-complete-line-aux (variant indent-struct)
@@ -5847,20 +5939,27 @@ completion."
   "Apply indent region from begin of line at BEG to end of line at END.
 Return true if the region was already properly indented (nothing was
 changed)."
-  (let ((beg-reg (save-excursion
-                   (goto-char beg)
-                   (line-beginning-position)))
-        (end-reg (save-excursion
-                   (goto-char end)
-                   (line-end-position))))
-    (let ((old-text (buffer-substring-no-properties beg-reg end-reg))
-          (vec (f90-ts--indent-blank-leading-amp-or-label-region beg-reg end-reg)))
-      (treesit-indent-region beg-reg end-reg)
-      (f90-ts--indent-restore-leading-amp-or-label-region beg-reg vec)
-      ;; place point properly on last line, but where does treesit-indent-region and
-      ;; the restore function (which uses a save-excursion) put point?
-      (skip-chars-forward "& \t")
-      (string= old-text (buffer-substring-no-properties beg-reg end-reg)))))
+  (let (beg-marker end-marker)
+    (unwind-protect
+        (progn
+          ;; beg marker should stay before inserted text
+          ;; end marker should stay after inserted text
+          (let ((beg-reg (save-excursion
+                           (goto-char beg)
+                           (line-beginning-position)))
+                (end-reg (save-excursion
+                           (goto-char end)
+                           (line-end-position))))
+            (setq beg-marker (copy-marker beg-reg))
+            (setq end-marker (copy-marker end-reg t))
+            (let ((old-text (buffer-substring-no-properties beg-reg end-reg)))
+              (f90-ts--indent-region-aux beg-marker end-marker)
+              ;; place point properly on last line, but where does treesit-indent-region and
+              ;; the restore function (which uses a save-excursion) put point?
+              (skip-chars-forward "& \t")
+              (string= old-text (buffer-substring-no-properties beg-marker end-marker)))))
+      (when beg-marker (set-marker beg-marker nil))
+      (when end-marker (set-marker end-marker nil)))))
 
 
 (defun f90-ts--indent-and-complete-region-aux (beg end)
@@ -5877,15 +5976,7 @@ completion for a region, like indent-stmt operations on an end struct line."
           (setq end-marker (copy-marker end t))
           (f90-ts--with-check-modified-region beg-marker end-marker
             (f90-ts-complete-smart-end-region beg-marker end-marker)
-            ;; remove leading ampersands, saving which lines had them
-            (let ((vec (f90-ts--indent-blank-leading-amp-or-label-region
-                        beg-marker end-marker)))
-              (treesit-indent-region beg-marker end-marker)
-              ;; restore ampersands or labels: beg-marker still points to the
-              ;; first line (insertion-type nil keeps it before any text
-              ;; treesit-indent may have inserted at the start).
-              (f90-ts--indent-restore-leading-amp-or-label-region
-               beg-marker vec))))
+            (f90-ts--indent-region-aux beg-marker end-marker)))
       (when beg-marker (set-marker beg-marker nil))
       (when end-marker (set-marker end-marker nil)))))
 
@@ -6013,6 +6104,31 @@ no abort mechanism for `treesit-search-foward'."
       (set-marker end-marker nil))))
 
 
+(defun f90-ts-indent-region (beg end)
+  "Indent region from BEG to END.
+It is based on the treesitter tree overlapping that region.
+
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent-region', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'."
+  (interactive
+   (if (use-region-p)
+       (list (region-beginning) (region-end))
+     (list (point-min) (point-max))))
+
+  (let (beg-marker end-marker)
+    (unwind-protect
+        (progn
+          ;; beg marker should stay before inserted text
+          ;; end marker should stay after inserted text
+          (setq beg-marker (copy-marker beg))
+          (setq end-marker (copy-marker end t))
+          (f90-ts--with-check-modified-region beg-marker end-marker
+            (f90-ts--indent-region-aux beg-marker end-marker)))
+      (when beg-marker (set-marker beg-marker nil))
+      (when end-marker (set-marker end-marker nil)))))
+
+
 (defun f90-ts-indent-and-complete-region (beg end)
   "Indent region and execute smart end completion in region from BEG to END.
 It is based on the treesitter tree overlapping that region.
@@ -6031,9 +6147,9 @@ hence indentation as well as smart end completion both work.  However,
 the keyword \"function\" after \"end\" starts a new function and muddles the
 subsequent tree.
 
-Leading ampersands on continuation lines are temporarily removed before
-calling `treesit-indent-region' and restored afterwards at the column
-determined by `f90-ts-leading-ampersand-style'."
+Leading ampersands and statement labels on continuation lines are temporarily
+removed before calling `treesit-indent-region', and restored afterwards at the
+determined by `f90-ts-leading-ampersand-style' and `f90-ts-stmt-label-column'."
   (interactive
    (if (use-region-p)
        (list (region-beginning) (region-end))
@@ -7734,25 +7850,50 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
 ;;;-----------------------------------------------------------------------------
 ;;; Comment region using some prefix
 
+(defun f90-ts--comment-region-ins-del-line (prefix prefix-trimmed uncomment-re)
+  "Insert or delete comment PREFIX on the current line.
+PREFIX-TRIMMED is the trimmed PREFIX and UNCOMMENT-RE is a regexp to match
+the prefix for uncommenting the line if already commented."
+  (cond
+   ((looking-at uncomment-re)
+    (let ((m-beg (match-beginning 1)))
+      (if f90-ts-comment-prefix-keep-indent
+          ;; preserve current indentation
+          (let ((m-end (match-end 1)))
+            (delete-region m-beg m-end)
+            (goto-char m-beg)
+            (insert (make-string (- m-end m-beg) ?\s)))
+        ;; remove prefix, including trailing blanks, as best as possible
+        (let ((prefix-end (+ m-beg
+                             (f90-ts--common-prefix-length prefix m-beg))))
+          (delete-region m-beg prefix-end))))
+    ;; there is no way (in particular in conjunction with comment prefixes which
+    ;; are indented like code [option "indent"]) to preserve original amount of
+    ;; trailing blanks, to avoid build up of trailing blanks in comment-uncomment
+    ;; cycle, delete blanks on empty lines
+    (when (f90-ts--point-on-empty-line-p)
+      (delete-region (line-beginning-position) (line-end-position))))
+
+   ((= (line-beginning-position) (line-end-position))
+    ;; avoid trailing blanks on empty lines, but preserve trailing blanks
+    ;; if present
+    (insert prefix-trimmed))
+
+   (t
+    (insert prefix))))
+
+
 (defun f90-ts--comment-region-ins-del (beg end prefix)
   "Insert or delete PREFIX at each line between BEG and END."
   (let* ((prefix-trimmed (string-trim-right prefix))
          (prefix-trimmed-re (regexp-quote prefix-trimmed))
-         (uncomment-re (concat "\\s-*\\(?1:" prefix-trimmed-re "\\)")))
+         (uncomment-re (concat "[ \t]*\\(?1:" prefix-trimmed-re "\\)")))
     (goto-char beg)
     (beginning-of-line)
     (cl-loop
-     do (cond
-         ((looking-at uncomment-re)
-          (delete-region (match-beginning 1) (match-end 1))
-          (when (looking-at-p "[ \t]+$")
-            ;; after deletion, we have an empty line, remove trailing blanks
-            (delete-region (point) (line-end-position))))
-         ((looking-at-p "[ \t]*$")
-          ;; avoid trailing blanks on empty lines
-          (insert prefix-trimmed))
-         (t
-          (insert prefix)))
+     do (f90-ts--comment-region-ins-del-line prefix
+                                             prefix-trimmed
+                                             uncomment-re)
      while (and (zerop (forward-line 1))
                 (< (point) end)))))
 
@@ -7760,45 +7901,45 @@ Otherwise mark the region spanned by the node itself (like enlarge-region)."
 (defun f90-ts--comment-region-adjust (beg end prefix)
   "Adjust indentation of code between BEG and END commented by PREFIX.
 After pasting PREFIX and indenting the commented region, the commented code
-is adjusted to preserve original indentation as far as possible.  This also
-depends on option `f90-ts-comment-prefix-keep-indent'.  This also takes into
+is adjusted to preserve original indentation as far as possible.
+This depends on option `f90-ts-comment-prefix-keep-indent'.  It also takes into
 account, that different types of prefixes might be indented differently,
 depending on `f90-ts-special-comment-rules'."
-    (goto-char end)
-    ;; if end marker is at end of line, skip that line
-    (if (bolp)
-        (forward-line -1)
-      (beginning-of-line))
+  (goto-char end)
+  ;; if end marker is at end of line, skip that line
+  (if (bolp)
+      (forward-line -1)
+    (beginning-of-line))
 
-    (let* ((prefix-re (regexp-quote prefix))
-           (adjust-re (concat "\\(?1:\\(?2:\\s-*\\)" prefix-re "\\)\\(?3:\\s-*\\)"))
-           (min-len-after
-            ;; determine maximal number of blanks we can delete in each line safely,
-            ;; using the same number for each line preserves relative indentation
-            (cl-loop
-             do (beginning-of-line)
-             if (looking-at adjust-re)
-             minimize (let* ((cap-group-before (if f90-ts-comment-prefix-keep-indent 1 2))
-                             (len-before (length (match-string cap-group-before)))
-                             (after (match-string 3)))
-                        (min len-before (length after)))
-             while (and (> (point) beg)
-                        (zerop (forward-line -1))))))
+  (let* ((prefix-re (regexp-quote prefix))
+         (adjust-re (concat "\\(?1:\\(?2:\\s-*\\)" prefix-re "\\)\\(?3:\\s-*\\)"))
+         (min-len-after
+          ;; determine maximal number of blanks we can delete in each line safely,
+          ;; using the same number for each line preserves relative indentation
+          (cl-loop
+           do (beginning-of-line)
+           if (looking-at adjust-re)
+           minimize (let* ((cap-group-before (if f90-ts-comment-prefix-keep-indent 1 2))
+                           (len-before (length (match-string cap-group-before)))
+                           (after (match-string 3)))
+                      (min len-before (length after)))
+           while (and (> (point) beg)
+                      (zerop (forward-line -1))))))
 
-      ;; delete blanks uniformly in a second pass, but only
-      ;; if blanks can be removed at all
-      (when (and min-len-after
-                 (> min-len-after 0))
-        (goto-char end)
-        (if (bolp)
-            (forward-line -1)
-          (beginning-of-line))
-        (cl-loop
-         do (when (looking-at adjust-re)
-              (delete-region (match-beginning 3)
-                             (+ (match-beginning 3) min-len-after)))
-         while (and (> (point) beg)
-                    (zerop (forward-line -1)))))))
+    ;; delete blanks uniformly in a second pass,
+    ;; but only if blanks can be removed at all
+    (when (and min-len-after
+               (> min-len-after 0))
+      (goto-char end)
+      (if (bolp)
+          (forward-line -1)
+        (beginning-of-line))
+      (cl-loop
+       do (when (looking-at adjust-re)
+            (delete-region (match-beginning 3)
+                           (+ (match-beginning 3) min-len-after)))
+       while (and (> (point) beg)
+                  (zerop (forward-line -1)))))))
 
 
 ;; The following code was originally adapted from `f90.el' (part of GNU Emacs).
@@ -7813,20 +7954,21 @@ If the prefix is already present, then remove it and uncomment the line.
 
 Note that prefixes are allowed to have trailing blanks.  These are inserted
 as well.  However, for uncommenting, the trimmed prefix is used."
-  (let ((beg (copy-marker beg-region))
-        (end (copy-marker end-region t)))
+  (let (beg-marker end-marker)
     (unwind-protect
         (progn
+          (setq beg-marker (copy-marker beg-region))
+          (setq end-marker (copy-marker end-region t))
           ;; pass 1 (insert/delete comment prefix)
-          (f90-ts--comment-region-ins-del beg end prefix)
+          (f90-ts--comment-region-ins-del beg-marker end-marker prefix)
           ;; pass 2
-          (treesit-indent-region beg end)
+          (f90-ts--indent-region-aux beg-marker end-marker)
           ;; pass 3 (adjust indentation within commented part)
-          (f90-ts--comment-region-adjust beg end prefix)
+          (f90-ts--comment-region-adjust beg-marker end-marker prefix)
 
-          (goto-char end))
-      (set-marker beg nil)
-      (set-marker end nil))))
+          (goto-char end-marker))
+      (set-marker beg-marker nil)
+      (set-marker end-marker nil))))
 
 
 (defun f90-ts-comment-region-default (beg-region end-region)
@@ -8764,7 +8906,11 @@ package `markdown-mode' are available, then use these."
   "Display information about `f90-ts-mode'."
   (interactive)
   (with-help-window "*About f90-ts-mode*"
-    (princ (format "f90-ts-mode %s\n\n" f90-ts-mode-version))
+    (let ((version-line (format "version: f90-ts-mode %s" f90-ts-mode-version)))
+      (princ version-line)
+      (princ "\n")
+      (princ (make-string (string-width version-line) ?-))
+      (princ "\n"))
     (princ f90-ts--about-text)
     (princ "\nRepository:\n")
     (princ f90-ts--github-url)

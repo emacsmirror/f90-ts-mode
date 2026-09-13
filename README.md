@@ -14,7 +14,16 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Recently added, changed or improved
 
 **09-2026**
- - Syntax highlighting, indentation, break/join/fill etc. for string literals improved.
+- Fix some issues in comment-region operations (preserve indentation, preserve
+  trailing whitespace where possible, region boundaries,
+  missing `f90-ts-indent-region').
+- Fix some issues in comment-region operations (preserve indentation, preserve
+  trailing whitespace where possible).
+- Fix indentation after uncommenting lines in comment-region operation executed
+  on commented lines of code, with leading ampersand or statement label.
+- Add (missing) option `keep-or-continued-line` to `f90-ts--indent-options-alist`
+  for indentation selection options.
+- Syntax highlighting, indentation, break/join/fill etc. for string literals improved.
    This requires a proposed (but not yet merged) tree-sitter language grammar extension.
    See issues [Continued strings at grammar repo](https://github.com/stadelmanma/tree-sitter-fortran/issues/193)
    and [Continued strings at mode repo](https://github.com/mscfd/emacs-f90-ts-mode/issues/127),

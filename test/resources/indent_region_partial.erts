@@ -135,3 +135,189 @@ subroutine foo
 |end
 
 =-=-=
+
+Name: continued line partial 1
+=-=
+! first line is missing
+subroutine sub()
+     call foo(arg1, &
+|   arg2, &
+@              arg3)
+end subroutine sub
+=-=
+! first line is missing
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+|              arg3)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 2
+=-=
+! first and second line are missing
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+|   arg2, &
+    arg3, &
+@              arg5)
+end subroutine sub
+=-=
+! first and second line are missing
+subroutine sub()
+     call foo(arg1, &
+              arg2, &
+              arg2, &
+              arg3, &
+|              arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 3
+=-=
+! keep alignment even if outside of marked region
+subroutine sub()
+     call foo(arg1, &
+                arg2, &
+|   arg3, &
+                arg4, &
+@              arg5)
+end subroutine sub
+=-=
+! keep alignment even if outside of marked region
+subroutine sub()
+     call foo(arg1, &
+                arg2, &
+              arg3, &
+                arg4, &
+|              arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 4
+=-=
+! keep leading ampersand
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+|   &arg2, &
+    &arg3, &@
+   &           arg5)
+end subroutine sub
+=-=
+! keep leading ampersand
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+        &     arg2, &
+        &     arg3, &|
+   &           arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 5
+=-=
+! do not modify leading ampersand if end is at bol
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+|   &arg2, &
+    &arg3, &
+@   &           arg5)
+end subroutine sub
+=-=
+! do not modify leading ampersand if end is at bol
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+        &     arg2, &
+        &     arg3, &
+|   &           arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 6
+=-=
+! do modify leading ampersand if end is not at bol
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+ |  &arg2, &
+    &arg3, &
+ @   &          arg5)
+end subroutine sub
+=-=
+! do modify leading ampersand if end is not at bol
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+        &     arg2, &
+        &     arg3, &
+ |       &      arg5)
+end subroutine sub
+=-=-=
+
+
+Name: continued line partial 7
+=-=
+! do not modify line if beg is after last character on line
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &  |  
+   &arg2, &
+    &arg3, &
+@   &           arg5)
+end subroutine sub
+=-=
+! do not modify line if beg is after last character on line
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &    
+        &     arg2, &
+        &     arg3, &
+|   &           arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 8
+=-=
+! do modify line if beg is not after last character on line
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+   &arg2,| &
+    &arg3, &
+ @   &          arg5)
+end subroutine sub
+=-=
+! do modify line if beg is not after last character on line
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &
+        &     arg2, &
+        &     arg3, &
+ |       &      arg5)
+end subroutine sub
+=-=-=
+
+Name: continued line partial 9
+=-=
+! do nothing if region is within trailing whitespaces
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &  |  @  
+   &arg2, &
+    &arg3, &
+    &          arg5)
+end subroutine sub
+=-=
+! do nothing if region is within trailing whitespaces
+subroutine sub()
+     call foo(arg1, &
+    &          arg2, &    |  
+   &arg2, &
+    &arg3, &
+    &          arg5)
+end subroutine sub
+=-=-=
