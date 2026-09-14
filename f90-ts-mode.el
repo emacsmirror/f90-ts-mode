@@ -34,7 +34,9 @@
 ;; Recently changed, added or improved:
 ;;   [09-2026] Fix some issues in comment-region operations (preserve
 ;;             indentation, preserve trailing whitespace where possible,
-;;             region boundaries, missing `f90-ts-indent-region').
+;;             keep existing alignment with keep options, do not operate
+;;             outside of region boundaries, add missing function
+;;             `f90-ts-indent-region').
 ;;   [09-2026] Fix indentation after uncommenting lines in comment-region
 ;              operation executed on commented lines of code, with leading
 ;;             ampersand or statement label.
@@ -146,9 +148,10 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
-- Fix some issues in comment-region operations (preserve indentation, preserve
-  trailing whitespace where possible, region boundaries,
-  missing `f90-ts-indent-region').
+- Fix some issues in comment-region operations (preserve indentation,
+  preserve trailing whitespace where possible, keep existing alignment
+  with keep options, do not operate outside of region boundaries, add
+  missing function `f90-ts-indent-region').
 - Fix indentation after uncommenting lines in comment-region operation executed
   on commented lines of code, with leading ampersand or statement label.
 - Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
@@ -3260,7 +3263,7 @@ to a line by line number is far more expensive)."
                                (delta (caddr entry)))
                            (cons line
                                  (if (= line first-line)
-                                     (list first-col-current 0)
+                                     (list first-col-current delta)
                                    (list col-cached (+ delta first-delta))))))
                        f90-ts--continued-line-cache))))))
 
@@ -3274,7 +3277,7 @@ It is allowed to be negative.  If the resulting column becomes negative,
 then it is bounded by zero.
 
 Lookup the cache for the line anchor is placed on.  If current and cached
-indentation is equal, then apply cached delta to current column,
+indentation are equal, then apply cached delta to current column,
 otherwise return column as is."
   (let* ((anchor (car anoff))
          (offset (cdr anoff))
@@ -3290,10 +3293,8 @@ otherwise return column as is."
              (delta (cadr entry))
              (col-cached (car entry))
              (col-current (f90-ts--indentation-at-pos pos)))
-
         ;;(f90-ts-log-msg :cachecol "line, entry, delta = %s, %s, %s" line entry delta)
         ;;(f90-ts-log-msg :cachecol "col: cached, current = %s, %s" col-cached col-current)
-
         (cl-assert entry
                    nil
                    "no entry for line in cache, line=%s, cache=%s"
@@ -3302,6 +3303,30 @@ otherwise return column as is."
             ;; not yet flushed
             (+ col delta)
           col)))))
+
+
+(defun f90-ts--continued-line-cache-get-orig (col pos)
+  "Return the original column of COL at position POS in a continued statement.
+
+The function looks up the cache at the line given by POS.  If current and
+cached indentation are not equal, and hence indentation changes have been
+flushed by the treesit indent engine, it subtracts cached delta to revert
+column to the original indentation."
+  (if f90-ts--align-continued-variant-tab
+      ;; line based indentation, no caching
+      col
+    (let* ((entry (f90-ts--continued-line-cache-lookup pos))
+           (delta (cadr entry))
+           (col-cached (car entry))
+           (col-current (f90-ts--indentation-at-pos pos)))
+        (cl-assert entry
+                   nil
+                   "no entry for line in cache, line=%s, cache=%s"
+                   (line-number-at-pos pos) f90-ts--continued-line-cache)
+        (if (= col-cached col-current)
+            ;; not yet flushed
+            (- col delta)
+          col))))
 
 
 ;;++++++++++++++
@@ -4503,9 +4528,24 @@ buffer position."
     (seq-sort (lambda (a b) (< (car a) (car b))) cpo-list-unique)))
 
 
-(defun f90-ts--align-list-select (variant cur-col primary items)
+(defun f90-ts--align-list-aligned-p (cpo col-cur)
+  "Check whether item provided by tuple CPO was aligned at COL-CUR.
+Current column COL-CUR is the column number at line to be indented.
+CPO = (COLUMN POSITION OFFSET) represents a potential anchor with offset on a
+previous line.  POSITION is serves as anchor and column is the resulting
+column, after applying OFFSET.
+In order to preserve existing alignment, the current column COL-CUR must be
+compared with the original column of the item represented by CPO.  This depends
+on the flush state of the internal buffer of the treesit indent engine."
+  (let* ((col-item (car cpo))
+         (pos (cadr cpo))
+         (col-orig (f90-ts--continued-line-cache-get-orig col-item pos)))
+    (= col-cur col-orig)))
+
+
+(defun f90-ts--align-list-select (variant col-cur primary items)
   "Select (anchor offset) from PRIMARY and ITEMS.
-Depending on VARIANT and current column CUR-COL, select the relevant
+Depending on VARIANT and current column COL-CUR, select the relevant
 anchor and offset.
 
 PRIMARY is a default/fallback anchor (position offset).  Depending on
@@ -4513,12 +4553,17 @@ VARIANT (like keep-or-primary) and current alignment, PRIMARY is
 selected."
   ;; note that entries in col-pos are triples
   ;; cpo = (column position offset),
-  ;; where buffer position must be start of a previous node to ensure
-  ;; that treesitter buffering in indent-region works as expected,
+  ;; where any position in the list must be the start of a previous node
+  ;; to ensure that treesitter buffering in indent-region works as expected,
   (let* ((col-pos-off-unsorted (seq-map #'f90-ts--align-list-map-col-pos-off items))
+         ;; alignment check needs the unsorted list, as sorting also removes double
+         ;; entries resulting in the same column AFTER indentation, but aligned-at
+         ;; checks the original column
+         (aligned-at (seq-find (lambda (cpo)
+                                 (f90-ts--align-list-aligned-p cpo col-cur))
+                               col-pos-off-unsorted))
+         ;; sort and uniquify the list, keep only one entry per resulting column
          (col-pos-off (f90-ts--align-list-cpo-sort col-pos-off-unsorted))
-         (aligned-at (seq-find (lambda (cpo) (= cur-col (car cpo)))
-                               col-pos-off))
          (primary-col-pos-off (f90-ts--align-list-map-col-pos-off primary)))
     ;; :get-other-fn should always return some fallback position
     ;; (like pstmt-1+default indent for continued lines), and thus
@@ -4531,7 +4576,7 @@ selected."
      ;; special case (e.g. after inserting newline by <return> or f90-line-break)
      ;; check whether we are before first entry in col-pos-off,
      ;; if this is the case we go to primary, not to first entry in col-pos-off
-     ((< cur-col (caar col-pos-off))
+     ((< col-cur (caar col-pos-off))
       (cdr primary-col-pos-off))
 
      ;; cases: (aligned, rotate), (not-aligned, rotate),
@@ -4541,7 +4586,7 @@ selected."
                (eq variant 'keep-or-rotate)))
       ;; go to next column or wrap around,
       ;; recall that col-pos-off is sorted by columns
-      (let ((aligned-next (seq-find (lambda (cpo) (< cur-col (car cpo)))
+      (let ((aligned-next (seq-find (lambda (cpo) (< col-cur (car cpo)))
                                     col-pos-off)))
         ;; next if there is a next, otherwise first entry (not necessarily primary)
         (or (cdr aligned-next)

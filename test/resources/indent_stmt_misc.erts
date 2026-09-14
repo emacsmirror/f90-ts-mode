@@ -92,6 +92,32 @@ end
 end
 =-=-=
 
+Name: continued line statement 3
+=-=
+! .eqv. is already aligned with .and. between A2 and A4 on the first line,
+! check that it keeps aligned with that operator, and is not shadowed
+! by .and. between B1 and B2, which gets aligned at the same column,
+! but was not aligned initially
+subroutine sub()
+     if (A1 .and. A2 .and. A3 &
+                       .and. B1 .and. B2 &
+|                     .eqv. C1) then
+     end if
+end subroutine sub
+=-=
+! .eqv. is already aligned with .and. between A2 and A4 on the first line,
+! check that it keeps aligned with that operator, and is not shadowed
+! by .and. between B1 and B2, which gets aligned at the same column,
+! but was not aligned initially
+subroutine sub()
+     if (A1 .and. A2 .and. A3 &
+            .and. B1 .and. B2 &
+                     |.eqv. C1) then
+     end if
+end subroutine sub
+=-=-=
+
+
 
 Code:
   (lambda ()
