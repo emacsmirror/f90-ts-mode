@@ -32,15 +32,16 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [09-2026] Fix some issues in comment-region operations (preserve
+;;   [09-2026] Fontification of error nodes fixed if line limitting is enabled.
+;;   [09-2026] Some issues in comment-region operations fixed (preserve
 ;;             indentation, preserve trailing whitespace where possible,
 ;;             keep existing alignment with keep options, do not operate
 ;;             outside of region boundaries, add missing function
 ;;             `f90-ts-indent-region').
-;;   [09-2026] Fix indentation after uncommenting lines in comment-region
-;;             operation executed on commented lines of code, with leading
-;;             ampersand or statement label.
-;;   [09-2026] Add (missing) option `keep-or-continued-line' to
+;;   [09-2026] Indentation after uncommenting lines in comment-region
+;;             operation on commented lines of code containing leading
+;;             ampersand or statement label fixed.
+;;   [09-2026] Missing option `keep-or-continued-line' added to
 ;;             `f90-ts--indent-options-alist' for indentation selection options.
 ;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string
 ;;             literals improved.  This requires a proposed (but not yet merged)
@@ -148,14 +149,15 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
-- Fix some issues in comment-region operations (preserve indentation,
+- Fontification of error nodes fixed if line limitting is enabled.
+- Some issues in comment-region operations fixed (preserve indentation,
   preserve trailing whitespace where possible, keep existing alignment
   with keep options, do not operate outside of region boundaries, add
-  missing function `f90-ts-indent-region').
-- Fix indentation after uncommenting lines in comment-region operation executed
-  on commented lines of code, with leading ampersand or statement label.
-- Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
-  for indentation selection options.
+  missing function `f90-ts-indent-region`).
+- Indentation after uncommenting lines in comment-region operation on
+  commented lines of code containing leading ampersand or statement label fixed.
+- Missing option `keep-or-continued-line` added to
+  `f90-ts--indent-options-alist` for indentation selection options.
 - Improve syntax highlighting, indentation and break/join/fill for string
   literals.  This requires a proposed (but not yet merged) tree-sitter
   language grammar extension.  See README.md for more details.
