@@ -32,15 +32,16 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
 ;; Recently changed, added or improved:
-;;   [09-2026] Fix some issues in comment-region operations (preserve
+;;   [09-2026] Fontification of error nodes fixed if line limitting is enabled.
+;;   [09-2026] Some issues in comment-region operations fixed (preserve
 ;;             indentation, preserve trailing whitespace where possible,
 ;;             keep existing alignment with keep options, do not operate
 ;;             outside of region boundaries, add missing function
 ;;             `f90-ts-indent-region').
-;;   [09-2026] Fix indentation after uncommenting lines in comment-region
-;;             operation executed on commented lines of code, with leading
-;;             ampersand or statement label.
-;;   [09-2026] Add (missing) option `keep-or-continued-line' to
+;;   [09-2026] Indentation after uncommenting lines in comment-region
+;;             operation on commented lines of code containing leading
+;;             ampersand or statement label fixed.
+;;   [09-2026] Missing option `keep-or-continued-line' added to
 ;;             `f90-ts--indent-options-alist' for indentation selection options.
 ;;   [09-2026] Syntax highlighting, indentation and break/join/fill for string
 ;;             literals improved.  This requires a proposed (but not yet merged)
@@ -148,14 +149,15 @@ source files, based on Emacs's built-in tree-sitter support
 Recently changed, added or improved:
 
 [09-2026]
-- Fix some issues in comment-region operations (preserve indentation,
+- Fontification of error nodes fixed if line limitting is enabled.
+- Some issues in comment-region operations fixed (preserve indentation,
   preserve trailing whitespace where possible, keep existing alignment
   with keep options, do not operate outside of region boundaries, add
-  missing function `f90-ts-indent-region').
-- Fix indentation after uncommenting lines in comment-region operation executed
-  on commented lines of code, with leading ampersand or statement label.
-- Add (missing) option `keep-or-continued-line' to `f90-ts--indent-options-alist'
-  for indentation selection options.
+  missing function `f90-ts-indent-region`).
+- Indentation after uncommenting lines in comment-region operation on
+  commented lines of code containing leading ampersand or statement label fixed.
+- Missing option `keep-or-continued-line` added to
+  `f90-ts--indent-options-alist` for indentation selection options.
 - Improve syntax highlighting, indentation and break/join/fill for string
   literals.  This requires a proposed (but not yet merged) tree-sitter
   language grammar extension.  See README.md for more details.
@@ -2312,14 +2314,15 @@ rule but not for matched keywords, which are enforced with override=t."
                        'font-lock-warning-face t))))))
 
 
-(defun f90-ts--fontify-error (node _override _start _end &rest _)
+(defun f90-ts--fontify-error (node override start end &rest _)
   "Add error fontification for span of NODE if enabled and applicable.
 If `f90-ts-font-lock-error-show' is non-nil, and NODE of type \"ERROR\" has
 no other error node has descendant, then the function appends
 `f90-ts-font-lock-error-face' to existing font-lock face.
 Often an error results in several \"ERROR\" nodes in the chain towards the root.
 Only the smallest error nodes should be marked.  Moreover, the span is trimmed
-to exclude leading and trailing blanks, which are sometimes part of ERROR nodes."
+to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
+Restrict fontification to the region between START and END, using OVERRIDE."
   (when (and f90-ts-font-lock-error-show
              (let ((sparse-tree (treesit-induce-sparse-tree node "^ERROR$")))
                ;; if the sparse-tree has only one node (node itself),
@@ -2327,9 +2330,9 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
                (and (= (length (cdr sparse-tree)) 1)
                     (null (cdr (cadr sparse-tree))))))
 
-    (cl-destructuring-bind (start . end) (f90-ts--node-span-trimmed node)
+    (cl-destructuring-bind (node-start . node-end) (f90-ts--node-span-trimmed node)
       (let ((end-err (if (eq f90-ts-font-lock-error-show 'all)
-                         end
+                         node-end
                        (cl-assert (and (integerp f90-ts-font-lock-error-show)
                                        (> f90-ts-font-lock-error-show 0))
                                   nil
@@ -2337,14 +2340,15 @@ to exclude leading and trailing blanks, which are sometimes part of ERROR nodes.
                                   f90-ts-font-lock-error-show)
                        ;; go f90-ts-font-lock-error-show minus one line forward and
                        ;; then trim to last character of that line
-                       (save-excursion
-                         (goto-char start)
-                         (end-of-line f90-ts-font-lock-error-show)
-                         (skip-chars-backward " \t")
-                         (point)))))
-        (treesit-fontify-with-override start end-err
+                       (min node-end
+                            (save-excursion
+                              (goto-char node-start)
+                              (end-of-line f90-ts-font-lock-error-show)
+                              (skip-chars-backward " \t")
+                              (point))))))
+        (treesit-fontify-with-override node-start end-err
                                        'f90-ts-font-lock-error-face
-                                       'append)))))
+                                       override start end)))))
 
 
 ;;;-----------------------------------------------------------------------------
@@ -2739,6 +2743,7 @@ append to a determined font lock face."
   (treesit-font-lock-rules
    :language 'fortran
    :feature 'error
+   :override 'append
    '(;; if enabled append some error face properties to existing faces
      ((ERROR) @f90-ts--fontify-error))))
 

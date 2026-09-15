@@ -546,9 +546,6 @@ PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
                        (ert-test-erts-file (ert-resource-file ,file))))))))))))
 
 
-;;------------------------------------------------------------------------------
-;; ERT: font locking
-
 (defun f90-ts-mode-test--next-boundary (beg end)
   "Find next face or blank/non-blank boundary from BEG to END."
   (let ((next-face-change (next-single-property-change beg 'face nil end))
@@ -1062,7 +1059,8 @@ If buffer was modified, insert `**' otherwise insert '--'."
      ;; note that assertions are also part of the fontified buffer,
      ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
      ;; which is what we want to see in font_lock_error5
-     ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9))))))
+     ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))
+     ("font_lock_error6.f90" . ((f90-ts-font-lock-error-show . 6))))))
 
 
 ;; xref tests
