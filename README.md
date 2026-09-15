@@ -1,7 +1,7 @@
 # f90-ts-mode
 
 Tree-sitter-based major mode for editing Fortran (Fortran 90 / 2003 and
-newer) in free source form in Emacs. It requires Emacs 30+.
+newer) in free source form in Emacs. It requires Emacs 29+.
 
 The mode is inspired by f90-mode in Emacs core. Alongside modern
 Tree-sitter-based functionality, it aims to provide and enhance features
@@ -11,9 +11,10 @@ productive and enjoyable to use.
 This project is under active [development](#roadmap).
 For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
-### Recently added, changed or improved
+### Changelog
 
 **09-2026**
+ - Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and tree-sitter 0.20.8).
  - Fontification of error nodes fixed if line limitting is enabled.
  - Some issues in comment-region operations fixed (preserve indentation,
    preserve trailing whitespace where possible, keep existing alignment
@@ -93,17 +94,17 @@ including syntax highlighting, indentation, navigation, and structural editing f
 The mode provides direct keybindings for the most frequent operations like indentation with `TAB`
 and a **transient popup** for discoverability of all commands:
 
-| Key                            | Description                      |
-|--------------------------------|----------------------------------|
-| `C-c C-f`                      | Open the transient command popup |
+| Key                            | Description                            |
+|--------------------------------|----------------------------------------|
+| `C-c C-f`                      | Open the transient command popup       |
 | `<tab>`                        | Indent and complete line               |
 | `C-<tab>`                      |  Indent and complete statement (block) |
 | `<backtab>` (shift `<tab>`)    | Indent and complete line variant 2     |
 | `C-S-<iso-lefttab>` (Linux)    | Indent and complete line variant 3     |
 | `C-<backtab>`       (Windows?) | Indent and complete line variant 3     |
-| `C-<return>`                   | Break line                       |
-| `C-c ;`                        | Comment region (default prefix)  |
-| `C-c '`                        | Comment region (custom prefix)   |
+| `C-<return>`                   | Break line                             |
+| `C-c ;`                        | Comment region (default prefix)        |
+| `C-c '`                        | Comment region (custom prefix)         |
 
 Pressing `C-c C-f` opens a transient popup, grouping all major commands by category.
 
@@ -113,9 +114,17 @@ For the full keybinding reference see the
 
 ## Installation
 
-This mode requires **Emacs 30+** and a compatible Tree-sitter Fortran grammar.
-In particular tree-sitter ABI version 15 and tree-sitter library version 0.25.x for Emacs 30.x.
-Emacs 31 supports tree-sitter 0.26.
+This mode requires **Emacs 29+** and a compatible Tree-sitter Fortran grammar and compatible
+shared core libraries.
+
+The mode is tested with:
+* Emacs 29.1 + tree-sitter 0.20.8 (ABI version 14)
+* Emacs 29.3 + tree-sitter 0.20.8 (ABI version 14)
+* Emacs 30.1 + tree-sitter 0.24.7 (ABI version 14)
+* Emacs 30.1 + tree-sitter 0.25.10 (ABI version 15)
+* Emacs 30.2 + tree-sitter 0.24.7 (ABI version 14)
+* Emacs 30.2 + tree-sitter 0.25.10 (ABI version 15)
+* Emacs 31.1 + tree-sitter 0.26.11 (ABI version 15)
 
 Detailed technical requirements and troubleshooting can be found
 in [MANUAL.md](MANUAL.md#installation).

@@ -7,7 +7,7 @@
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
 ;; Version: 0.4.0-snapshot
-;; Package-Requires: ((emacs "30.1"))
+;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -31,7 +31,9 @@
 ;; f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer) source
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 30+)
 ;;
-;; Recently changed, added or improved:
+;; Changelog:
+;;   [09-2026] Support for Emacs 29 + tree-sitter 0.20.x added (tested with
+;;             29.1, 29.3 and tree-sitter 0.20.8).
 ;;   [09-2026] Fontification of error nodes fixed if line limitting is enabled.
 ;;   [09-2026] Some issues in comment-region operations fixed (preserve
 ;;             indentation, preserve trailing whitespace where possible,
@@ -146,9 +148,11 @@ f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer)
 source files, based on Emacs's built-in tree-sitter support
 (requires Emacs 30+).
 
-Recently changed, added or improved:
+Changelog:
 
 [09-2026]
+- Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and
+  tree-sitter 0.20.8).
 - Fontification of error nodes fixed if line limitting is enabled.
 - Some issues in comment-region operations fixed (preserve indentation,
   preserve trailing whitespace where possible, keep existing alignment
@@ -994,6 +998,257 @@ seem to make much sense."
 
 
 ;;;-----------------------------------------------------------------------------
+;; auxiliary function for work-around and advices
+
+(defun f90-ts--fortran-node-p (node)
+  "Return non-nil if NODE belongs to the Fortran grammar."
+  (and node
+       (eq (treesit-parser-language
+            (treesit-node-parser node))
+           'fortran)))
+
+
+(defun f90-ts--fortran-lang-p (parser-or-lang)
+  "Return non-nil if PARSER-OR-LANG resolved to the Fortran grammar.
+If PARSER-OR-LANG is nil, use the first parser of the current buffer."
+  (let* ((parser (or parser-or-lang
+                     (car (treesit-parser-list))))
+         (lang (if (treesit-parser-p parser)
+                   (treesit-parser-language parser)
+                 parser)))
+    (eq lang 'fortran)))
+
+
+(defun f90-ts--node-virtual-p (node)
+  "Return non-nil if NODE is virtual (has zero width)."
+  (and node
+       (= (treesit-node-start node)
+          (treesit-node-end node))))
+
+(defun f90-ts--proper-cover-of-region (beg end)
+  "Return some node which properly covers BEG..END.
+Start and end of node should be before BEG and after END, respectively.
+
+This is used to restrict `treesit-induce-sparse-tree' for relatives of
+a node or nodes at some region to a proper ascendant, which is as small
+as possible."
+  (treesit-node-on (max (point-min) (1- beg))
+                   (min (point-max) (1+ end))))
+
+
+(defun f90-ts--node-virtual-at (pos)
+  "Query whether there is a virtual node at POS and return it if there is one.
+
+This uses an expensive top-down tree search."
+  ;; TODO: use a direct search, but avoid any sibling operations
+  (let ((root (or (f90-ts--proper-cover-of-region pos pos)
+                  (treesit-buffer-root-node 'fortran))))
+  (caadr
+   (treesit-induce-sparse-tree
+    root
+    (lambda (node)
+      (and (= (treesit-node-start node) pos)
+           (= (treesit-node-end node) pos)))))))
+
+
+(defun f90-ts--node-child-index (node parent)
+  "Return the index of NODE as a child of PARENT.
+If NODE is not a child of PARENT, then return nil."
+  (cl-loop
+   for i below (treesit-node-child-count parent)
+   when (treesit-node-eq
+         (treesit-node-child parent i)
+         node)
+   return i))
+
+
+(defun f90-ts--node-parent-by-search (node)
+  "Find the parent of NODE by top-down searching the Fortran syntax tree.
+
+This might look like a bad idea, but the core parent function of
+tree-sitter 0.20.x fails to determine the parent in if NODE is in the
+vicinity of a virtual node."
+  ;; TODO: use a direct search, but avoid any sibling operations
+  (when node
+    (let ((root (or (f90-ts--proper-cover-of-region (treesit-node-start node)
+                                                    (treesit-node-end node))
+                    (treesit-buffer-root-node 'fortran))))
+      (caadr
+       (treesit-induce-sparse-tree
+        root
+        (lambda (n)
+          (cl-loop
+           for i below (treesit-node-child-count n)
+           thereis
+           (treesit-node-eq
+            (treesit-node-child n i)
+            node))))))))
+
+
+(defun f90-ts--node-sibling-by-search (node direction &optional named)
+  "Return NODE's sibling in DIRECTION.
+
+DIRECTION must be either `prev' or `next'.  If NAMED is non-nil,
+only return a named sibling.
+
+Intended for older tree-sitter versions, where sibling and parent operations
+fail in the vicinity of virtual nodes."
+  (let ((parent (f90-ts--node-parent-by-search node)))
+    (when parent
+      (let ((count (treesit-node-child-count parent))
+            (index
+             (cl-loop
+              for i below (treesit-node-child-count parent)
+              when (treesit-node-eq
+                    (treesit-node-child parent i)
+                    node)
+              return i)))
+        (when index
+          (let ((step (if (eq direction 'prev) -1 1))
+                (i (if (eq direction 'prev)
+                       (1- index)
+                     (1+ index))))
+            (cl-loop
+             while (and (>= i 0) (< i count))
+             for sibling = (treesit-node-child parent i)
+             when (or (not named)
+                      (treesit-node-check sibling 'named))
+             return sibling
+             do (setq i (+ i step)))))))))
+
+
+(defun f90-ts--field-name-p-native (node field-name)
+  "Return non-nil if the field name of NODE is FIELD-NAME.
+Use the field name of NODE as a child of its parent."
+  (string= (treesit-node-field-name node)
+           field-name))
+
+
+(defun f90-ts--field-name-p-query (node field-name)
+  "Return non-nil if the field name of NODE is FIELD-NAME.
+Use the field name of NODE as a child of its parent.
+
+Work-around for older tree-sitter versions with bugs in the core."
+  (cl-some
+   (lambda (n) (treesit-node-eq n node))
+   (treesit-query-capture
+    (treesit-node-parent node)
+    (format "(_ %s: _ @cap)" field-name)
+    nil nil t)))
+
+
+(defalias 'f90-ts--field-name-p
+  (if (>= emacs-major-version 30)
+      #'f90-ts--field-name-p-native
+    #'f90-ts--field-name-p-query)
+  "Return non-nil if the field name of NODE is FIELD-NAME.
+Use the field name of NODE as a child of its parent.
+
+Dispatches once at load time:
+On emacs 30+ use `treesit-node-field-name'.
+On emacs 29.x with tree-sitter 0.20.8 (or similar) use `treesit-query-capture'.
+Virtual nodes trigger a bug and resolve to nil.")
+
+
+(defun f90-ts--field-names-any-p-native (node field-names)
+  "Return non-nil if the field name of NODE is in FIELD-NAMES.
+Use the field name of NODE as a child of its parent."
+  (member (treesit-node-field-name node)
+          field-names))
+
+
+(defun f90-ts--field-names-any-p-query (node field-names)
+  "Return non-nil if the field name of NODE is in FIELD-NAMES.
+Use the field name of NODE as a child of its parent.
+
+Work-around for older tree-sitter versions with bugs in the core."
+  (let ((query
+         (format
+          "(_ %s: _ @cap)"
+          (mapconcat #'identity field-names ": _ @cap) (_ "))))
+    (cl-some
+     (lambda (n) (treesit-node-eq n node))
+     (treesit-query-capture
+      (treesit-node-parent node)
+      query
+      nil nil t))))
+
+
+(defalias 'f90-ts--field-names-any-p
+  (if (>= emacs-major-version 30)
+      #'f90-ts--field-names-any-p-native
+    #'f90-ts--field-names-any-p-query)
+  "Return non-nil if the field name of NODE is in FIELD-NAMES.
+Use the field name of NODE as a child of its parent.
+
+Dispatches once at load time:
+On Emacs 30+ use `treesit-node-field-name'.
+On Emacs 29.x with tree-sitter 0.20.8 (or similar) use
+`treesit-query-capture'.
+
+Virtual nodes trigger a bug and resolve to nil.")
+
+
+(defun f90-ts--node-child-by-field-name-native (node field-name)
+  "Return the first child of NODE with FIELD-NAME, or nil."
+  (treesit-node-child-by-field-name node field-name))
+
+
+(defun f90-ts--node-child-by-field-name-query (node field-name)
+  "Return the first child of NODE with FIELD-NAME, or nil.
+
+Work-around for older tree-sitter versions with bugs in the core."
+  (car
+   (last
+    (treesit-query-capture
+     node
+     (format "(_ %s: _ @cap)" field-name)
+     nil nil t))))
+
+
+;; currently not used, but keep it as failure of node-child-by-field-name
+;; are possible, but not for the types of nodes where it is currently used
+(defalias 'f90-ts--node-child-by-field-name
+  (if (>= emacs-major-version 30)
+      #'f90-ts--node-child-by-field-name-native
+    #'f90-ts--node-child-by-field-name-query)
+  "Return the first child of NODE with FIELD-NAME, or nil
+
+Dispatches once at load time:
+On emacs 30+ use `treesit-node-child-by-field-name'.
+On emacs 29.x with tree-sitter 0.20.8 (or similar) use `treesit-query-capture'.
+Virtual nodes trigger a bug and resolve to nil.")
+
+
+(defun f90-ts--children-by-fields-native (parent field-names)
+  "Return direct children of PARENT whose field is in FIELD-NAMES."
+  (cl-loop
+   for i below (treesit-node-child-count parent)
+   when (member (treesit-node-field-name-for-child parent i) field-names)
+   collect (treesit-node-child parent i)))
+
+
+(defun f90-ts--children-by-fields-query (parent field-names)
+  "Return direct children of PARENT whose field is in FIELD-NAMES.
+
+Work-around for older tree-sitter versions with bugs in the core."
+  (treesit-query-capture
+   parent
+   (format "(%s %s)"
+           (treesit-node-type parent)
+           (mapconcat (lambda (f) (format "%s: (_) @cap" f)) field-names " "))
+   nil nil t))
+
+
+(defalias 'f90-ts--children-by-fields
+  (if (>= emacs-major-version 30)
+      #'f90-ts--children-by-fields-native
+    #'f90-ts--children-by-fields-query)
+  "Return direct children of PARENT whose field name is in FIELD-NAMES.
+See `f90-ts--field-name-p' for the reason of the version split.")
+
+
+;;;-----------------------------------------------------------------------------
 ;;; tree-sitter workaround
 
 ;; For virtual zero-length nodes, `treesit-node-parent' fails. For
@@ -1009,23 +1264,23 @@ seem to make much sense."
 ;; To circumvent this, treesit-node-parent is patched by using previous or next
 ;; sibling and check, whether those have a proper parent. Which seems always the case.
 
-(define-advice treesit-node-parent (:around (orig node) f90-ts--skip-zero-width-extras)
+(defun f90-ts--node-parent-workaround-30 (orig node)
   "If NODE is zero-width with no parent, walk siblings to find a real parent.
-
 This is required for virtual ampersand continuation line nodes, for which
 there is no parent.  Those nodes always have direct proper previous and next
-siblings with the correct parent.  So walking is just one step in general."
+siblings with the correct parent.  So walking is just one step in general.
+
+ORIG is a reference to the original `treesit-node-parent' function used by
+default."
   (let ((parent (funcall orig node)))
     (cond
      ((null node)
       ;; nothing to do if node is nil (original function returns nil in that case)
       ;; (do not try to query the parser with a nil node)
       nil)
-     ((not (eq (treesit-parser-language
-                (treesit-node-parser node))
-               'fortran))
-      ;; always use default function for non-fortran languages
-      parent)
+     ((not (f90-ts--fortran-node-p node))
+        ;; always use default function for non-fortran languages
+        parent)
      ((or parent
           (< (treesit-node-start node) (treesit-node-end node)))
       ;; just use original function for nodes with a non-zero span
@@ -1033,14 +1288,104 @@ siblings with the correct parent.  So walking is just one step in general."
      (t
       ;; try previous siblings first, then next siblings as fallback,
       ;; but for the intended case, one step to the prev-sibling resolves the issue
-      (or (cl-loop for candidate = (treesit-node-prev-sibling node)
-                   then (treesit-node-prev-sibling candidate)
-                   while candidate
-                   thereis (funcall orig candidate))
-          (cl-loop for candidate = (treesit-node-next-sibling node)
-                   then (treesit-node-next-sibling candidate)
-                   while candidate
-                   thereis (funcall orig candidate)))))))
+      (or (cl-loop for n = (treesit-node-prev-sibling node)
+                   then (treesit-node-prev-sibling n)
+                   while n
+                   thereis (funcall orig n))
+          (cl-loop for n = (treesit-node-next-sibling node)
+                   then (treesit-node-next-sibling n)
+                   while n
+                   thereis (funcall orig n)))))))
+
+
+(when (>= emacs-major-version 30)
+  (advice-add #'treesit-node-parent
+              :around #'f90-ts--node-parent-workaround-30))
+
+
+;; ---------------------------------------------------------------------------
+;; Tree-sitter compatibility for older tree-sitter versions
+;;
+;; On Emacs 29 often shipped with tree-sitter 0.20.x, there are some serious
+;; bugs in conjunction with the fortran grammar, which require to work around.
+;;
+;; One kind of bug concerns the optional leading ampersand in continued lines,
+;; which is represented as a virtual (zero-width) token. Navigation (parent and
+;; sibling queries) around these virtual tokens can fails.
+;; Function treesit-node-on also fails to return virtual nodes.
+;;
+;; A second bug are field queries, if a node has several children with the same
+;; field name behind an anonymous node.
+;; (This happens for variable declarations and "declarator" fields after
+;; anonymous node "::".) This second bug is not handled by advices, but directly
+;; in the code.
+;;
+;; ---------------------------------------------------------------------------
+
+(defun f90-ts--node-on-workaround-29 (orig beg end &optional parser-or-lang named)
+  "Evaluate `treesit-node-on' using function ORIG.
+Arguments BEG, END, PARSER-OR-LANG and NAMED are the same as
+for `treesit-node-on'.
+If BEG and END are equal and there is a virtual node at this point, older
+tree-sitter versions fail to return this node.  The function makes an
+exhaustive search for these nodes.
+In general or if there are zero-width nodes, it just calls ORIG."
+  (or (and (= beg end)
+           (f90-ts--fortran-lang-p parser-or-lang)
+           (f90-ts--node-virtual-at beg))
+      (funcall orig beg end parser-or-lang named)))
+
+
+(defun f90-ts--node-parent-workaround-29 (orig node)
+  "Evaluate `treesit-node-parent' for NODE using function ORIG.
+In the vicinity of virtual nodes, `treesit-node-parent' might fail
+by returning nil instead of the parent of NODE.
+If this is the case, make an exhaustive top-down search to find the parent."
+  (let ((parent (funcall orig node)))
+    (cond
+     ((null node)
+      nil)
+
+     ((not (f90-ts--fortran-node-p node))
+      parent)
+
+     ((or parent
+          (not (f90-ts--node-virtual-p node)))
+      parent)
+
+     (t
+      (f90-ts--node-parent-by-search node)))))
+
+
+(defun f90-ts--node-prev-sibling-workaround-29 (orig node &optional named)
+  "Evaluate `treesit-node-prev-sibling' for NODE and NAMED using function ORIG.
+
+If necessary, use an exhaustive top-down tree search to work around a
+bug in older tree-sitter version."
+  (if (f90-ts--fortran-node-p node)
+      (f90-ts--node-sibling-by-search node 'prev named)
+    (funcall orig node named)))
+
+
+(defun f90-ts--node-next-sibling-workaround-29 (orig node &optional named)
+  "Evaluate `treesit-node-next-sibling' for NODE and NAMED using function ORIG.
+
+If necessary, use an exhaustive top-down tree search to work around a
+bug in older tree-sitter version."
+  (if (f90-ts--fortran-node-p node)
+      (f90-ts--node-sibling-by-search node 'next named)
+    (funcall orig node named)))
+
+
+(unless (>= emacs-major-version 30)
+  (advice-add #'treesit-node-on
+              :around #'f90-ts--node-on-workaround-29)
+  (advice-add #'treesit-node-parent
+              :around #'f90-ts--node-parent-workaround-29)
+  (advice-add #'treesit-node-prev-sibling
+              :around #'f90-ts--node-prev-sibling-workaround-29)
+  (advice-add #'treesit-node-next-sibling
+              :around #'f90-ts--node-next-sibling-workaround-29))
 
 
 ;;;-----------------------------------------------------------------------------
@@ -1969,8 +2314,8 @@ return the node directly following the sequence's second ampersand (nil if
 there is no such sibling).  Otherwise return the sibling of NODE itself."
   (when-let* ((nsib (funcall sibling-fn node)))
     (if-let* ((amp2 (f90-ts--find-ampersand-boundary
-                     nsib #'treesit-node-next-sibling)))
-        (treesit-node-next-sibling amp2)
+                     nsib sibling-fn)))
+        (funcall sibling-fn amp2)
       nsib)))
 
 
@@ -3703,13 +4048,14 @@ If NODE is nil return nil."
         'comment)
 
        (unary-leftm
-        (if (f90-ts--node-type-p (treesit-node-child-by-field-name unary-leftm "operator")
+        (if (f90-ts--node-type-p (treesit-node-child-by-field-name unary-leftm
+                                                                   "operator")
                                  '("-" "+"))
             'operator-unary-minusplus
           ;; either user defined operator or logical .not.
           'operator-unary-other))
 
-       ((string= (treesit-node-field-name node) "operator")
+       ((f90-ts--field-name-p node "operator")
         ;; applies if node is a binary operator like "+" or ".and."
         (let* ((parent (treesit-node-parent node))
                (type (and parent (treesit-node-type parent))))
@@ -3858,7 +4204,8 @@ It does not descend into parenthesized_expressions and unary_expression whose
 operator is a minus."
   (if (and (f90-ts--node-op-expr-p node)
            (not (and (f90-ts--node-type-p node "unary_expression")
-                     (f90-ts--node-type-p (treesit-node-child-by-field-name node "operator")
+                     (f90-ts--node-type-p (treesit-node-child-by-field-name node
+                                                                            "operator")
                                           "-"))))
       (mapcan #'f90-ts--align-list-expand-op-expr
               (treesit-node-children node))
@@ -3927,14 +4274,10 @@ before and after \"::\")."
   (let ((list-context (car context)))
     (cl-assert (f90-ts--node-type-p list-context "variable_declaration")
                nil "expected list context: variable_declaration, got '%s'" list-context)
-    (when-let* ((children (treesit-node-children list-context)))
+    (when (< 0 (treesit-node-child-count list-context))
       (let* ((pos (alist-get 'pos loc))
-             (attr-children (seq-filter (lambda (n)
-                                          (string= (treesit-node-field-name n) "attribute"))
-                                        children))
-             (decl-children (seq-filter (lambda (n)
-                                          (string= (treesit-node-field-name n) "declarator"))
-                                        children))
+             (attr-children (f90-ts--children-by-fields list-context '("attribute")))
+             (decl-children (f90-ts--children-by-fields list-context '("declarator")))
 
              ;;(attr-end (seq-max (seq-map (lambda (child) (treesit-node-end child))
              ;;                            attr-children)))
@@ -4339,8 +4682,8 @@ for default continued line indentation."
                                              ))
          (node-type-attr (unless node-colons
                            (treesit-search-subtree list-context
-                                                   (lambda (n) (member (treesit-node-field-name n)
-                                                                       '("type" "attribute")))
+                                                   (lambda (n) (f90-ts--field-names-any-p
+                                                                n '("type" "attribute")))
                                                    t   ; search backward to find last attribute node
                                                    t   ; only named nodes
                                                    1   ; maximal depth of 1, search only children
@@ -4451,7 +4794,8 @@ unary_expression, to handle blanks between the minus and the value content."
            (eq nsym 'operator-unary-minusplus))
       (let* ((node (car item-nsym))
              (unary-leftm (f90-ts--node-leftmost-unary node))
-             (arg (treesit-node-child-by-field-name unary-leftm "argument")))
+             (arg (treesit-node-child-by-field-name unary-leftm
+                                                    "argument")))
         (if (= (f90-ts--node-line node) (f90-ts--node-line arg))
             (- (treesit-node-start arg) (treesit-node-start node))
           ;; argument of unary expression is not on the same line
