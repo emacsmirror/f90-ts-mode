@@ -31,6 +31,9 @@
 (require 'cl-lib)
 (require 'ert)
 (require 'ert-x)
+(when (version< emacs-version "30")
+  (require 'ert-font-lock))
+
 (require 'treesit)
 (require 'xref)
 (require 'f90-ts-mode)
