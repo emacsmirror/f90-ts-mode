@@ -252,9 +252,9 @@ and nodes for debugging purposes into the exclusive log buffer."
               (tt-nopp (format "types nopp p-gp = %s, %s"
                                (and parent-nopp (treesit-node-type parent-nopp))
                                (and grandparent-nopp (treesit-node-type grandparent-nopp)))))
-          (f90-ts-log-msg :indent (propertize ttt-1 'face '(:foreground "brown2")))
-          (f90-ts-log-msg :indent (propertize ttt-2 'face '(:foreground "brown2")))
-          (f90-ts-log-msg :indent (propertize tt-nopp 'face '(:foreground "brown2")))
+          (f90-ts-log-msg :indent "%s" (propertize ttt-1 'face '(:foreground "brown2")))
+          (f90-ts-log-msg :indent "%s" (propertize ttt-2 'face '(:foreground "brown2")))
+          (f90-ts-log-msg :indent "%s" (propertize tt-nopp 'face '(:foreground "brown2")))
           (f90-ts-log--indent-cache-print))))
     nil))
 
