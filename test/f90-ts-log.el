@@ -232,6 +232,7 @@ and nodes for debugging purposes into the exclusive log buffer."
   (lambda (node parent bol &rest _)
     (f90-ts-log-msg :indent "---------info %s--------------" msg)
     (when (or (string= msg "start") (string= msg "catch all"))
+      (f90-ts-log-line :indent "line")
       (let* ((grandparent (and parent (treesit-node-parent parent)))
              (psibp (f90-ts--indent-prev-sib-by-parent))
              (pstmt-k (f90-ts--indent-prev-stmt-keyword))

@@ -1,5 +1,5 @@
 EMACS ?= emacs
-EMACSFLAGS = -batch -Q -L .
+EMACSFLAGS = -batch -Q -L . -L test
 
 # Path to this Makefile.  Used by the recursive make invocation that
 # creates the individual parallel ERT targets.
