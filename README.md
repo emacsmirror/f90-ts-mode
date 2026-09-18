@@ -11,7 +11,10 @@ productive and enjoyable to use.
 This project is under active [development](#roadmap).
 For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
-### Changelog
+### Changelog (recent)
+
+**10-2026**
+- Support for hideshow and outline added.
 
 **09-2026**
  - `f90-ts-mode.el` decomposed into several smaller packages. Experimental
@@ -63,10 +66,6 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
  - Smart end completion of coarray "change team ... end team" blocks fixed. It was
    wrongly assumed that the end statement is "end change team".
 
-**07-2026**
- - Inherit attribute of some font lock faces fixed.
- - Alignment of unary expressions with leading minus or plus improved.
-
 
 ## Overview
 
@@ -94,7 +93,7 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Coarray keywords and statements
 - Imenu and a Fortran menu in the menu bar
 - Navigation (defun, things, Xref, side panel tree)
-
+- Hideshow and outline support (support for external treesit-fold is pending)
 
 ## Keybindings
 
@@ -193,6 +192,10 @@ It will automatically be loaded when opening a file with extension `.f90`.
   ;; uncomment if Imenu entry in menu bar is desired
   ;; :hook (f90-ts-mode . (lambda () (imenu-add-to-menubar "Imenu")))
 
+  ;; uncomment to switch on hideshow and outline minor mode automatically
+  ;; :hook (f90-ts-mode . hs-minor-mode)
+  ;; :hook (f90-ts-mode . outline-minor-mode)
+
   :config
   (message "f90-ts-mode loaded")
 
@@ -257,8 +260,6 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
-- Provide code folding: add support for hideshow `hs-minor-mode`, `outline-mode` (both provided by emacs core)
-  and external `treesit-fold` package.
 - Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
 - Fill operations with lower column width (before joining).
 - Fill operation similar to `f90-fill-paragraph`. In conjunction with mark operations: determine interesting

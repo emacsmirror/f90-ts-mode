@@ -3,11 +3,6 @@
 ;; Copyright (C) 2025-2026 Martin Stein
 
 ;; Author: Martin Stein <mscfd@gmx.net>
-;; Maintainer: Martin Stein <mscfd@gmx.net>
-;; URL: https://github.com/mscfd/emacs-f90-ts-mode
-;; Keywords: languages, treesitter, fortran
-;; Version: 0.4.0-snapshot
-;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -46,8 +41,8 @@
 ;; `f90-ts-special-comment-rules' and `f90-ts-special-var-regexp'
 (require 'f90-ts-custom)
 
-;; provide workarounds and missing functions for Emacs 29
-;;(require 'f90-ts-workaround)
+;; provide workarounds and missing functions
+(require 'f90-ts-workaround)
 
 
 ;;;-----------------------------------------------------------------------------

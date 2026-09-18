@@ -57,6 +57,7 @@ SRCS = \
 	f90-ts-xref.el \
 	f90-ts-imenu.el \
 	f90-ts-thing.el \
+	f90-ts-fold.el \
 	f90-ts-mode.el \
 	f90-ts-nav.el \
 	test/f90-ts-mode-test.el

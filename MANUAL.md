@@ -17,9 +17,9 @@ for implementation.
   - [Tree-sitter based mode](#tree-sitter-based-mode)
   - [Setup](#setup)
     - [Standard installation via package manager](#standard-installation-via-package-manager)
-    - [Optional packages](#ptional-packages)
+    - [Optional packages](#optional-packages)
     - [Development setup via local clone](#development-setup-via-local-clone)
-    - [Loading test package](#Loading test package)
+    - [Loading test package](#loading-test-package)
 - [Keybindings](#keybindings)
 - [Features](#features)
   - [Syntax highlight and font lock faces](#syntax-highlight-and-font-lock-faces)
@@ -154,12 +154,15 @@ git clone https://github.com/mscfd/emacs-f90-ts-mode.git path_to/emacs-f90-ts-mo
 The mode itself and optionally the testing module can be loaded with `use-package`
 placed somewhere in `init.el` (or elsewhere).
 
+Example setups provided below should be adjusted to ones requirements.
+
 #### Standard installation via package manager
 
 ```elisp
 (use-package f90-ts-mode
   :ensure t
   :mode (("\\.f90\\'" . f90-ts-mode)
+         ;; preprocessor files
          ("\\.i90\\'" . f90-ts-mode))
 
   :init
@@ -168,16 +171,20 @@ placed somewhere in `init.el` (or elsewhere).
   ;; uncomment if Imenu entry in menu bar is desired
   ;; :hook (f90-ts-mode . (lambda () (imenu-add-to-menubar "Imenu")))
 
+  ;; uncomment to switch on hideshow and outline minor mode automatically
+  ;; :hook (f90-ts-mode . hs-minor-mode)
+  ;; :hook (f90-ts-mode . outline-minor-mode)
+
   :config
   (message "f90-ts-mode loaded")
 
-  :bind (;; mode-specific bindings, adjust to your needs
-         ;; (just some examples)
+  :bind (;; mode-specific bindings, adjust to your needs by
+         ;; changing or adding new key bindings
+         ;; (below are just some examples)
          :map f90-ts-mode-map
          ;; transient popup (additional shorter binding to "C-c C-f")
          ("A-<up>"        . #'f90-ts-transient)
 
-         ("A-<return>"    . #'f90-ts-break-line)
          ("A-<return>"    . #'f90-ts-break-line)
          ("C-<return>"    . #'f90-ts-shift-line-break)
          ("A-<backspace>" . #'f90-ts-join-line-prev)
@@ -415,7 +422,7 @@ Customizable variables for indentations are:
 Additionally `f90-ts-indent-delete-trailing-whitespace` can be used to enable automatic deletion of
 trailing whitespace characters of indented lines after each indentation operation.
 
-*Remarks*
+*Remarks:*
 - statement blocks are features such as `functions`, `subroutines`, control statements (`do`, `if`, `select`)
   and other block structures (`associate`, `block` etc.)
 - `f90-ts-indent-toplevel` is intended to reduce the indentation of anything which is right below the program
@@ -447,7 +454,7 @@ used by functions bound to `<backtab>` (S-`TAB`) and `C-S-<iso-lefttab>` / `C-<b
 
 Also check out [Continued statements and blocks](#indentation-of-continued-statements-and-blocks).
 
-Remark: three variants are offerend to allow selection of primary and continued line offset additionally
+*Remark:* three variants are offerend to allow selection of primary and continued line offset additionally
 to the rotation option. The current setup offers keybindings for all three variants.
 
 
@@ -490,7 +497,7 @@ subroutine sub(arg1, arg2)
 end subroutine sub
 ```
 
-Remark: Indentation hints `context` and `indented` are ignored if comment is within a continued line.
+*Remark:* Indentation hints `context` and `indented` are ignored if comment is within a continued line.
 Only `column-0` is applied in the continued line context.
 
 
@@ -558,7 +565,8 @@ Entries are grouped by `module`, `submodule`, `subroutine`, `function`, `module 
 Additionally to the Imenu grouping, the optional `Fortran` menu offers a submenu where the
 same imenu items are structured as a tree reflecting the hierarchical structure of the source file,
 with submenus for structures that contain other items.
-This requires and extra use-package statement to load the optional package, see #
+This requires and extra use-package statement to load the optional package,
+see [Optional packages](#ptional-packages).
 
 ### Navigation buffer
 
@@ -711,7 +719,7 @@ This behavior is controlled by the customizable variable `f90-ts-fill-select-bre
     * `q` to skip the line and keep as is.
     * `C-g` to abort the fill session.
 
-Remark: The current `fill-column` and breakpoint selection method can be overwritten on the fly
+*Remark:* The current `fill-column` and breakpoint selection method can be overwritten on the fly
 using `C-f` and `C-b` inside the transient menu.
 
 
