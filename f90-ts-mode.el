@@ -1476,6 +1476,15 @@ Result is detected once and cached for the session."
 ;;;-----------------------------------------------------------------------------
 ;;; auxiliary predicates, walk and query functions
 
+(defun f90-ts--node-named-p (node)
+  "Check whether NODE is named or anonymous.
+
+Used as additional predicate in thing queries.  Checking with regexp is not
+always sufficient, as main structure node and keyword are sometimes equal.
+But for thing queries, only the named structure node should match."
+  (treesit-node-check node 'named))
+
+
 (defun f90-ts--node-line (node)
   "Determine line number of start position of NODE."
   (line-number-at-pos (treesit-node-start node)))
@@ -9159,13 +9168,6 @@ This is done for the current f90-ts source buffer."
 ;;;-----------------------------------------------------------------------------
 ;;; Defun and thing
 
-(defun f90-ts--thing-node-p (node)
-  "Check whether NODE is named or anonymous.
-Just checking with regexp is not sufficient, as main structure node
-and keyword are sometimes equal.  But we only want the structure node."
-  (treesit-node-check node 'named))
-
-
 (defun f90-ts--defun-name (node)
   "Return the name of defun NODE, for use in `which-function-mode' etc."
   (caar (f90-ts--imenu-name-pos-fn node)))
@@ -9181,7 +9183,7 @@ and keyword are sometimes equal.  But we only want the structure node."
                              "module_procedure"
                              "interface"
                              "derived_type_definition")) "$")
-   #'f90-ts--thing-node-p)
+   #'f90-ts--node-named-p)
   "Regexp and predicate for matching node types to determine defun nodes.")
 
 
@@ -9190,21 +9192,21 @@ and keyword are sometimes equal.  But we only want the structure node."
    (concat "^" (regexp-opt '("subroutine"
                              "function"
                              "module_procedure")) "$")
-   #'f90-ts--thing-node-p)
+   #'f90-ts--node-named-p)
   "Regexp and predicate for matching node types to determine procedure nodes.")
 
 
 (defconst f90-ts--thing-interface-regexp-pred
   (cons
    "^interface$"
-   #'f90-ts--thing-node-p)
+   #'f90-ts--node-named-p)
   "Regexp and predicate for matching node types to determine interface nodes.")
 
 
 (defconst f90-ts--thing-type-regexp-pred
   (cons
    "^derived_type_definition$"
-   #'f90-ts--thing-node-p)
+   #'f90-ts--node-named-p)
   "Regexp and predicate for matching node types to determine derived type nodes.")
 
 
