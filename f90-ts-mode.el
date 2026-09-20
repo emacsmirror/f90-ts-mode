@@ -9229,6 +9229,7 @@ This is a wrapper to provide the navigate feature for Emacs 29."
            (treesit-query-capture
             (treesit-buffer-root-node)
             `((,(symbol-name thing)) @thing))))
+      ;; assuming direction is either -1 or +1
       (if (> direction 0)
           (when-let* ((capture
                        (seq-find
@@ -9265,6 +9266,10 @@ This is a wrapper to provide the navigate feature for Emacs 29."
   "Move to end of current THING.
 
 This is a wrapper to provide the navigate feature for Emacs 29."
+  ;; to avoid going to end of non-trimmed node, skip whitespace (trailing)
+  ;; characters, if skipped whitespace characters are not trailing, then it
+  ;; should still make no difference
+  (skip-chars-forward " \t\n")
   (if (fboundp 'treesit-end-of-thing)
       (treesit-end-of-thing thing)
     (when-let* ((node
@@ -9273,7 +9278,9 @@ This is a wrapper to provide the navigate feature for Emacs 29."
                  (lambda (node)
                    (equal (treesit-node-type node)
                           (symbol-name thing))))))
-      (goto-char (treesit-node-end node)))))
+      (goto-char (treesit-node-end node))))
+  ;; in case of a non-trimmed node with trailing blanks, skip backwards
+  (skip-chars-backward " \t\n"))
 
 
 (defmacro f90-ts--define-thing-commands (thing label)

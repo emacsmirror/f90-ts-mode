@@ -139,8 +139,8 @@ module mod
            import t2
 |           type(t2), intent(inout) :: x
            integer, intent(out) :: y
-      end subroutine sub2_ifc
-@
+      end subroutine sub2_ifc@
+
       impure recursive function fun3_ifc(x, y) result(i)
            import t3
            integer :: i
@@ -181,8 +181,8 @@ contains
     end subroutine sub21
     integer function fun22()
 |         fun22 = 2
-    end function fun22
-@ end subroutine sub2
+    end function fun22@
+ end subroutine sub2
 
  impure recursive function fun3(x, y)
       class(t3), intent(inout) :: x
@@ -245,8 +245,8 @@ contains
     integer function fun42()
          fun22 = 2
     end function fun42
- end subroutine sub4
-@
+ end subroutine sub4@
+
 end module mod
 =-=-=
 
@@ -274,8 +274,8 @@ contains
     integer function fun22()
          fun22 = 2
     end function fun22
-| end subroutine sub2
-@
+| end subroutine sub2@
+
  impure recursive function fun3(x, y)
       class(t3), intent(inout) :: x
       class(t3), intent(inout) :: y
@@ -292,6 +292,33 @@ contains
          fun22 = 2
     end function fun42
  end subroutine sub4
+
+end module mod
+=-=-=
+
+Name: navigate thing end procedure 5
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ end subroutine sub2|
+
+ impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3@
 
 end module mod
 =-=-=
