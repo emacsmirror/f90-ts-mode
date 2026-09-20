@@ -1,0 +1,587 @@
+Point-Char: |
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-beginning-of-procedure))
+
+Name: navigate thing beginning procedure 1
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      @subroutine sub2_ifc(x, y)
+           import t2
+|           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+
+      impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing beginning procedure 2
+=-=
+module mod
+
+ abstract interface
+      @subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      |subroutine sub2_ifc(x, y)
+           import t2
+           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+
+      impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing beginning procedure 3
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    @integer function fun22()
+|         fun22 = 2
+    end function fun22
+ end subroutine sub2
+
+ impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+ subroutine sub4(x, y)
+      type(t4), intent(in) :: x
+      class(t4), intent(in) :: y
+ contains
+    subroutine sub41()
+         x = 1
+    end subroutine sub41
+    integer function fun42()
+         fun22 = 2
+    end function fun42
+ end subroutine sub4
+
+end module mod
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-end-of-procedure))
+
+Name: navigate thing end procedure 1
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      subroutine sub2_ifc(x, y)
+           import t2
+|           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+@
+      impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing end procedure 2
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+|         fun22 = 2
+    end function fun22
+@ end subroutine sub2
+
+ impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+ subroutine sub4(x, y)
+      type(t4), intent(in) :: x
+      class(t4), intent(in) :: y
+ contains
+    subroutine sub41()
+         x = 1
+    end subroutine sub41
+    integer function fun42()
+         fun22 = 2
+    end function fun42
+ end subroutine sub4
+
+end module mod
+=-=-=
+
+Name: navigate thing end procedure 3
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+         fun22 = 2
+    end function fun22
+ end subroutine sub2
+
+ impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+|
+ subroutine sub4(x, y)
+      type(t4), intent(in) :: x
+      class(t4), intent(in) :: y
+ contains
+    subroutine sub41()
+         x = 1
+    end subroutine sub41
+    integer function fun42()
+         fun22 = 2
+    end function fun42
+ end subroutine sub4
+@
+end module mod
+=-=-=
+
+Name: navigate thing end procedure 4
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+         fun22 = 2
+    end function fun22
+| end subroutine sub2
+@
+ impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+ subroutine sub4(x, y)
+      type(t4), intent(in) :: x
+      class(t4), intent(in) :: y
+ contains
+    subroutine sub41()
+         x = 1
+    end subroutine sub41
+    integer function fun42()
+         fun22 = 2
+    end function fun42
+ end subroutine sub4
+
+end module mod
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-prev-procedure))
+
+Name: navigate thing prev procedure 1
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      @subroutine sub2_ifc(x, y)
+           import t2
+|           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+
+      impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing prev procedure 2
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      @subroutine sub2_ifc(x, y)
+           import t2
+           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+
+      |impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing prev procedure 3
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ @subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+         fun22 = 2
+    end function fun22
+ end subroutine sub2
+
+ |impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+ subroutine sub4(x, y)
+      type(t4), intent(in) :: x
+      class(t4), intent(in) :: y
+ contains
+    subroutine sub41()
+         x = 1
+    end subroutine sub41
+    integer function fun42()
+         fun22 = 2
+    end function fun42
+ end subroutine sub4
+
+end module mod
+=-=-=
+
+Name: navigate thing prev procedure 4
+=-=
+module mod
+
+contains
+
+ subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+         fun22 = 2
+    end function fun22
+ end subroutine sub2
+
+ @i|mpure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+end module mod
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-next-procedure))
+
+Name: navigate thing next procedure 1
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      subroutine sub2_ifc(x, y)
+           import t2
+|           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+
+      @impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing next procedure 2
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+
+      |subroutine sub2_ifc(x, y)
+           import t2
+           type(t2), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub2_ifc
+
+      @impure recursive function fun3_ifc(x, y) result(i)
+           import t3
+           integer :: i
+           class(t3), intent(in) :: x
+           class(t3), intent(in) :: y
+      end function fun3_ifc
+
+      subroutine sub4_ifc(x, y)
+           import t4
+           type(t4), intent(in) :: x
+           class(t4), intent(in) :: y
+      end subroutine sub4_ifc
+ end interface
+
+end module mod
+=-=-=
+
+Name: navigate thing next procedure 3
+=-=
+module mod
+
+ abstract interface
+      subroutine sub1_ifc(x, y)
+           import t1
+           class(t1), intent(inout) :: x
+           integer, intent(out) :: y
+      end subroutine sub1_ifc
+ end interface
+
+contains
+
+ |subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+         fun22 = 2
+    end function fun22
+ end subroutine sub2
+
+ @impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+ subroutine sub4(x, y)
+      type(t4), intent(in) :: x
+      class(t4), intent(in) :: y
+ contains
+    subroutine sub41()
+         x = 1
+    end subroutine sub41
+    integer function fun42()
+         fun22 = 2
+    end function fun42
+ end subroutine sub4
+
+end module mod
+=-=-=
+
+Name: navigate thing next procedure 4
+=-=
+module mod
+
+contains
+
+| @subroutine sub2(x, y)
+      type(t2), intent(inout) :: x
+      integer, intent(out) :: y
+ contains
+    subroutine sub21()
+         x = 1
+    end subroutine sub21
+    integer function fun22()
+         fun22 = 2
+    end function fun22
+ end subroutine sub2
+
+ impure recursive function fun3(x, y)
+      class(t3), intent(inout) :: x
+      class(t3), intent(inout) :: y
+ end function fun3
+
+end module mod
+=-=-=
