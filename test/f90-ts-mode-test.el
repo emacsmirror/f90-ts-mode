@@ -1038,7 +1038,9 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "comment_region.erts"
    "comment_prefix.erts"
    "modified_bit.erts"
-   "navigate_thing_procedure.erts"))
+   "navigate_thing_procedure.erts"
+   "navigate_thing_interface.erts"
+   "navigate_thing_type.erts"))
 
 
 ;; expensive tests

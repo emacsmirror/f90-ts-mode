@@ -1,0 +1,126 @@
+Point-Char: |
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-beginning-of-type))
+
+Name: navigate thing beginning type 1
+=-=
+module dt
+
+ @type, abstract, public :: base
+      procedure(ifc1), pointer, nopass :: sleep
+ contains
+      procedure(ifc2), deferred :: work
+ end type base
+
+| type, extends(base), public :: impl
+      procedure :: work => my_work
+ end type impl
+
+ type, bind(c) :: ext
+      integer(c_int_64_t) :: val
+ end type ext
+
+end module dt
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-end-of-type))
+
+Name: navigate thing end type 1
+=-=
+module dt
+
+ type, abstract, public :: base
+      procedure(ifc1), pointer, nopass :: sleep
+ contains
+|      procedure(ifc2), deferred :: work
+ end type base@
+
+ type, extends(base), public :: impl
+      procedure :: work => my_work
+ end type impl
+
+ type, bind(c) :: ext
+      integer(c_int_64_t) :: val
+ end type ext
+
+end module dt
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-prev-type))
+
+Name: navigate thing prev type 1
+=-=
+module dt
+
+ @type, abstract, public :: base
+      procedure(ifc1), pointer, nopass :: sleep
+ contains
+      procedure(ifc2), deferred :: work
+ end type base
+
+ |type, extends(base), public :: impl
+      procedure :: work => my_work
+ end type impl
+
+ type, bind(c) :: ext
+      integer(c_int_64_t) :: val
+ end type ext
+
+end module dt
+=-=-=
+
+Name: navigate thing prev type 1
+=-=
+module dt
+
+ type, abstract, public :: base
+      procedure(ifc1), pointer, nopass :: sleep
+ contains
+      procedure(ifc2), deferred :: work
+ end type base
+
+ @type, extends(base), public :: impl
+      procedure :: work => my_work|
+ end type impl
+
+ type, bind(c) :: ext
+      integer(c_int_64_t) :: val
+ end type ext
+
+end module dt
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-next-type))
+
+Name: navigate thing next type 1
+=-=
+module dt
+
+ type, abstract, public :: base
+      procedure(ifc1), pointer, nopass :: sleep
+ contains
+      procedure(ifc2), deferred :: work
+ end type base
+
+ |type, extends(base), public :: impl
+      procedure :: work => my_work
+ end type impl
+
+ @type, bind(c) :: ext
+      integer(c_int_64_t) :: val
+ end type ext
+
+end module dt
+=-=-=

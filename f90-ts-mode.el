@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 29+)
 ;;
 ;; Changelog:
+;;   [09-2026] Trimming of trailing whitespace characters in thing-end-of-X
+;;             navigation added.
 ;;   [09-2026] Support for Emacs 29 + tree-sitter 0.20.x added (tested with
 ;;             29.1, 29.3 and tree-sitter 0.20.8).
 ;;   [09-2026] Fontification of error nodes fixed if line limitting is enabled.
@@ -151,6 +153,7 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog:
 
 [09-2026]
+- Handling of trailing whitespace characters in thing-end-of-X navigation added.
 - Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and
   tree-sitter 0.20.8).
 - Fontification of error nodes fixed if line limitting is enabled.
