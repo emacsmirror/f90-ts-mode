@@ -31,7 +31,7 @@
 (require 'cl-lib)
 (require 'ert)
 (require 'ert-x)
-(when (version< emacs-version "30")
+(unless (>= emacs-major-version 30)
   (require 'ert-font-lock))
 
 (require 'treesit)
@@ -187,9 +187,9 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
 (defun f90-ts-mode-test--font-lock-recompute-features ()
   "Wrapper to invoke the treesit function depending on Emacs version."
   (apply #'treesit-font-lock-recompute-features
-         (if (version< emacs-version "30")
-             '(nil nil)
-           '(nil nil fortran))))
+         (if (>= emacs-major-version 30)
+             '(nil nil fortran)
+           '(nil nil))))
 
 
 ;;;###autoload

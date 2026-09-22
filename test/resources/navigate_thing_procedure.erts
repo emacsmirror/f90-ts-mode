@@ -396,6 +396,12 @@ module mod
 end module mod
 =-=-=
 
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (when (>= emacs-major-version 30)
+      (f90-ts-mode-test--move-point-check #'f90-ts-thing-prev-procedure)))
+
 Name: navigate thing prev procedure 3
 =-=
 module mod
@@ -441,6 +447,11 @@ contains
 
 end module mod
 =-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-prev-procedure))
 
 Name: navigate thing prev procedure 4
 =-=
@@ -541,6 +552,12 @@ module mod
 end module mod
 =-=-=
 
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (when (>= emacs-major-version 30)
+      (f90-ts-mode-test--move-point-check #'f90-ts-thing-next-procedure)))
+
 Name: navigate thing next procedure 3
 =-=
 module mod
@@ -586,6 +603,11 @@ contains
 
 end module mod
 =-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-next-procedure))
 
 Name: navigate thing next procedure 4
 =-=

@@ -9228,60 +9228,78 @@ This is done for the current f90-ts source buffer."
 This is a wrapper to provide the navigate feature for Emacs 29."
   (if (fboundp 'treesit-navigate-thing)
       (treesit-navigate-thing pos direction 'beg thing)
-    (let ((captures
-           (treesit-query-capture
-            (treesit-buffer-root-node)
-            `((,(symbol-name thing)) @thing))))
-      ;; assuming direction is either -1 or +1
-      (if (> direction 0)
-          (when-let* ((capture
-                       (seq-find
-                        (lambda (capture)
-                          (> (treesit-node-start (cdr capture)) pos))
-                        captures)))
-            (treesit-node-start (cdr capture)))
-        (when-let* ((capture
-                     (car
-                      (last
-                       (seq-filter
-                        (lambda (capture)
-                          (< (treesit-node-start (cdr capture)) pos))
-                        captures)))))
-          (treesit-node-start (cdr capture)))))))
+    (let* ((pattern
+            (pcase thing
+              ('defun     (car f90-ts--thing-defun-regexp-pred))
+              ('procedure (car f90-ts--thing-procedure-regexp-pred))
+              ('interface (car f90-ts--thing-interface-regexp-pred))
+              ('type      (car f90-ts--thing-type-regexp-pred))))
+           (captures
+            (treesit-query-capture (treesit-buffer-root-node) '((_) @thing)))
+           (matches
+            (seq-filter
+             (lambda (cap)
+               (let ((node (cdr cap)))
+                 (and (f90-ts--node-type-match-p node pattern)
+                      (if (> direction 0)
+                          (> (treesit-node-start node) pos)
+                        (< (treesit-node-start node) pos)))))
+             captures))
+           (node-thing
+            (if (> direction 0)
+                (cdar matches)
+              (cdar (last matches)))))
+      (when node-thing
+        (treesit-node-start node-thing)))))
 
 
-(defun f90-ts--beginning-of-thing (thing)
-  "Move to beginning of current THING.
-
-This is a wrapper to provide the navigate feature for Emacs 29."
-  (if (fboundp 'treesit-beginning-of-thing)
-      (treesit-beginning-of-thing thing)
-    (when-let* ((node
-                 (treesit-parent-until
-                 (treesit-node-at (point))
-                 (lambda (node)
-                   (equal (treesit-node-type node)
-                          (symbol-name thing))))))
-      (goto-char (treesit-node-start node)))))
+(defun f90-ts--beginning-of-thing-29 (thing &optional arg _tactic)
+  "Execute `treesit-beginning-of-thing' with arguments THING and ARG.
+THING is actually mapped to a pattern as required by Emacs 29."
+  (let ((pattern (pcase thing
+                   ('defun     (car f90-ts--thing-defun-regexp-pred))
+                   ('procedure (car f90-ts--thing-procedure-regexp-pred))
+                   ('interface (car f90-ts--thing-interface-regexp-pred))
+                   ('type      (car f90-ts--thing-type-regexp-pred)))))
+    (treesit-beginning-of-thing pattern arg)))
 
 
-(defun f90-ts--end-of-thing (thing)
-  "Move to end of current THING.
+(defalias 'f90-ts--beginning-of-thing
+  (if (>= emacs-major-version 30)
+      #'treesit-beginning-of-thing
+    #'f90-ts--beginning-of-thing-29)
+  "Invoke `f90-ts--beginning-of-thing-29' for Emacs 29.")
 
-This is a wrapper to provide the navigate feature for Emacs 29."
+
+(defun f90-ts--end-of-thing-29 (thing &optional arg _tactic)
+  "Execute `treesit-end-of-thing' with arguments THING and ARG.
+THING is actually mapped to a pattern as required by Emacs 29."
+  (let ((pattern (pcase thing
+                   ('defun     (car f90-ts--thing-defun-regexp-pred))
+                   ('procedure (car f90-ts--thing-procedure-regexp-pred))
+                   ('interface (car f90-ts--thing-interface-regexp-pred))
+                   ('type      (car f90-ts--thing-type-regexp-pred)))))
+    (treesit-end-of-thing pattern arg)))
+
+
+(defalias 'f90-ts--end-of-thing
+  (if (>= emacs-major-version 30)
+      #'treesit-end-of-thing
+    #'f90-ts--end-of-thing-29)
+  "Invoke `f90-ts--end-of-thing-29' for Emacs 29.")
+
+
+(defun f90-ts--end-of-thing-trimmed (thing &optional arg tactic)
+  "Execute `treesit-end-of-thing' with trimming.
+Arguments THING, ARG and TACTIC are the same as for `treesit-end-of-thing'.
+
+Use a trimmed end of node by skipping trailing whitespace
+characters."
   ;; to avoid going to end of non-trimmed node, skip whitespace (trailing)
   ;; characters, if skipped whitespace characters are not trailing, then it
   ;; should still make no difference
   (skip-chars-forward " \t\n")
-  (if (fboundp 'treesit-end-of-thing)
-      (treesit-end-of-thing thing)
-    (when-let* ((node
-                (treesit-parent-until
-                 (treesit-node-at (point))
-                 (lambda (node)
-                   (equal (treesit-node-type node)
-                          (symbol-name thing))))))
-      (goto-char (treesit-node-end node))))
+  (f90-ts--end-of-thing thing arg tactic)
   ;; in case of a non-trimmed node with trailing blanks, skip backwards
   (skip-chars-backward " \t\n"))
 
@@ -9307,7 +9325,7 @@ LABEL is used in the generated docstrings."
          (f90-ts--beginning-of-thing ',thing))
        (defun ,end () ,(format "Move to end of current %s." label)
          (interactive)
-         (f90-ts--end-of-thing ',thing)))))
+         (f90-ts--end-of-thing-trimmed ',thing)))))
 
 
 (f90-ts--define-thing-commands procedure "procedure")
