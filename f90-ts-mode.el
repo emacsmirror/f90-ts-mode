@@ -32,6 +32,8 @@
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 29+)
 ;;
 ;; Changelog:
+;;   [09-2026] Font locking of interface name in deferred procedure
+;;             declaration fixed.
 ;;   [09-2026] Trimming of trailing whitespace characters in thing-end-of-X
 ;;             navigation added.
 ;;   [09-2026] Support for Emacs 29 + tree-sitter 0.20.x added (tested with
@@ -117,8 +119,10 @@
 ;; Bugs and features:
 ;;   https://github.com/mscfd/emacs-f90-ts-mode/issues
 ;;
-;; Note: Emacs 30.x must be linked against tree-sitter 0.25.x at runtime.
-;; Emacs 31 supports 0.26. The mode runs in both configurations.
+;; Notes:
+;; - Emacs 31 supports 0.26, and the mode runs in both configurations.
+;; - Emacs 30.x must be linked against tree-sitter 0.25.x at runtime.
+;; - Emacs 29 support has been tested with treesitter 0.20.8.
 ;; For details see MANUAL at https://github.com/mscfd/emacs-f90-ts-mode
 
 ;;; Code:
@@ -136,7 +140,7 @@
 
 ;;;-----------------------------------------------------------------------------
 
-(defconst f90-ts-mode-version "0.3.0-snapshot"
+(defconst f90-ts-mode-version "0.4.0-snapshot"
   "Version of `f90-ts-mode'.")
 
 
@@ -145,14 +149,14 @@
 
 
 (defconst f90-ts--about-text
-  "
-f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer)
+  "f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer)
 source files, based on Emacs's built-in tree-sitter support
-(requires Emacs 30+).
+(requires Emacs 29+).
 
 Changelog:
 
 [09-2026]
+- Font locking of interface name in deferred procedure declaration fixed.
 - Handling of trailing whitespace characters in thing-end-of-X navigation added.
 - Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and
   tree-sitter 0.20.8).
@@ -2932,13 +2936,17 @@ Restrict fontification to the region between START and END, using OVERRIDE."
                     (type_member)  @font-lock-function-name-face))
                    ])
 
-     ;; within derived type declarations
+     ((procedure_interface)               @font-lock-function-name-face)
+     ;; within derived type declarations (before contains), match only
+     ;; procedure declaration
      (variable_declaration
-      type: (procedure
-             "procedure"
-             (procedure_interface)        @font-lock-function-name-face)
+      type: (procedure)
       ;; is this always a pointer to a procedure?
       declarator: (identifier)            @font-lock-function-name-face)
+     (procedure_statement
+      (procedure_kind)
+      "("
+      (procedure_interface)               @font-lock-function-name-face)
      (procedure_statement
       declarator: [
                    ((method_name)         @font-lock-function-name-face)
