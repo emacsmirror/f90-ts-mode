@@ -252,8 +252,10 @@ The following list provides features planned for implementation (somewhat ordere
   alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.
 - Indentation for labeled do loops, like:
+```f90
   do 123 i = 1,10
      do 123 j = 1,10
         print *, i, j
   123 end do
+```
   (Remark: the end do statement has one real and one virtual node to match the number of nested loops.)
