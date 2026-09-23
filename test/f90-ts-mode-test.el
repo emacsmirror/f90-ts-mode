@@ -31,7 +31,7 @@
 (require 'cl-lib)
 (require 'ert)
 (require 'ert-x)
-(when (version< emacs-version "30")
+(unless (>= emacs-major-version 30)
   (require 'ert-font-lock))
 
 (require 'treesit)
@@ -187,9 +187,9 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
 (defun f90-ts-mode-test--font-lock-recompute-features ()
   "Wrapper to invoke the treesit function depending on Emacs version."
   (apply #'treesit-font-lock-recompute-features
-         (if (version< emacs-version "30")
-             '(nil nil)
-           '(nil nil fortran))))
+         (if (>= emacs-major-version 30)
+             '(nil nil fortran)
+           '(nil nil))))
 
 
 ;;;###autoload
@@ -851,6 +851,40 @@ PREFIX is the test name prefix, usually \"f90-ts-mode-test-std\"."
 
 
 ;;------------------------------------------------------------------------------
+;; helper for checking point movement
+;; | marks the initial point position
+;; @ marks the final point position
+;; the @ is removed, command is executed, then @ is inserted at current position
+;; and point is moved by initial measured difference of @ and |, so that the
+;; point should be at its initial position and the normal erts checks succeed
+
+(defun f90-ts-mode-test--move-point-check (command)
+  "Pre- and post process buffer to test point movement done by COMMAND.
+Remove final position marker \"@\", execute command, re-insert \"@\" and final
+position and move point to its expected original position, so that a test
+does not need a separate after block.
+
+Use \"(lambda () (fun arg1 arg2 ...))))\" as command if arguments are
+expected."
+  (let* ((pos1 (point))
+         (pos2 (save-excursion
+                 (goto-char (point-min))
+                 (search-forward "@")
+                 ;; point is after marker @, so delete before
+                 (delete-char -1)
+                 (1+ (point))))
+         (offset (- pos1 pos2)))
+    ;; move point around by command
+    (funcall command)
+    ;; if everything is as intended, restore to original buffer state
+    ;; and point position
+    (insert "@")
+    (goto-char (max (point-min)
+                    (min (point-max)
+                         (+ (point) offset))))))
+
+
+;;------------------------------------------------------------------------------
 ;; mark region helpers
 
 (defun f90-ts-mode-test--mark-region-pre (command)
@@ -1003,7 +1037,10 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "mark_region.erts"
    "comment_region.erts"
    "comment_prefix.erts"
-   "modified_bit.erts"))
+   "modified_bit.erts"
+   "navigate_thing_procedure.erts"
+   "navigate_thing_interface.erts"
+   "navigate_thing_type.erts"))
 
 
 ;; expensive tests

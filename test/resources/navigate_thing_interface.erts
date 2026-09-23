@@ -1,0 +1,186 @@
+Point-Char: |
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-beginning-of-interface))
+
+Name: navigate thing beginning interface 1
+=-=
+module ifc
+
+ interface generic
+      module procedure sub1
+      module procedure sub2
+ end interface generic
+
+ @interface
+     module pure function fun1(x, z)
+          real :: fun1
+          real, intent(in) :: x
+          complex, intent(in) :: z
+     end function fun1
+     module function fun2(i, j) result(k)
+          integer :: k
+          integer, intent(in) :: i
+          type(int_arbitrary_prec), intent(in) :: j
+     end function fun2
+ end interface
+|
+ abstract interface
+      subroutine sub_ifc()
+      end subroutine sub_ifc
+      function fun_ifc()
+           logical :: fun_ifc
+      end function fun_ifc
+ end interface
+
+end module ifc
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-end-of-interface))
+
+Name: navigate thing end interface 1
+=-=
+module ifc
+
+ interface generic
+      module procedure sub1
+      module procedure sub2
+ end interface generic
+
+ interface
+     module pure function fun1(x, z)
+          real :: fun1
+          real, intent(in) :: x
+          complex, intent(in) :: z
+     end function fun1
+     module function fun2(i, j) result(k)
+          integer :: k
+          integer, intent(in) :: i
+          type(int_arbitrary_prec), intent(in) :: j
+     end function fun2
+ end interface
+|
+ abstract interface
+      subroutine sub_ifc()
+      end subroutine sub_ifc
+      function fun_ifc()
+           logical :: fun_ifc
+      end function fun_ifc
+ end interface@
+
+end module ifc
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-prev-interface))
+
+Name: navigate thing prev interface 1
+=-=
+module ifc
+
+ @interface generic
+      module procedure sub1
+      module procedure sub2
+ end interface generic
+
+ |interface
+     module pure function fun1(x, z)
+          real :: fun1
+          real, intent(in) :: x
+          complex, intent(in) :: z
+     end function fun1
+     module function fun2(i, j) result(k)
+          integer :: k
+          integer, intent(in) :: i
+          type(int_arbitrary_prec), intent(in) :: j
+     end function fun2
+ end interface
+
+ abstract interface
+      subroutine sub_ifc()
+      end subroutine sub_ifc
+      function fun_ifc()
+           logical :: fun_ifc
+      end function fun_ifc
+ end interface
+
+end module ifc
+=-=-=
+
+Name: navigate thing prev interface 1
+=-=
+module ifc
+
+ interface generic
+      module procedure sub1
+      module procedure sub2
+ end interface generic
+
+ @interface
+     module pure function fun1(x, z)
+          real :: fun1
+          real, intent(in) :: x
+          complex, intent(in) :: z
+     end function fun1
+ |    module function fun2(i, j) result(k)
+          integer :: k
+          integer, intent(in) :: i
+          type(int_arbitrary_prec), intent(in) :: j
+     end function fun2
+ end interface
+
+ abstract interface
+      subroutine sub_ifc()
+      end subroutine sub_ifc
+      function fun_ifc()
+           logical :: fun_ifc
+      end function fun_ifc
+ end interface
+
+end module ifc
+=-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test--move-point-check #'f90-ts-thing-next-interface))
+
+Name: navigate thing next interface 1
+=-=
+module ifc
+
+ interface generic
+      module procedure sub1
+      module procedure sub2
+ end interface generic
+
+ interface
+     module pure function fun1(x, z)
+          real :: fun1
+          real, intent(in) :: x
+          complex, intent(in) :: z
+     end function fun1
+  |   module function fun2(i, j) result(k)
+          integer :: k
+          integer, intent(in) :: i
+          type(int_arbitrary_prec), intent(in) :: j
+     end function fun2
+ end interface
+
+ @abstract interface
+      subroutine sub_ifc()
+      end subroutine sub_ifc
+      function fun_ifc()
+           logical :: fun_ifc
+      end function fun_ifc
+ end interface
+
+end module ifc
+=-=-=

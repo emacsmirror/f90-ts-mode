@@ -14,6 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog
 
 **09-2026**
+ - Handling of trailing whitespace characters in thing-end-of-X navigation added.
  - Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and tree-sitter 0.20.8).
  - Fontification of error nodes fixed if line limitting is enabled.
  - Some issues in comment-region operations fixed (preserve indentation,
