@@ -40,7 +40,7 @@
        procedure(sub_ifc), nopass, pointer :: sub => null()
 !      ^^^^^^^^^ font-lock-keyword-face
 !               ^ f90-ts-font-lock-bracket-face
-!                ^^^^^^^ nil
+!                ^^^^^^^ font-lock-function-name-face
 !                       ^ f90-ts-font-lock-bracket-face
 !                        ^ f90-ts-font-lock-delimiter-face
 !                          ^^^^^^ font-lock-keyword-face
@@ -66,7 +66,7 @@
        procedure(fun_ifc), deferred :: fun
 !      ^^^^^^^^^ font-lock-keyword-face
 !               ^ f90-ts-font-lock-bracket-face
-!                ^^^^^^^ nil
+!                ^^^^^^^ font-lock-function-name-face
 !                       ^ f90-ts-font-lock-bracket-face
 !                        ^ f90-ts-font-lock-delimiter-face
 !                          ^^^^^^^^ font-lock-keyword-face

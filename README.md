@@ -14,6 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog
 
 **09-2026**
+ - Font locking of interface name in deferred procedure declaration fixed.
  - Handling of trailing whitespace characters in thing-end-of-X navigation added.
  - Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and tree-sitter 0.20.8).
  - Fontification of error nodes fixed if line limitting is enabled.
@@ -251,8 +252,10 @@ The following list provides features planned for implementation (somewhat ordere
   alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.
 - Indentation for labeled do loops, like:
+```f90
   do 123 i = 1,10
      do 123 j = 1,10
         print *, i, j
   123 end do
+```
   (Remark: the end do statement has one real and one virtual node to match the number of nested loops.)
