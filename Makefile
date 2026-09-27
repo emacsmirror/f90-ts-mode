@@ -47,6 +47,7 @@ ERTFLAGS = \
 
 SRCS =  f90-ts-workaround.el \
 		f90-ts-custom.el \
+		f90-ts-auxiliary.el \
 		f90-ts-mode.el \
 		f90-ts-nav.el \
 		test/f90-ts-mode-test.el
@@ -243,6 +244,7 @@ test-byte-compile:
 		--eval "(setq byte-compile-error-on-warn t)" \
 		--eval "(byte-compile-file \"f90-ts-workaround.el\")" \
 		--eval "(byte-compile-file \"f90-ts-custom.el\")" \
+		--eval "(byte-compile-file \"f90-ts-auxiliary.el\")" \
 		--eval "(byte-compile-file \"f90-ts-mode.el\")" \
 		--eval "(load-file \"f90-ts-mode.el\")" \
 		--eval "(byte-compile-file \"f90-ts-nav.el\")" \
