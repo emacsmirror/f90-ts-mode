@@ -7698,6 +7698,9 @@ in `markdown-view-mode'."
     (replace-match "\\1" t nil)))
 
 
+(declare-function url-insert-file-contents "url-handlers"
+                  (url &optional visit beg end replace))
+
 (defun f90-ts--browse-doc (doc-name)
   "Open the online document DOC-NAME from the github repository.
 If `markdown-view-mode' or github variant `gfm-view-mode' from the
@@ -7715,6 +7718,7 @@ package `markdown-mode' are available, then use these."
                          doc-name))
             (buffer-name (format "*f90-ts-mode %s*" doc-name)))
         (with-current-buffer (get-buffer-create buffer-name)
+          (require 'url)
           (erase-buffer)
           (url-insert-file-contents url)
           (f90-ts--strip-markdown-links)
