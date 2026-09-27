@@ -45,7 +45,7 @@ LOAD = \
 ERTFLAGS = \
 	--eval '(setq ert-batch-print-length nil ert-batch-print-level nil)'
 
-SRCS = f90-ts-workaround.el f90-ts-mode.el test/f90-ts-mode-test.el
+SRCS = f90-ts-workaround.el f90-ts-custom.el f90-ts-mode.el test/f90-ts-mode-test.el
 
 
 # ----------------------------------------------------------------------
@@ -238,6 +238,7 @@ test-byte-compile:
 		--eval "(add-to-list 'load-path \"test\")" \
 		--eval "(setq byte-compile-error-on-warn t)" \
 		--eval "(byte-compile-file \"f90-ts-workaround.el\")" \
+		--eval "(byte-compile-file \"f90-ts-custom.el\")" \
 		--eval "(byte-compile-file \"f90-ts-mode.el\")" \
 		--eval "(load-file \"f90-ts-mode.el\")" \
 		--eval "(byte-compile-file \"test/f90-ts-mode-test.el\")" \
