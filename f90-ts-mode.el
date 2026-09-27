@@ -870,17 +870,6 @@ Hence checking the type of the node works only partially."
       (eq (char-after start) ?#)))
 
 
-(defconst f90-ts--preproc-block-keyword-regexp
-  "^#\\(ifdef\\|ifndef\\|elifdef\\|elifndef\\|elif\\|else\\|endif\\|if\\)$"
-  "Regexp for matching preprocessor nodes of block type (if block).")
-
-
-(defun f90-ts--preproc-block-keyword-p (node)
-  "Match type of NODE against block type preprocessor keywords.
-This uses `f90-ts--preproc-block-keyword-regexp' as a regexp for the matching."
-  (f90-ts--node-type-match-p node f90-ts--preproc-block-keyword-regexp))
-
-
 (defconst f90-ts--builtin-functions
   '(;; integer/real
     "abs" "aimag" "aint" "anint" "ceiling" "conjg" "dble" "dim" "dprod"
@@ -1439,11 +1428,13 @@ example on empty lines)."
 
 (defun f90-ts--previous-stmt-keyword-by-first (first)
   "Return keyword of previous statement.
-Use node FIRST which provides the very first leaf node of previous statement.
-This might be a \"block_label_start_expression\", which needs to be skipped.
-
-Auxiliary function for `f90-ts--previous-stmt-keyword' or when
-first statement is known."
+The returned leaf node is usually some keyword like \"if\", \"elseif\", \"do\".
+In case of a block label the first leaf node FIRST is the label, not the
+keyword.  For use as anchor, the label is required.  For use as matcher, the
+keyword is relevant."
+  ;; if the statement starts with a block label, then first is unnamed
+  ;; node label, and its parent is block_label_start_expression. Its
+  ;; next sibling is a keyword like if or do (or some continuation line bustle)
   (if-let* ((block-label (f90-ts--node-block-label-ancestor first))
 	        (next (f90-ts--skip-continuation-forward block-label)))
       (cl-loop
@@ -1453,22 +1444,6 @@ first statement is known."
        finally return n)
     ;; not a label expression, just return first
     first))
-
-
-(defun f90-ts--previous-stmt-keyword (node parent)
-  "Return the previous statement leaf node.
-Use NODE and PARENT to deteremine previous statement or start of
-statement in a multiline statement.
-Usually some keyword like if, elseif, do, etc. for `f90-ts-prev-stmt-first'.
-In case of a block label the first leaf node is the label, not the keyword.
-For use as anchor, the label is required.  For use as matcher, we need the
-keyword.
-Keyword nodes become relevant for incomplete code with ERROR nodes."
-  ;; if the statement starts with a block label, then first is unnamed
-  ;; node label, and its parent is block_label_start_expression. Its
-  ;; next sibling is a keyword like if or do
-  (let ((first (f90-ts--previous-stmt-first node parent)))
-    (f90-ts--previous-stmt-keyword-by-first first)))
 
 
 (defun f90-ts--before-child (node line predicate)
@@ -1507,7 +1482,7 @@ Comment and preprocessor nodes are ignored as previous siblings."
 It usually ends in &, but might be followed by a comment.  First check that
 there is a next line after current line.
 LAST is expected to be the last node on the line, and can be obtained
-by `f90-ts--last-node-line'"
+by `f90-ts--last-node-on-line'"
   ;; if there is an ampersand (or ampersand (comment)) at end of line but
   ;; no other sibling follows, we are probably at end of file
   (when (treesit-node-next-sibling last)
@@ -1580,24 +1555,6 @@ If PARENT is a normal node, then return PARENT."
   (when-let* ((parent-nopp (f90-ts--parent-no-preproc parent))
               (gp (treesit-node-parent parent-nopp)))
     (f90-ts--parent-no-preproc gp)))
-
-
-(defun f90-ts--after-stmt-line1-p (node pos)
-  "Check whether position POS is on the next line after NODE.
-NODE is assumed to being part of a statement possibly spread over several lines.
-Empty lines are automatically skipped as those are not present in the tree."
-  ;; strategy: get last node on the same line as NODE, check whether it is &,
-  ;; goto next node, which is & on next line and compare with line number at pos;
-  ;; note that if "&" is at end of line, then there is always a second "&"
-  ;; at beginning of the next non-empty/non-comment line or at EOF,
-  ;; hence (treesit-next-sibling last) below can always be executed.
-  (when-let* ((cur-line (line-number-at-pos pos))
-              (pos-node (treesit-node-start node))
-              (last (f90-ts--last-node-on-line pos-node)))
-    (when (f90-ts--line-continued-at-end-p last pos-node)
-      (let ((nsib (treesit-node-next-sibling last)))
-        (and nsib
-             (not (< (f90-ts--node-line nsib) cur-line)))))))
 
 
 (defun f90-ts--indent-pos-at-node (node)
@@ -2459,7 +2416,7 @@ Use cached value or compute using cached node and parent."
 
 
 (defun f90-ts--indent-prev-stmt-keyword ()
-  "Return result of `f90-ts--previous-stmt-keyword' for cached node and parent.
+  "Return result of `f90-ts--previous-stmt-keyword-by-first'.
 Use cached value or compute using cached node and parent."
   (f90-ts--indent-with-cache
    f90-ts--indent-slot-prev-stmt-keyword
