@@ -62,12 +62,6 @@ Standard font-lock faces are used as well."
   :group  'f90-ts)
 
 
-(defgroup f90-ts-nav nil
-  "Navigation options used by `f90-ts-mode'."
-  :prefix "f90-ts-"
-  :group  'f90-ts)
-
-
 ;;;-----------------------------------------------------------------------------
 
 (defcustom f90-ts-indent-toplevel 0
@@ -390,53 +384,6 @@ Highlighting uses the face `f90-ts-font-lock-error-face'.
 
 
 ;;;-----------------------------------------------------------------------------
-
-(defface f90-ts-nav-procedure-face
-  '((t :inherit font-lock-function-name-face :weight bold))
-  "Face for subroutine, function, and interface entries in navigation buffer."
-  :group 'f90-ts-nav)
-
-
-(defface f90-ts-nav-type-face
-  '((t :inherit font-lock-type-face :weight bold))
-  "Face for type entries in navigation buffer."
-  :group 'f90-ts-nav)
-
-
-(defface f90-ts-nav-module-face
-  '((t :inherit font-lock-function-name-face :weight bold))
-  "Face for module, submodule, program entries in navigation buffer."
-  :group 'f90-ts-nav)
-
-
-(defface f90-ts-nav-variable-face
-  '((t :inherit default))
-  "Face for variable entries in navigation buffer."
-  :group 'f90-ts-nav)
-
-
-(defcustom f90-ts-nav-buffer-auto-sync t
-  "If non-nil the point in the nav buffer follows point in the source buffer."
-  :type 'boolean
-  :safe  #'booleanp
-  :group 'f90-ts-nav)
-
-
-(defcustom f90-ts-nav-buffer-idle-delay 1.0
-  "Seconds of idle time before the nav buffer is automatically refreshed."
-  :type 'number
-  :safe (lambda (x) (and (numberp x) (> x 0)))
-  :group 'f90-ts-nav)
-
-
-(defcustom f90-ts-nav-buffer-width 40
-  "Width of navigation buffer."
-  :type 'integer
-  :safe (lambda (x) (and (integerp x) (> x 0)))
-  :group 'f90-ts-nav)
-
-
-;;;-----------------------------------------------------------------------------
 ;;; other options
 
 (defcustom f90-ts-smart-end 'blink
@@ -483,14 +430,6 @@ defaulting to end of region if there is no active region present."
   :type '(choice (const :tag "Rightmost" rightmost)
                  (const :tag "Interactive" interactive))
   :safe (lambda (v) (memq v '(rightmost interactive)))
-  :group 'f90-ts)
-
-
-(defcustom f90-ts-menu-show-navigate t
-  "Show navigate submenu in fortran menu if non-nil.
-For large source files, the menu might not be useful and reduce performance."
-  :type  'boolean
-  :safe  #'booleanp
   :group 'f90-ts)
 
 

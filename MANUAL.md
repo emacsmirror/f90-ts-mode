@@ -13,9 +13,14 @@ for implementation.
 
 - [Installation](#installation)
   - [Tree-sitter grammar](#tree-sitter-grammar)
+    -[Installing the grammar in Emacs](#installing-the-grammar-in-emacs)
   - [Tree-sitter based mode](#tree-sitter-based-mode)
   - [Setup](#setup)
-  - [Keybindings](#keybindings)
+    - [Standard installation via package manager](#standard-installation-via-package-manager)
+    - [Optional packages](#ptional-packages)
+    - [Development setup via local clone](#development-setup-via-local-clone)
+    - [Loading test package](#Loading test package)
+- [Keybindings](#keybindings)
 - [Features](#features)
   - [Syntax highlight and font lock faces](#syntax-highlight-and-font-lock-faces)
     - [Syntax highlighting of error regions](#syntax-highlighting-of-error-regions)
@@ -149,7 +154,7 @@ git clone https://github.com/mscfd/emacs-f90-ts-mode.git path_to/emacs-f90-ts-mo
 The mode itself and optionally the testing module can be loaded with `use-package`
 placed somewhere in `init.el` (or elsewhere).
 
-#### Standard installation (package manager)
+#### Standard installation via package manager
 
 ```elisp
 (use-package f90-ts-mode
@@ -190,7 +195,21 @@ placed somewhere in `init.el` (or elsewhere).
          ("A-}"           . #'f90-ts-mark-region-last-sibling)))
 ```
 
-#### Development setup (local clone)
+#### Optional packages
+
+A navigation tree in the fortran menu and a side panel with the tree
+can be enabled by loading optional package `f90-ts-nav`:
+
+```elisp
+(use-package f90-ts-nav
+  :after f90-ts-mode
+  ;; demand loading after f90-ts-mode, otherwise entries for nav-tree functions
+  ;; do not show up in menus
+  :demand t)
+```
+
+
+#### Development setup via local clone
 
 First clone the repository of `f90-ts-mode` as mentioned above.
 Then modify the use-package block:
@@ -209,7 +228,7 @@ Then modify the use-package block:
   ...
 ```
 
-#### Testing module
+#### Loading test package
 
 The testing helpers are only required for development and repository testing.
 
@@ -536,14 +555,14 @@ Entries are grouped by `module`, `submodule`, `subroutine`, `function`, `module 
 
 ### Navigation menu
 
-Additionally to the Imenu grouping, the `Fortran` menu offers a submenu where the same imenu
-items are structured as a tree reflecting the hierarchical structure of the source file,
+Additionally to the Imenu grouping, the optional `Fortran` menu offers a submenu where the
+same imenu items are structured as a tree reflecting the hierarchical structure of the source file,
 with submenus for structures that contain other items.
-
+This requires and extra use-package statement to load the optional package, see #
 
 ### Navigation buffer
 
-The navigation buffer provides a persistent side panel showing the structure of the current
+The optional navigation buffer provides a persistent side panel showing the structure of the current
 Fortran source buffer. It is based on the same tree as offered in
 the [Navigation menu](#navigation-menu) and a sparse version of the tree-sitter tree.
 

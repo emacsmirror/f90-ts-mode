@@ -14,7 +14,10 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog
 
 **09-2026**
- - `f90-ts-indent-delete-trailing-whitespace' added to automatically delete
+ - `f90-ts-mode.el` decomposed into several smaller packages. Experimental
+   `f90-ts-nav` (tree in fortran menu and tree view in side panel) has been
+   made optional and requires a separate use-package to load it.
+ - `f90-ts-indent-delete-trailing-whitespace` added to automatically delete
    trailing whitespace after indentation operation.
  - Font locking of interface name in deferred procedure declaration fixed.
  - Handling of trailing whitespace characters in thing-end-of-X navigation added.
@@ -56,7 +59,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
  - About, README and MANUAL entries in the fortran and transient
    popup menu to view information about the mode added.
  - Additional font-locking for error regions added.  This can be customized by
-   `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
+   `f90-ts-font-lock-error` and `f90-ts-font-lock-error-face`.
  - Smart end completion of coarray "change team ... end team" blocks fixed. It was
    wrongly assumed that the end statement is "end change team".
 
@@ -214,6 +217,20 @@ It will automatically be loaded when opening a file with extension `.f90`.
          ("A-]"           . #'f90-ts-mark-region-next-sibling)
          ("A-}"           . #'f90-ts-mark-region-last-sibling)))
 ```
+
+4. Enable optional packages
+
+A navigation tree in the fortran menu and a side panel with the tree
+can be enabled by loading optional package `f90-ts-nav`:
+
+```elisp
+(use-package f90-ts-nav
+  :after f90-ts-mode
+  ;; demand loading after f90-ts-mode, otherwise entries for nav-tree functions
+  ;; do not show up in menus
+  :demand t)
+```
+
 
 *Remark:*
 The readme and manual documents can be easily loaded from github and opened via the fortran menu
