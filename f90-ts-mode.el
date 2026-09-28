@@ -3723,32 +3723,6 @@ completion for a region, like indent-stmt operations on an end struct line."
 ;;; region indentation:
 ;;;  * f90-ts-indent-and-complete-region
 
-(defconst f90-ts--join-line-prev-valid-actions
-  '(empty-line
-    beg-of-buffer
-    remove-blank-lines-between
-    join-continued-lines
-    join-continued-string
-    join-comments-same-prefix-trimmed
-    join-comments-same-prefix-with-blanks
-    append-comment-after-amp
-    append-comment-after-stmt)
-  "All valid action symbols returned by `f90-ts--join-line-prev-aux'.")
-
-
-(defconst f90-ts--join-line-next-valid-actions
-  '(empty-line
-    end-of-buffer
-    remove-blank-lines-between
-    join-continued-lines
-    join-continued-string
-    join-comments-same-prefix-trimmed
-    join-comments-same-prefix-with-blanks
-    append-comment-after-amp
-    append-comment-after-stmt)
-  "All valid action symbols returned by `f90-ts--join-line-next-aux'.")
-
-
 (defun f90-ts-indent-and-complete-line ()
   "Indent and apply smart end completion to current line.
 This is the default function for indent and smart complete of end lines,
@@ -3952,6 +3926,32 @@ The variant to be used can be customized.  Intended for use in key bindings."
 
 ;;;-----------------------------------------------------------------------------
 ;;; Break lines and add continuation symbol
+
+(defconst f90-ts--join-line-prev-valid-actions
+  '(empty-line
+    beg-of-buffer
+    remove-blank-lines-between
+    join-continued-lines
+    join-continued-string
+    join-comments-same-prefix-trimmed
+    join-comments-same-prefix-with-blanks
+    append-comment-after-amp
+    append-comment-after-stmt)
+  "All valid action symbols returned by `f90-ts--join-line-prev-aux'.")
+
+
+(defconst f90-ts--join-line-next-valid-actions
+  '(empty-line
+    end-of-buffer
+    remove-blank-lines-between
+    join-continued-lines
+    join-continued-string
+    join-comments-same-prefix-trimmed
+    join-comments-same-prefix-with-blanks
+    append-comment-after-amp
+    append-comment-after-stmt)
+  "All valid action symbols returned by `f90-ts--join-line-next-aux'.")
+
 
 (defun f90-ts--break-line-insert-amp-at-end ()
   "If not yet present, insert ampersand at end of line."
