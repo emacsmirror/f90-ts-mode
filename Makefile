@@ -156,7 +156,7 @@ test-ert-discover:
 # ----------------------------------------------------------------------
 
 .PHONY: test-ert-parallel
-test-ert-parallel:
+test-ert-parallel: test-checkdoc test-byte-compile
 	@set -e; \
 	tmp_tests=$$(mktemp); \
 	tmp_make=$$(mktemp); \
@@ -247,37 +247,23 @@ test-checkdoc:
 
 .PHONY: test-byte-compile
 test-byte-compile:
-	@$(EMACS) $(EMACSFLAGS) \
-		$(TREE_SITTER_LOAD) \
-		--eval "(add-to-list 'load-path \"test\")" \
-		--eval "(setq byte-compile-error-on-warn t)" \
-		--eval "(byte-compile-file \"f90-ts-workaround.el\")" \
-		--eval "(byte-compile-file \"f90-ts-custom.el\")" \
-		--eval "(byte-compile-file \"f90-ts-auxiliary.el\")" \
-		--eval "(byte-compile-file \"f90-ts-font-lock.el\")" \
-		--eval "(byte-compile-file \"f90-ts-indent.el\")" \
-		--eval "(byte-compile-file \"f90-ts-break-join-fill.el\")" \
-		--eval "(byte-compile-file \"f90-ts-mark-region.el\")" \
-		--eval "(byte-compile-file \"f90-ts-comment-region.el\")" \
-		--eval "(byte-compile-file \"f90-ts-xref.el\")" \
-		--eval "(byte-compile-file \"f90-ts-imenu.el\")" \
-		--eval "(byte-compile-file \"f90-ts-thing.el\")" \
-		--eval "(byte-compile-file \"f90-ts-mode.el\")" \
-		--eval "(load-file \"f90-ts-mode.el\")" \
-		--eval "(byte-compile-file \"f90-ts-nav.el\")" \
-		--eval "(byte-compile-file \"test/f90-ts-mode-test.el\")" \
-		--eval "(when (get-buffer \"*Compile-Log*\") \
-		  (with-current-buffer \"*Compile-Log*\" \
-		    (let ((content (string-trim (buffer-string)))) \
-		      (when (string-match-p \"Error:\" content) \
-		        (kill-emacs 1)))))" \
-	2>&1; \
-	rc=$$?; \
+	@set -e; \
+	for file in $(SRCS); do \
+		echo "byte-compile: $$file"; \
+		$(EMACS) $(EMACSFLAGS) \
+			$(TREE_SITTER_LOAD) \
+			--eval "(setq byte-compile-error-on-warn t)" \
+			--eval "(condition-case err \
+			          (if (byte-compile-file \"$$file\") \
+			              (kill-emacs 0) \
+			            (kill-emacs 1)) \
+			        (error \
+			         (princ (error-message-string err) \
+			                'external-debugging-output) \
+			         (kill-emacs 1)))"; \
+	done; \
 	rm -f $(foreach f,$(SRCS),$(f:%.el=%.elc)); \
-	if [ $$rc -eq 0 ]; then \
-		echo "byte-compile: all files passed"; \
-	fi; \
-	exit $$rc
+	echo "byte-compile: all files passed"
 
 
 # ----------------------------------------------------------------------
