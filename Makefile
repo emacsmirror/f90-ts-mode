@@ -53,6 +53,7 @@ SRCS = \
 	f90-ts-indent.el \
 	f90-ts-break-join-fill.el \
 	f90-ts-mark-region.el \
+	f90-ts-xref.el \
 	f90-ts-mode.el \
 	f90-ts-nav.el \
 	test/f90-ts-mode-test.el
@@ -254,6 +255,7 @@ test-byte-compile:
 		--eval "(byte-compile-file \"f90-ts-indent.el\")" \
 		--eval "(byte-compile-file \"f90-ts-break-join-fill.el\")" \
 		--eval "(byte-compile-file \"f90-ts-mark-region.el\")" \
+		--eval "(byte-compile-file \"f90-ts-xref.el\")" \
 		--eval "(byte-compile-file \"f90-ts-mode.el\")" \
 		--eval "(load-file \"f90-ts-mode.el\")" \
 		--eval "(byte-compile-file \"f90-ts-nav.el\")" \
