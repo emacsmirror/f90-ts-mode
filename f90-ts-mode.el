@@ -394,41 +394,6 @@ Changelog:
 
 
 ;;;-----------------------------------------------------------------------------
-;;; switches for grammar variant
-
-(defvar f90-ts--string-literal-variant-cached 'unknown
-  "Cached grammar variant for string_literal of loaded fortran grammar.
-Original grammar just had a named leaf node `string_literal'.
-New grammar decomposes it into its parts and ampersand, comment and
-quote symbols.
-Value is `unknown' until first detection, then t for new and nil
-for original grammar rule.")
-
-
-(defun f90-ts--string-literal-decomposed-p ()
-  "Return non-nil if string_literal is decomposed by the Fortran grammar.
-The original grammar provided `string_literal' as a named leaf node.
-Newer grammars decompose it into its parts (with `string_literal_part',
-quotation, comment etc. as children of `string_literal').
-Result is detected once and cached for the session."
-  (when (eq f90-ts--string-literal-variant-cached 'unknown)
-    (setq f90-ts--string-literal-variant-cached
-          (condition-case nil
-              (progn
-                ;; eagerly compile a query with `string_literal_part',
-                ;; if it is unknown, this signals a `treesit-query-error',
-                ;; otherwise a `treesit-compiled-query' object is returned
-                (treesit-query-compile 'fortran '((string_literal_part) @x) t)
-                t)
-            (treesit-query-error nil)
-            (error nil)))
-    ;;(f90-ts-log-msg :grammar "discovered string literal: %s" f90-ts--string-literal-variant-cached)
-    )
-  ;; return cached value
-  f90-ts--string-literal-variant-cached)
-
-
-;;;-----------------------------------------------------------------------------
 ;;; Font-locking: auxiliary
 
 (defun f90-ts--fontify-comment (node override start end &rest _)

@@ -38,8 +38,9 @@
 ;; functions on Emacs 30+ and to workaround implementations on
 ;; Emacs 29.x.  There is just one bug in Emacs 30+ (or rather
 ;; tree-sitter 0.25+) in `treesit-node-parent', which needs patching.
+;; It also provides code to discover and manage different grammar variants.
 ;;
-;; Three kinds of bugs are addressed:
+;; Four kind of bugs and workarounds are addressed:
 ;;
 ;; - The optional leading ampersand in continued lines is represented as
 ;;   a virtual (zero-width) token.  Around such virtual tokens, parent and
@@ -65,6 +66,9 @@
 ;;   `f90-ts--beginning-of-thing-29' and `f90-ts--end-of-thing-29'.
 ;;   Implementations do not mirror those of Emacs 30+, but are simpler (with
 ;;   respect to argument TACTIC).  Thus navigation in 29 is somewhat different.
+;;
+;; - Grammar versions requiring a switch.  Currently this is required for
+;;   the `string_literal' variants.
 ;;
 ;; The public dispatch between native and fallback/patched
 ;; implementations (`f90-ts--field-name-p', `f90-ts--children-by-fields',
@@ -544,6 +548,42 @@ Uses the native `treesit-navigate-thing' on Emacs 30+, and
 
 
 ;;;-----------------------------------------------------------------------------
+;;; switches for grammar variant
+
+(defvar f90-ts--string-literal-variant-cached 'unknown
+  "Cached grammar variant for string_literal of loaded fortran grammar.
+Original grammar just had a named leaf node `string_literal'.
+New grammar decomposes it into its parts and ampersand, comment and
+quote symbols.
+Value is `unknown' until first detection, then t for new and nil
+for original grammar rule.")
+
+
+(defun f90-ts--string-literal-decomposed-p ()
+  "Return non-nil if string_literal is decomposed by the Fortran grammar.
+The original grammar provided `string_literal' as a named leaf node.
+Newer grammars decompose it into its parts (with `string_literal_part',
+quotation, comment etc. as children of `string_literal').
+Result is detected once and cached for the session."
+  (when (eq f90-ts--string-literal-variant-cached 'unknown)
+    (setq f90-ts--string-literal-variant-cached
+          (condition-case nil
+              (progn
+                ;; eagerly compile a query with `string_literal_part',
+                ;; if it is unknown, this signals a `treesit-query-error',
+                ;; otherwise a `treesit-compiled-query' object is returned
+                (treesit-query-compile 'fortran '((string_literal_part) @x) t)
+                t)
+            (treesit-query-error nil)
+            (error nil)))
+    ;;(f90-ts-log-msg :grammar "discovered string literal: %s" f90-ts--string-literal-variant-cached)
+    )
+  ;; return cached value
+  f90-ts--string-literal-variant-cached)
+
+
+;;;-----------------------------------------------------------------------------
+
 (provide 'f90-ts-workaround)
 
 ;;; f90-ts-workaround.el ends here
