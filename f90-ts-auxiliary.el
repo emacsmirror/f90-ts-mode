@@ -1217,6 +1217,82 @@ If the line is empty, return nil."
 
 
 ;;;-----------------------------------------------------------------------------
+;;; Imenu and navigation queries
+
+(defconst f90-ts--nav-queries
+  `(("program"
+     :label   "program"
+     :capture name_program
+     :query   "(program (program_statement \"program\" (name) @name_program))")
+
+    ("module"
+     :label   "module"
+     :capture name_module
+     :query   "(module (module_statement \"module\" (name) @name_module))")
+
+    ("submodule"
+     :label   "submodule"
+     :capture name_submodule
+     :query   "(submodule (submodule_statement \"submodule\" (name) @name_submodule))")
+
+    ("subroutine"
+     :label   "subroutine"
+     :capture name_subroutine
+     :query   "(subroutine (subroutine_statement \"subroutine\" name: (name) @name_subroutine))")
+
+    ("function"
+     :label   "function"
+     :capture name_function
+     :query   "(function (function_statement \"function\" name: (name) @name_function))")
+
+    ("module_procedure"
+     :label   "module procedure"
+     :capture name_module_proc
+     :query   "(module_procedure (module_procedure_statement \"module\" \"procedure\" name: (name) @name_module_proc))")
+
+    ("derived_type_definition"
+     :label   "derived type"
+     :capture name_dt_type
+     :query   "(derived_type_definition (derived_type_statement \"type\" (_) * (type_name) @name_dt_type))")
+
+    ("interface"
+     :label   "interface"
+     :capture name_interface
+     :query   ,(concat "(interface (interface_statement (abstract_specifier)?"
+                       " \"interface\""
+                       " [((name) @name_interface)"
+                       "  ((operator) @name_interface)"
+                       "  ((assignment) @name_interface)]?"
+                       "))"))
+
+    ("variable_declaration"
+     :label   "variable"
+     :capture name_var_decl
+     :query   ,(concat "(variable_declaration"
+                       " declarator:"
+                       " [((identifier) @name_var_decl)"
+                       "  (init_declarator left: (identifier) @name_var_decl)"
+                       "  (pointer_init_declarator left: (identifier) @name_var_decl)"
+                       "  (sized_declarator (identifier) @name_var_decl)])")
+     :leaf t))
+  "Query specification and properties for Imenu, nav-buffer and nav-tree menu.
+Each entry is a list (KEY PLIST) where KEY is a string returned by the related
+Tree-sitter node type, and PLIST may contain:
+  :label   Display string used in Imenu and menus.
+  :capture Symbol matching the Tree-sitter capture name for the node name.
+  :query   Tree-sitter query string capturing the relevant node name.
+  :leaf    Non-nil if entries should be treated as leaf nodes (no children).")
+
+
+(defconst f90-ts--nav-capture-key-alist
+  (cl-loop for (key . plist) in f90-ts--nav-queries
+           collect (cons (plist-get plist :capture) key))
+  "Alist mapping Tree-sitter capture symbols to query-key.
+Each entry is (CAPTURE-SYMBOL . KEY) where KEY is the
+car of the corresponding entry in `f90-ts--nav-queries'.")
+
+
+;;;-----------------------------------------------------------------------------
 
 (provide 'f90-ts-auxiliary)
 

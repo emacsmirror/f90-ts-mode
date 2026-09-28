@@ -46,6 +46,10 @@
 ;; provide workarounds and missing functions for Emacs 29
 (require 'f90-ts-workaround)
 
+;; auxiliary stuff, in particular `f90-ts--nav-queries'
+(require 'f90-ts-auxiliary)
+
+;; main mode to hook into f90-ts-mode-menu
 (require 'f90-ts-mode)
 
 
@@ -146,6 +150,7 @@ non-nil and non-empty it is appended as \"LABEL: NAME\"."
 If no :face property is present, return `f90-ts-nav-variable-face' as default."
   (or (plist-get (alist-get key f90-ts--nav-faces) :face)
       'f90-ts-nav-variable-face))
+
 
 ;;;-----------------------------------------------------------------------------
 ;;; Navigation tree builder (for use with fortran easy-menu and navigation buffer)
