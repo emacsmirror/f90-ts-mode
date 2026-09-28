@@ -156,6 +156,7 @@
 (require 'f90-ts-comment-region)
 (require 'f90-ts-xref)
 (require 'f90-ts-imenu)
+(require 'f90-ts-thing)
 
 
 ;;;-----------------------------------------------------------------------------
@@ -293,211 +294,7 @@ Changelog:
 
 
 ;;;-----------------------------------------------------------------------------
-;;; transient
-
-(transient-define-infix f90-ts-transient--indent-list-line ()
-  "Transient infix for indent-line alignment variant."
-  :class    'transient-lisp-variable
-  :variable 'f90-ts-indent-list-line
-  :prompt   "Indent list line method: "
-  :reader   (lambda (prompt initial _history)
-              (let* ((choice (completing-read
-                               prompt
-                               f90-ts--indent-options-alist
-                               nil t nil nil
-                               (car (rassq initial f90-ts--indent-options-alist)))))
-                (cdr (assoc choice f90-ts--indent-options-alist)))))
-
-
-(transient-define-infix f90-ts-transient--fill-column ()
-  "Transient infix for fill column override."
-  :class    'transient-lisp-variable
-  :variable 'fill-column
-  :prompt   "Fill column: "
-  :reader   (lambda (prompt initial _history)
-               (read-number prompt initial)))
-
-
-(transient-define-suffix f90-ts-transient--fill-select-breakpoint-by ()
-  "Toggle breakpoint selection between `rightmost' and `interactive'."
-  :transient t
-  :description (lambda ()
-                 (concat "Fill column select by: "
-                         (propertize (symbol-name f90-ts-fill-select-breakpoint-by)
-                                     'face 'transient-value)))
-  (interactive)
-  (setq f90-ts-fill-select-breakpoint-by
-        (if (eq f90-ts-fill-select-breakpoint-by 'interactive)
-            'rightmost
-          'interactive)))
-
-
-(transient-define-prefix f90-ts-transient ()
-  "F90 Tree-sitter Mode."
-  ;; Modify
-  [["Indentation, break & join"
-    ("L"     "Indent list line:"          f90-ts-transient--indent-list-line)
-    ("TAB"   "Indent & comlete line"      f90-ts-indent-and-complete-line)
-    ("s"     "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
-    ("I"     "Indent & complete region"   f90-ts-indent-and-complete-region)
-    ("C-TAB" "Indent line"                f90-ts-indent-line)
-    ("C-I"   "Indent region"              f90-ts-indent-region)
-    ("b"     "Break line"                 f90-ts-break-line)
-    ("j"     "Join with previous line"    f90-ts-join-line-prev)
-    ("J"     "Join with next line"        f90-ts-join-line-next)
-    ("C-s"   "Shift line break"           f90-ts-shift-line-break)]
-   ["Mark and (un)comment region"
-    ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
-    ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
-    ("9"   "Shrink to last child"       f90-ts-mark-region-shrink-child-last)
-    ("{"   "First sibling"              f90-ts-mark-region-first-sibling)
-    ("["   "Previous sibling"           f90-ts-mark-region-prev-sibling)
-    ("]"   "Next sibling"               f90-ts-mark-region-next-sibling)
-    ("}"   "Last sibling"               f90-ts-mark-region-last-sibling)
-    ("X"   "Exchange point and mark"    exchange-point-and-mark)
-    ("c"   "Comment region (default)"   f90-ts-comment-region-default)
-    ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]
-   ["Fill/Rebalance"
-    ("C-f" "Fill column:"               f90-ts-transient--fill-column)
-    ("C-b"                              f90-ts-transient--fill-select-breakpoint-by) ; text is in description slot
-    ("f"   "Fill region/buffer"         f90-ts-fill-region)
-    ("M-f" "Fill at line"               f90-ts-fill-at-line)
-    ("M-j" "Fill with prev line"        f90-ts-fill-prev-line)
-    ("M-J" "Fill with next line"        f90-ts-fill-next-line)]]
-
-  ;; Navigate
-  [["Procedure"
-    ("a"   "Beginning"                  f90-ts-thing-beginning-of-procedure)
-    ("e"   "End"                        f90-ts-thing-end-of-procedure)
-    ("p"   "Previous"                   f90-ts-thing-prev-procedure)
-    ("n"   "Next"                       f90-ts-thing-next-procedure)]
-   ["Derived Type"
-    ("M-a" "Beginning"                  f90-ts-thing-beginning-of-type)
-    ("M-e" "End"                        f90-ts-thing-end-of-type)
-    ("M-p" "Previous"                   f90-ts-thing-prev-type)
-    ("M-n" "Next"                       f90-ts-thing-next-type)]
-  ["Interface"
-    ("C-M-a" "Beginning"                f90-ts-thing-beginning-of-interface)
-    ("C-M-e" "End"                      f90-ts-thing-end-of-interface)
-    ("C-M-p" "Previous"                 f90-ts-thing-prev-interface)
-    ("C-M-n" "Next"                     f90-ts-thing-next-interface)]]
-
-  [["Xref"
-    ("."   "Find definition"            xref-find-definitions)
-    (","   "Find references"            xref-find-references)
-    ("/"   "Find apropos"               xref-find-apropos)
-    ("<"   "Go back"                    xref-go-back)
-    (">"   "Go forward"                 xref-go-forward)]
-   ["Side panel (alpha!)"
-    :if (lambda () (featurep 'f90-ts-nav))
-    ("B"   "Open nav buffer"            f90-ts-nav-buffer-open)
-    ("F"   "Focus nav buffer"           f90-ts-nav-buffer-focus)]
-   ["About & Doc"
-    ("C-h a" "About"                    f90-ts-mode-about)
-    ("C-h r" "README"                   f90-ts--browse-readme)
-    ("C-h m" "MANUAL"                   f90-ts--browse-manual)]])
-
-
-;;;-----------------------------------------------------------------------------
-;;; Defun and thing
-
-(defun f90-ts--defun-name (node)
-  "Return the name of defun NODE, for use in `which-function-mode' etc."
-  (caar (f90-ts--imenu-name-pos-fn node)))
-
-
-(defconst f90-ts--thing-defun-regexp-pred
-  (cons
-   (concat "^" (regexp-opt '("module"
-                             "submodule"
-                             "program"
-                             "subroutine"
-                             "function"
-                             "module_procedure"
-                             "interface"
-                             "derived_type_definition")) "$")
-   #'f90-ts--node-named-p)
-  "Regexp and predicate for matching node types to determine defun nodes.")
-
-
-(defconst f90-ts--thing-procedure-regexp-pred
-  (cons
-   (concat "^" (regexp-opt '("subroutine"
-                             "function"
-                             "module_procedure")) "$")
-   #'f90-ts--node-named-p)
-  "Regexp and predicate for matching node types to determine procedure nodes.")
-
-
-(defconst f90-ts--thing-interface-regexp-pred
-  (cons
-   "^interface$"
-   #'f90-ts--node-named-p)
-  "Regexp and predicate for matching node types to determine interface nodes.")
-
-
-(defconst f90-ts--thing-type-regexp-pred
-  (cons
-   "^derived_type_definition$"
-   #'f90-ts--node-named-p)
-  "Regexp and predicate for matching node types to determine derived type nodes.")
-
-
-(defconst f90-ts--thing-settings
-  `((fortran
-     (defun     ,f90-ts--thing-defun-regexp-pred)
-     (procedure ,f90-ts--thing-procedure-regexp-pred)
-     (interface ,f90-ts--thing-interface-regexp-pred)
-     (type      ,f90-ts--thing-type-regexp-pred)))
-  "List of things with regexp and predicates to identify relevant nodes.")
-
-
-(defun f90-ts--end-of-thing-trimmed (thing &optional arg tactic)
-  "Execute `treesit-end-of-thing' with trimming.
-Arguments THING, ARG and TACTIC are the same as for `treesit-end-of-thing'.
-
-Use a trimmed end of node by skipping trailing whitespace
-characters."
-  ;; to avoid going to end of non-trimmed node, skip whitespace (trailing)
-  ;; characters, if skipped whitespace characters are not trailing, then it
-  ;; should still make no difference
-  (skip-chars-forward " \t\n")
-  (f90-ts--end-of-thing thing arg tactic)
-  ;; in case of a non-trimmed node with trailing blanks, skip backwards
-  (skip-chars-backward " \t\n"))
-
-
-(defmacro f90-ts--define-thing-commands (thing label)
-  "Define next/prev/beginning/end-of navigation commands for THING.
-LABEL is used in the generated docstrings."
-  (let ((next (intern (format "f90-ts-thing-next-%s" thing)))
-        (prev (intern (format "f90-ts-thing-prev-%s" thing)))
-        (beg  (intern (format "f90-ts-thing-beginning-of-%s" thing)))
-        (end  (intern (format "f90-ts-thing-end-of-%s" thing))))
-    `(progn
-       (defun ,next () ,(format "Move to next %s." label)
-         (interactive)
-         (when-let* ((pos (f90-ts--navigate-thing (point) 1 ',thing)))
-           (goto-char pos)))
-       (defun ,prev () ,(format "Move to previous %s." label)
-         (interactive)
-         (when-let* ((pos (f90-ts--navigate-thing (point) -1 ',thing)))
-           (goto-char pos)))
-       (defun ,beg () ,(format "Move to beginning of current %s." label)
-         (interactive)
-         (f90-ts--beginning-of-thing ',thing))
-       (defun ,end () ,(format "Move to end of current %s." label)
-         (interactive)
-         (f90-ts--end-of-thing-trimmed ',thing)))))
-
-
-(f90-ts--define-thing-commands procedure "procedure")
-(f90-ts--define-thing-commands type "derived type")
-(f90-ts--define-thing-commands interface "interface")
-
-
-;;;-----------------------------------------------------------------------------
-;;; about and documentation for menu
+;;; about page and documentation
 
 (defun f90-ts--snapshot-version-p ()
   "Return non-nil if this is a snapshot version."
@@ -610,6 +407,112 @@ package `markdown-mode' are available, then use these."
      'action (lambda (_)
                (f90-ts--browse-doc "MANUAL.md")))
     (insert "\n")))
+
+
+;;;-----------------------------------------------------------------------------
+;;; transient
+
+(transient-define-infix f90-ts-transient--indent-list-line ()
+  "Transient infix for indent-line alignment variant."
+  :class    'transient-lisp-variable
+  :variable 'f90-ts-indent-list-line
+  :prompt   "Indent list line method: "
+  :reader   (lambda (prompt initial _history)
+              (let* ((choice (completing-read
+                               prompt
+                               f90-ts--indent-options-alist
+                               nil t nil nil
+                               (car (rassq initial f90-ts--indent-options-alist)))))
+                (cdr (assoc choice f90-ts--indent-options-alist)))))
+
+
+(transient-define-infix f90-ts-transient--fill-column ()
+  "Transient infix for fill column override."
+  :class    'transient-lisp-variable
+  :variable 'fill-column
+  :prompt   "Fill column: "
+  :reader   (lambda (prompt initial _history)
+               (read-number prompt initial)))
+
+
+(transient-define-suffix f90-ts-transient--fill-select-breakpoint-by ()
+  "Toggle breakpoint selection between `rightmost' and `interactive'."
+  :transient t
+  :description (lambda ()
+                 (concat "Fill column select by: "
+                         (propertize (symbol-name f90-ts-fill-select-breakpoint-by)
+                                     'face 'transient-value)))
+  (interactive)
+  (setq f90-ts-fill-select-breakpoint-by
+        (if (eq f90-ts-fill-select-breakpoint-by 'interactive)
+            'rightmost
+          'interactive)))
+
+
+(transient-define-prefix f90-ts-transient ()
+  "F90 Tree-sitter Mode."
+  ;; Modify
+  [["Indentation, break & join"
+    ("L"     "Indent list line:"          f90-ts-transient--indent-list-line)
+    ("TAB"   "Indent & comlete line"      f90-ts-indent-and-complete-line)
+    ("s"     "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
+    ("I"     "Indent & complete region"   f90-ts-indent-and-complete-region)
+    ("C-TAB" "Indent line"                f90-ts-indent-line)
+    ("C-I"   "Indent region"              f90-ts-indent-region)
+    ("b"     "Break line"                 f90-ts-break-line)
+    ("j"     "Join with previous line"    f90-ts-join-line-prev)
+    ("J"     "Join with next line"        f90-ts-join-line-next)
+    ("C-s"   "Shift line break"           f90-ts-shift-line-break)]
+   ["Mark and (un)comment region"
+    ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
+    ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
+    ("9"   "Shrink to last child"       f90-ts-mark-region-shrink-child-last)
+    ("{"   "First sibling"              f90-ts-mark-region-first-sibling)
+    ("["   "Previous sibling"           f90-ts-mark-region-prev-sibling)
+    ("]"   "Next sibling"               f90-ts-mark-region-next-sibling)
+    ("}"   "Last sibling"               f90-ts-mark-region-last-sibling)
+    ("X"   "Exchange point and mark"    exchange-point-and-mark)
+    ("c"   "Comment region (default)"   f90-ts-comment-region-default)
+    ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]
+   ["Fill/Rebalance"
+    ("C-f" "Fill column:"               f90-ts-transient--fill-column)
+    ("C-b"                              f90-ts-transient--fill-select-breakpoint-by) ; text is in description slot
+    ("f"   "Fill region/buffer"         f90-ts-fill-region)
+    ("M-f" "Fill at line"               f90-ts-fill-at-line)
+    ("M-j" "Fill with prev line"        f90-ts-fill-prev-line)
+    ("M-J" "Fill with next line"        f90-ts-fill-next-line)]]
+
+  ;; Navigate
+  [["Procedure"
+    ("a"   "Beginning"                  f90-ts-thing-beginning-of-procedure)
+    ("e"   "End"                        f90-ts-thing-end-of-procedure)
+    ("p"   "Previous"                   f90-ts-thing-prev-procedure)
+    ("n"   "Next"                       f90-ts-thing-next-procedure)]
+   ["Derived Type"
+    ("M-a" "Beginning"                  f90-ts-thing-beginning-of-type)
+    ("M-e" "End"                        f90-ts-thing-end-of-type)
+    ("M-p" "Previous"                   f90-ts-thing-prev-type)
+    ("M-n" "Next"                       f90-ts-thing-next-type)]
+  ["Interface"
+    ("C-M-a" "Beginning"                f90-ts-thing-beginning-of-interface)
+    ("C-M-e" "End"                      f90-ts-thing-end-of-interface)
+    ("C-M-p" "Previous"                 f90-ts-thing-prev-interface)
+    ("C-M-n" "Next"                     f90-ts-thing-next-interface)]]
+
+  [["Xref"
+    ("."   "Find definition"            xref-find-definitions)
+    (","   "Find references"            xref-find-references)
+    ("/"   "Find apropos"               xref-find-apropos)
+    ("<"   "Go back"                    xref-go-back)
+    (">"   "Go forward"                 xref-go-forward)]
+   ["Side panel (alpha!)"
+    :if (lambda () (featurep 'f90-ts-nav))
+    ("B"   "Open nav buffer"            f90-ts-nav-buffer-open)
+    ("F"   "Focus nav buffer"           f90-ts-nav-buffer-focus)]
+   ["About & Doc"
+    ("C-h a" "About"                    f90-ts-mode-about)
+    ("C-h r" "README"                   f90-ts--browse-readme)
+    ("C-h m" "MANUAL"                   f90-ts--browse-manual)]])
 
 
 ;;;-----------------------------------------------------------------------------

@@ -56,6 +56,7 @@ SRCS = \
 	f90-ts-comment-region.el \
 	f90-ts-xref.el \
 	f90-ts-imenu.el \
+	f90-ts-thing.el \
 	f90-ts-mode.el \
 	f90-ts-nav.el \
 	test/f90-ts-mode-test.el
@@ -260,6 +261,7 @@ test-byte-compile:
 		--eval "(byte-compile-file \"f90-ts-comment-region.el\")" \
 		--eval "(byte-compile-file \"f90-ts-xref.el\")" \
 		--eval "(byte-compile-file \"f90-ts-imenu.el\")" \
+		--eval "(byte-compile-file \"f90-ts-thing.el\")" \
 		--eval "(byte-compile-file \"f90-ts-mode.el\")" \
 		--eval "(load-file \"f90-ts-mode.el\")" \
 		--eval "(byte-compile-file \"f90-ts-nav.el\")" \
