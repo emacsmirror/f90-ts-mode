@@ -45,7 +45,21 @@ LOAD = \
 ERTFLAGS = \
 	--eval '(setq ert-batch-print-length nil ert-batch-print-level nil)'
 
-SRCS = f90-ts-mode.el test/f90-ts-mode-test.el
+SRCS = \
+	f90-ts-workaround.el \
+	f90-ts-custom.el \
+	f90-ts-auxiliary.el \
+	f90-ts-font-lock.el \
+	f90-ts-indent.el \
+	f90-ts-break-join-fill.el \
+	f90-ts-mark-region.el \
+	f90-ts-comment-region.el \
+	f90-ts-xref.el \
+	f90-ts-imenu.el \
+	f90-ts-thing.el \
+	f90-ts-mode.el \
+	f90-ts-nav.el \
+	test/f90-ts-mode-test.el
 
 
 # ----------------------------------------------------------------------
@@ -142,7 +156,7 @@ test-ert-discover:
 # ----------------------------------------------------------------------
 
 .PHONY: test-ert-parallel
-test-ert-parallel:
+test-ert-parallel: test-checkdoc test-byte-compile
 	@set -e; \
 	tmp_tests=$$(mktemp); \
 	tmp_make=$$(mktemp); \
@@ -233,25 +247,23 @@ test-checkdoc:
 
 .PHONY: test-byte-compile
 test-byte-compile:
-	@$(EMACS) $(EMACSFLAGS) \
-		$(TREE_SITTER_LOAD) \
-		--eval "(add-to-list 'load-path \"test\")" \
-		--eval "(setq byte-compile-error-on-warn t)" \
-		--eval "(byte-compile-file \"f90-ts-mode.el\")" \
-		--eval "(load-file \"f90-ts-mode.el\")" \
-		--eval "(byte-compile-file \"test/f90-ts-mode-test.el\")" \
-		--eval "(when (get-buffer \"*Compile-Log*\") \
-		  (with-current-buffer \"*Compile-Log*\" \
-		    (let ((content (string-trim (buffer-string)))) \
-		      (when (string-match-p \"Error:\" content) \
-		        (kill-emacs 1)))))" \
-	2>&1; \
-	rc=$$?; \
+	@set -e; \
+	for file in $(SRCS); do \
+		echo "byte-compile: $$file"; \
+		$(EMACS) $(EMACSFLAGS) \
+			$(TREE_SITTER_LOAD) \
+			--eval "(setq byte-compile-error-on-warn t)" \
+			--eval "(condition-case err \
+			          (if (byte-compile-file \"$$file\") \
+			              (kill-emacs 0) \
+			            (kill-emacs 1)) \
+			        (error \
+			         (princ (error-message-string err) \
+			                'external-debugging-output) \
+			         (kill-emacs 1)))"; \
+	done; \
 	rm -f $(foreach f,$(SRCS),$(f:%.el=%.elc)); \
-	if [ $$rc -eq 0 ]; then \
-		echo "byte-compile: all files passed"; \
-	fi; \
-	exit $$rc
+	echo "byte-compile: all files passed"
 
 
 # ----------------------------------------------------------------------
@@ -274,25 +286,3 @@ test-ert-extra:
 .PHONY: test-ert-all
 test-ert-all:
 	$(call run-ert-single,^f90-ts-mode-test)
-
-
-# ----------------------------------------------------------------------
-# Legacy internal parallel targets
-#
-# These are retained for compatibility.  They use the same parallel
-# runner as the dynamically generated targets.
-# ----------------------------------------------------------------------
-
-.PHONY: _test-ert-p-main
-_test-ert-p-main:
-	$(call run-ert-parallel,^f90-ts-mode-test-std)
-
-
-.PHONY: _test-ert-p-extra-font-lock
-_test-ert-p-extra-font-lock:
-	$(call run-ert-parallel,^f90-ts-mode-test-extra--font-lock--)
-
-
-.PHONY: _test-ert-p-extra-indent-by-region
-_test-ert-p-extra-indent-by-region:
-	$(call run-ert-parallel,^f90-ts-mode-test-extra--indent-by-region--)
