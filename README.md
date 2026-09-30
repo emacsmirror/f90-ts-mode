@@ -14,6 +14,9 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Replace f90-ts-nav by improved f90-ts-toc providing a side panel with a
+  table of content of a f90 buffer, see `MANUAL.md' for details.  This
+  optional package requires its own use-package statement.
 - Alignment rules for improved indentation of variable declarations with
   initialisation added.
 - Infinite loop caused by `f90-ts-indent-delete-trailing-whitespace` fixed.
@@ -106,7 +109,9 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - OpenMP and preprocessor directives
 - Coarray keywords and statements
 - Imenu and a Fortran menu in the menu bar
-- Navigation (defun, things, Xref, side panel tree)
+- Navigation (defun, things, Xref)
+- TOC side panel to show interactive table of content for a f90-ts buffer
+  (see [optional package](#4-enable-optional-packages))
 - Hideshow, outline and treesit-fold support
 
 ## Keybindings
@@ -237,13 +242,13 @@ It will automatically be loaded when opening a file with extension `.f90`.
 
 4. Enable optional packages
 
-A navigation tree in the fortran menu and a side panel with the tree
-can be enabled by loading optional package `f90-ts-nav`:
+A TOC side panel with a table-of-content tree (see [TOC buffer](MANUAL.md#toc-buffer)) can be
+enabled by loading the optional package `f90-ts-toc`:
 
 ```elisp
-(use-package f90-ts-nav
+(use-package f90-ts-toc
   :after f90-ts-mode
-  ;; demand loading after f90-ts-mode, otherwise entries for nav-tree functions
+  ;; demand loading after f90-ts-mode, otherwise entries for TOC functions
   ;; do not show up in menus
   :demand t)
 ```

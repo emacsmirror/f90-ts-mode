@@ -1308,7 +1308,7 @@ If the line is empty, return nil."
                        "  (pointer_init_declarator left: (identifier) @name_var_decl)"
                        "  (sized_declarator (identifier) @name_var_decl)])")
      :leaf t))
-  "Query specification and properties for Imenu, nav-buffer and nav-tree menu.
+  "Query specification and properties for Imenu and the TOC side panel buffer.
 Each entry is a list (KEY PLIST) where KEY is a string returned by the related
 Tree-sitter node type, and PLIST may contain:
   :label   Display string used in Imenu and menus.

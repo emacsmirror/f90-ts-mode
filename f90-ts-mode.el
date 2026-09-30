@@ -33,6 +33,9 @@
 ;;
 ;; Changelog (recent):
 ;; [10-2026]
+;;   - Replace f90-ts-nav by improved f90-ts-toc providing a side panel with a
+;;     table of content of a f90 buffer, see `MANUAL.md' for details.  This
+;;     optional package requires its own use-package statement.
 ;;   - Alignment rules for improved indentation of variable declarations with
 ;;     initialisation added.
 ;;   - Infinite loop caused by `f90-ts-indent-delete-trailing-whitespace' fixed.
@@ -115,7 +118,8 @@
 ;;   - OpenMP and preprocessor directives
 ;;   - Coarray keywords and statements
 ;;   - Imenu and a Fortran menu in the menu bar
-;;   - Navigation (defun, things, Xref, side panel tree)
+;;   - Navigation (defun, things, Xref)
+;;   - TOC side panel to show interactive table of content for a f90-ts buffer (optional package)
 ;;   - Hideshow and outline support (support for external treesit-fold is pending)
 ;;
 ;; Features can be found by the fortran menu or a transient popup bound
@@ -191,6 +195,9 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog (recent):
 
 [10-2026]
+- Replace f90-ts-nav by improved f90-ts-toc providing a side panel with a
+  table of content of a f90 buffer, see `MANUAL.md' for details.  This
+  optional package requires its own use-package statement.
 - Alignment rules for improved indentation of variable declarations with
   initialisation added.
 - Infinite loop caused by `f90-ts-indent-delete-trailing-whitespace' fixed.
@@ -537,11 +544,7 @@ package `markdown-mode' are available, then use these."
 
 (transient-define-prefix f90-ts-transient-misc ()
   "Miscellaneous commands for `f90-ts-mode'."
-  [["Side panel (alpha!)"
-    :if (lambda () (featurep 'f90-ts-nav))
-    ("B" "Open nav buffer"          f90-ts-nav-buffer-open)
-    ("F" "Focus nav buffer"         f90-ts-nav-buffer-focus)]
-   ["About & Doc"
+  [["About & Doc"
     ("a" "About"                    f90-ts-mode-about)
     ("r" "README"                   f90-ts--browse-readme)
     ("m" "MANUAL"                   f90-ts--browse-manual)]])
@@ -597,6 +600,10 @@ package `markdown-mode' are available, then use these."
     ("/"   "Find apropos"               xref-find-apropos)
     ("<"   "Go back"                    xref-go-back)
     (">"   "Go forward"                 xref-go-forward)]
+   ["TOC side panel"
+    :if (lambda () (featurep 'f90-ts-toc))
+    ("B" "Open TOC side panel"          f90-ts-toc-buffer-open)
+    ("F" "Focus TOC side panel"         f90-ts-toc-buffer-focus)]
    ["More"
     ("t"   "Types & interfaces..."      f90-ts-transient-things)
     ("@"   "Hideshow..."                f90-ts-transient-hideshow
@@ -668,8 +675,8 @@ package `markdown-mode' are available, then use these."
      ["Go back"          xref-go-back          :active t]
      ["Go forward"       xref-go-forward       :active t])
     "---"
-    ["Open navigation side buffer" f90-ts-nav-buffer-open   :visible (featurep 'f90-ts-nav) :active t]
-    ["Focus navigation side buffer" f90-ts-nav-buffer-focus :visible (featurep 'f90-ts-nav) :active t]
+    ["Open TOC side panel"  f90-ts-toc-buffer-open   :visible (featurep 'f90-ts-toc) :active t]
+    ["Focus TOC side panel" f90-ts-toc-buffer-focus  :visible (featurep 'f90-ts-toc) :active t]
     "---"
     ["Customize f90-ts"  (customize-group 'f90-ts) :active t]
     ["About f90-ts-mode" f90-ts-mode-about t]
