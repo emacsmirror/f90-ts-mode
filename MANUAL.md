@@ -45,6 +45,7 @@ for implementation.
   - [Filling lines and regions](#filling-lines-and-regions)
   - [Comment region](#comment-region)
   - [Mark regions based on tree-sitter nodes](#mark-regions-based-on-tree-sitter-nodes)
+  - [Folding](#folding)
 - [Development and Testing](#development-and-testing)
   - [Logging](#logging)
   - [Testing with ERT](#testing-with-ert)
@@ -291,28 +292,28 @@ The mode sets the following default mode-local keybindings:
 
 #### Transient popup (`C-c C-f`)
 
-Pressing `C-c C-f` opens a transient keymap window, which lists all major
-commands grouped by category.
+Pressing `C-c C-f` opens a transient popup with the most frequently used commands.
+Less frequently used commands are grouped in sub-menus (`C-g` returns to the parent menu).
+Each sub-menu is also an ordinary command and can be bound directly.
 
-The popup is defined as `f90-ts-transient` and covers:
+| Section                | Keys                  | Commands                                                |
+|------------------------|-----------------------|---------------------------------------------------------|
+| **Indentation**        | `TAB` `s` `I`         | Indent and complete line / statement / region           |
+|                        | `C-TAB` `C-I`         | Indent line / region                                    |
+| **Line editing**       | `b` `j` `J` `C-s`     | Break line, join with prev/next, shift line break       |
+| **Filling**            | `C-f` `C-b`           | Set fill column and fill method                         |
+|                        | `f` `M-f` `M-j` `M-J` | Fill region, line, with prev/next line                  |
+| **Mark region**        | `r` `0` `9`           | Enlarge, shrink to first / last child                   |
+|                        | `{` `[` `]` `}`       | First, prev, next and last sibling                      |
+|                        | `X`                   | Exchange mark and point                                 |
+| **Comment region**     | `c` `C`               | Default and custom prefix                               |
+| **Procedure**          | `a` `e` `p` `n`       | Beginning, end, previous, next                          |
+| **Xref**               | `.` `,` `/` `<` `>`   | Definitions, references, apropos, back, forward         |
+| **More...**            | `t`                   | Sub-menu: derived types (`a e p n`), interfaces (`A E P N`) |
+|                        | `h`                   | Sub-menu: hideshow (only if `hs-minor-mode` is active)  |
+|                        | `o`                   | Sub-menu: outline (only if `outline-minor-mode` is active) |
+|                        | `m`                   | Sub-menu: About, README, MANUAL (`a r m`), nav side panel (`B F`, if `f90-ts-nav` is loaded) |
 
-| Section                   | Keys                            | Commands                                          |
-|---------------------------|---------------------------------|---------------------------------------------------|
-| **Indentation**           | `TAB` `s` `I`   `               | Indent and complete line / statement / region     |
-|                           | `C-Tab` `C-I`                   | Indent line / region                              |
-| **Line editing**          | `b` `j` `J` `C-s`               | Break line, join with prev/next, shift line break |
-| **Filling**               | `C-f` `C-b`                     | Set fill column and fill method                   |
-|                           | `f` `M-f` `M-j` `M-J`           | fill line, region, with prev/next line            |
-| **Mark region**           | `r` `0` `9`                     | Enlarge, first and last,                          |
-|                           | `{` `[` `]` `}`                 | first, prev, next and last sibling                |
-|                           | `X`                             | Exchange mark and point                           |
-| **Comment region**        | `c` `C`                         | Default and custom prefix                         |
-| **Structural navigation** | `a` `e` `p` `n`                 | Procedure (beginning, end, prev, next)            |
-|                           | `M-a` `M-e` `M-p` `M-n`         | Type (beginning, end, prev, next)                 |
-|                           | `C-M-a` `C-M-e` `C-M-p` `C-M-n` | Interface (beginning, end, prev, next)            |
-| **Xref**                  | `.` `,` `/` `<` `>`             | Definitions, references, apropos, back, forward   |
-| **Navigation side panel** (alpha!) | `B` `F`                | Open and focus nav buffer                         |
-| **Documentation**         | `C-h a` `C-h r` 'C-h m'         | Show About, README and MANUAL                     |
 
 The entire transient popup can be bound to a different prefix with a use-package statement
 in the `:bind` section as shown above, or simply by:
@@ -775,6 +776,28 @@ Key bindings are provided in the transient popup (`C-c C-f`) under the Region se
 | `f90-ts-mark-region-prev-sibling`       | `[`       | Move selected region to previous sibling                                 |
 | `f90-ts-mark-region-next-sibling`       | `]`       | Move selected region to next sibling                                     |
 | `f90-ts-mark-region-last-sibling`       | `}`       | Move selected region to last sibling                                     |
+
+
+### Folding
+
+The mode supports `hs-minor-mode` and `outline-minor-mode`. Both are optional and independent.
+
+Hideshow folds blocks from their start to their own end statement.
+Outline treats program units (and other nodes matching `f90-ts--outline-predicate`) as headings,
+with the heading level given by the nesting depth in the syntax tree. Outline provides
+level-based overviews (`outline-hide-sublevels`) and sibling/parent navigation.
+
+Neither mode is enabled automatically. These can be enable by hooks (see [Setup](#setup)).
+Their most common commands are available in the transient popup (`@` and `$`) while the mode is active.
+
+*Remarks:*
+- Some outline functions like `outline-promote` and `outline-demote` have no meaning in this context,
+  as levels come from the code structure.
+- The body of a heading extends to the next heading, so closing `end` lines can be hidden together
+  with the preceding heading.
+- Support for external package `treesit-fold` is submitted but still pending. Use a local clone of
+  the fork `https://github.com/mscfd/treesit-fold`, checkout the branch `f90-ts` and setup the
+  cloned repository via use-package.
 
 
 ## Development and Testing
