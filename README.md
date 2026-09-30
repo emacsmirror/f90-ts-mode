@@ -14,6 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Transient menu restructured and decomposed.
 - Support for hideshow and outline added.
 
 **09-2026**
