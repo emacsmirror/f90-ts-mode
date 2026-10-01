@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.4.0-snapshot
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -162,7 +162,7 @@
 
 ;;;-----------------------------------------------------------------------------
 
-(defconst f90-ts-mode-version "0.4.0-snapshot"
+(defconst f90-ts-mode-version "0.5.0"
   "Version of `f90-ts-mode'.")
 
 
