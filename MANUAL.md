@@ -13,9 +13,14 @@ for implementation.
 
 - [Installation](#installation)
   - [Tree-sitter grammar](#tree-sitter-grammar)
+    -[Installing the grammar in Emacs](#installing-the-grammar-in-emacs)
   - [Tree-sitter based mode](#tree-sitter-based-mode)
   - [Setup](#setup)
-  - [Keybindings](#keybindings)
+    - [Standard installation via package manager](#standard-installation-via-package-manager)
+    - [Optional packages](#optional-packages)
+    - [Development setup via local clone](#development-setup-via-local-clone)
+    - [Loading test package](#loading-test-package)
+- [Keybindings](#keybindings)
 - [Features](#features)
   - [Syntax highlight and font lock faces](#syntax-highlight-and-font-lock-faces)
     - [Syntax highlighting of error regions](#syntax-highlighting-of-error-regions)
@@ -40,6 +45,7 @@ for implementation.
   - [Filling lines and regions](#filling-lines-and-regions)
   - [Comment region](#comment-region)
   - [Mark regions based on tree-sitter nodes](#mark-regions-based-on-tree-sitter-nodes)
+  - [Folding](#folding)
 - [Development and Testing](#development-and-testing)
   - [Logging](#logging)
   - [Testing with ERT](#testing-with-ert)
@@ -95,11 +101,23 @@ The installation can be verified with:
 ```
 
 **NOTE**:
-* `emacs 30.x`:
-The Fortran grammar should be compiled with Tree-sitter version `0.25.x`, as Emacs
+* Emacs 29.x:
+The mode has been tested with 29.1 and 29.3. and tree-sitter 0.20.8. There are a number fixes working around
+bugs the tree sitter core library. These might reduce performance in  some cases. Please open an issue
+if anything fails or performance is bad.
+
+The following can be used to check whether versions are correct:
+
+(`M-:` = `eval-expression`)
+
+- with `M-:` `(treesit-library-abi-version)` should be `14` (`13` is supposed to be ok as well)
+- with `M-:` `(treesit-language-abi-version 'fortran)` should be `14` (`13` is supposed to be ok as well)
+- emacs 29.x: `ldd bin_path_to_emacs/emacs | grep libtree-sitter` should show `libtree-sitter.so.0` or `libtree-sitter.so.0.20`
+
+
+* Emacs 30.x:
+The Fortran grammar should be compiled with Tree-sitter version `0.25.x`, as Emacs 30.x
 (including 30.2) does not yet support the `0.26` branch correctly.
-For example, queries are not translated as expected by the `0.26` branch.
-Emacs 31 added support for tree-sitter 0.26 and the mode has been tested with it.
 
 The master branch at `mscfd/tree-sitter-fortran` mentioned above provides the parser generated with `0.25.10` if required.
 
@@ -109,11 +127,11 @@ The following can be used to check whether versions are correct:
 
 - with `M-:` `(treesit-library-abi-version)` should be `15`
 - with `M-:` `(treesit-language-abi-version 'fortran)` should be `15`
-- emacs 30.x: `ldd bin_path_to_emacs/emacs | grep libtree-sitter` should show `libtree-sitter.so.0.25`
+- emacs 30.x: `ldd bin_path_to_emacs/emacs | grep libtree-sitter` should show `libtree-sitter.so.0.25` or  `libtree-sitter.so.0.24`
 
 The parser generator step `tree-sitter generate` done with Tree-Sitter `0.26` seems to be
-compatible with Emacs 30.x, but the library and ABI versions listed above must match in any case.
-This generator step of creating the parser source files is not necessary in general, as the
+compatible with Emacs 30.x, but the library and ABI versions listed above must match.
+This generator step of creating the parser source files is not necessary for emacs 30+ in general, as the
 parser source files are already provided in the grammar repositories.
 
 * `emacs 31.x`:
@@ -137,12 +155,15 @@ git clone https://github.com/mscfd/emacs-f90-ts-mode.git path_to/emacs-f90-ts-mo
 The mode itself and optionally the testing module can be loaded with `use-package`
 placed somewhere in `init.el` (or elsewhere).
 
-#### Standard installation (package manager)
+Example setups provided below should be adjusted to ones requirements.
+
+#### Standard installation via package manager
 
 ```elisp
 (use-package f90-ts-mode
   :ensure t
   :mode (("\\.f90\\'" . f90-ts-mode)
+         ;; preprocessor files
          ("\\.i90\\'" . f90-ts-mode))
 
   :init
@@ -151,16 +172,20 @@ placed somewhere in `init.el` (or elsewhere).
   ;; uncomment if Imenu entry in menu bar is desired
   ;; :hook (f90-ts-mode . (lambda () (imenu-add-to-menubar "Imenu")))
 
+  ;; uncomment to switch on hideshow and outline minor mode automatically
+  ;; :hook (f90-ts-mode . hs-minor-mode)
+  ;; :hook (f90-ts-mode . outline-minor-mode)
+
   :config
   (message "f90-ts-mode loaded")
 
-  :bind (;; mode-specific bindings, adjust to your needs
-         ;; (just some examples)
+  :bind (;; mode-specific bindings, adjust to your needs by
+         ;; changing or adding new key bindings
+         ;; (below are just some examples)
          :map f90-ts-mode-map
          ;; transient popup (additional shorter binding to "C-c C-f")
          ("A-<up>"        . #'f90-ts-transient)
 
-         ("A-<return>"    . #'f90-ts-break-line)
          ("A-<return>"    . #'f90-ts-break-line)
          ("C-<return>"    . #'f90-ts-shift-line-break)
          ("A-<backspace>" . #'f90-ts-join-line-prev)
@@ -178,7 +203,21 @@ placed somewhere in `init.el` (or elsewhere).
          ("A-}"           . #'f90-ts-mark-region-last-sibling)))
 ```
 
-#### Development setup (local clone)
+#### Optional packages
+
+A navigation tree in the fortran menu and a side panel with the tree
+can be enabled by loading optional package `f90-ts-nav`:
+
+```elisp
+(use-package f90-ts-nav
+  :after f90-ts-mode
+  ;; demand loading after f90-ts-mode, otherwise entries for nav-tree functions
+  ;; do not show up in menus
+  :demand t)
+```
+
+
+#### Development setup via local clone
 
 First clone the repository of `f90-ts-mode` as mentioned above.
 Then modify the use-package block:
@@ -197,7 +236,7 @@ Then modify the use-package block:
   ...
 ```
 
-#### Testing module
+#### Loading test package
 
 The testing helpers are only required for development and repository testing.
 
@@ -253,27 +292,28 @@ The mode sets the following default mode-local keybindings:
 
 #### Transient popup (`C-c C-f`)
 
-Pressing `C-c C-f` opens a transient keymap window, which lists all major
-commands grouped by category.
+Pressing `C-c C-f` opens a transient popup with the most frequently used commands.
+Less frequently used commands are grouped in sub-menus (`C-g` returns to the parent menu).
+Each sub-menu is also an ordinary command and can be bound directly.
 
-The popup is defined as `f90-ts-transient` and covers:
+| Section                | Keys                  | Commands                                                |
+|------------------------|-----------------------|---------------------------------------------------------|
+| **Indentation**        | `TAB` `s` `I`         | Indent and complete line / statement / region           |
+|                        | `C-TAB` `C-I`         | Indent line / region                                    |
+| **Line editing**       | `b` `j` `J` `C-s`     | Break line, join with prev/next, shift line break       |
+| **Filling**            | `C-f` `C-b`           | Set fill column and fill method                         |
+|                        | `f` `M-f` `M-j` `M-J` | Fill region, line, with prev/next line                  |
+| **Mark region**        | `r` `0` `9`           | Enlarge, shrink to first / last child                   |
+|                        | `{` `[` `]` `}`       | First, prev, next and last sibling                      |
+|                        | `X`                   | Exchange mark and point                                 |
+| **Comment region**     | `c` `C`               | Default and custom prefix                               |
+| **Procedure**          | `a` `e` `p` `n`       | Beginning, end, previous, next                          |
+| **Xref**               | `.` `,` `/` `<` `>`   | Definitions, references, apropos, back, forward         |
+| **More...**            | `t`                   | Sub-menu: derived types (`a e p n`), interfaces (`A E P N`) |
+|                        | `h`                   | Sub-menu: hideshow (only if `hs-minor-mode` is active)  |
+|                        | `o`                   | Sub-menu: outline (only if `outline-minor-mode` is active) |
+|                        | `m`                   | Sub-menu: About, README, MANUAL (`a r m`), nav side panel (`B F`, if `f90-ts-nav` is loaded) |
 
-| Section                   | Keys                            | Commands                                          |
-|---------------------------|---------------------------------|---------------------------------------------------|
-| **Indentation**           | `TAB` `s` `I` `E`               | Indent line / statement / region / smart end      |
-| **Line editing**          | `b` `j` `J` `C-s`               | Break line, join with prev/next, shift line break |
-| **Filling**               | `C-f` `C-b`                     | Set fill column and fill method                   |
-|                           | `f` `M-f` `M-j` `M-J`           | fill line, region, with prev/next line            |
-| **Mark region**           | `r` `0` `9`                     | Enlarge, first and last,                          |
-|                           | `{` `[` `]` `}`                 | first, prev, next and last sibling                |
-|                           | `X`                             | Exchange mark and point                           |
-| **Comment region**        | `c` `C`                         | Default and custom prefix                         |
-| **Structural navigation** | `a` `e` `p` `n`                 | Procedure (beginning, end, prev, next)            |
-|                           | `M-a` `M-e` `M-p` `M-n`         | Type (beginning, end, prev, next)                 |
-|                           | `C-M-a` `C-M-e` `C-M-p` `C-M-n` | Interface (beginning, end, prev, next)            |
-| **Xref**                  | `.` `,` `/` `<` `>`             | Definitions, references, apropos, back, forward   |
-| **Navigation side panel** (alpha!) | `B` `F`                | Open and focus nav buffer                         |
-| **Documentation**         | `C-h a` `C-h r` 'C-h m'         | Show About, README and MANUAL                     |
 
 The entire transient popup can be bound to a different prefix with a use-package statement
 in the `:bind` section as shown above, or simply by:
@@ -380,9 +420,10 @@ Customizable variables for indentations are:
 | `f90-ts-indent-block`            | extra indentation applied to most blocks                                    |
 | `f90-ts-indent-continued`        | extra indentation applied to continued lines                                |
 
+Additionally `f90-ts-indent-delete-trailing-whitespace` can be used to enable automatic deletion of
+trailing whitespace characters of indented lines after each indentation operation.
 
-
-*Remarks*
+*Remarks:*
 - statement blocks are features such as `functions`, `subroutines`, control statements (`do`, `if`, `select`)
   and other block structures (`associate`, `block` etc.)
 - `f90-ts-indent-toplevel` is intended to reduce the indentation of anything which is right below the program
@@ -401,10 +442,10 @@ call sub_with_many_arguments(argx, another, one_more, &
                              argy, just_this, &
                              argz)
 ```
-Five options are currently implemented: `continued-line`,  `primary`, `rotate`, `keep-or-primary`
-and `keep-or-next`. Primary column is some outstanding column with respect to the context (like
+Six options are currently implemented: `continued-line`,  `primary`, `rotate`, `keep-or-continued-line`,
+`keep-or-primary` and `keep-or-rotate`. Primary column is some outstanding column with respect to the context (like
 the smallest column of arguments in the example above, or the column just right to the opening parenthesis).
-The last three options `rotate`, `keep-or-primary` and `keep-or-next`, which collect and offer several
+The options `rotate`, `keep-or-primary` and `keep-or-rotate`, which collect and offer several
 alignment columns, always include the continued line position among the set of columns.
 
 Behaviour of indentation of a region and of a line are controlled by `f90-ts-indent-list-region`
@@ -414,7 +455,7 @@ used by functions bound to `<backtab>` (S-`TAB`) and `C-S-<iso-lefttab>` / `C-<b
 
 Also check out [Continued statements and blocks](#indentation-of-continued-statements-and-blocks).
 
-Remark: three variants are offerend to allow selection of primary and continued line offset additionally
+*Remark:* three variants are offerend to allow selection of primary and continued line offset additionally
 to the rotation option. The current setup offers keybindings for all three variants.
 
 
@@ -457,7 +498,7 @@ subroutine sub(arg1, arg2)
 end subroutine sub
 ```
 
-Remark: Indentation hints `context` and `indented` are ignored if comment is within a continued line.
+*Remark:* Indentation hints `context` and `indented` are ignored if comment is within a continued line.
 Only `column-0` is applied in the continued line context.
 
 
@@ -522,14 +563,15 @@ Entries are grouped by `module`, `submodule`, `subroutine`, `function`, `module 
 
 ### Navigation menu
 
-Additionally to the Imenu grouping, the `Fortran` menu offers a submenu where the same imenu
-items are structured as a tree reflecting the hierarchical structure of the source file,
+Additionally to the Imenu grouping, the optional `Fortran` menu offers a submenu where the
+same imenu items are structured as a tree reflecting the hierarchical structure of the source file,
 with submenus for structures that contain other items.
-
+This requires and extra use-package statement to load the optional package,
+see [Optional packages](#ptional-packages).
 
 ### Navigation buffer
 
-The navigation buffer provides a persistent side panel showing the structure of the current
+The optional navigation buffer provides a persistent side panel showing the structure of the current
 Fortran source buffer. It is based on the same tree as offered in
 the [Navigation menu](#navigation-menu) and a sparse version of the tree-sitter tree.
 
@@ -678,7 +720,7 @@ This behavior is controlled by the customizable variable `f90-ts-fill-select-bre
     * `q` to skip the line and keep as is.
     * `C-g` to abort the fill session.
 
-Remark: The current `fill-column` and breakpoint selection method can be overwritten on the fly
+*Remark:* The current `fill-column` and breakpoint selection method can be overwritten on the fly
 using `C-f` and `C-b` inside the transient menu.
 
 
@@ -734,6 +776,28 @@ Key bindings are provided in the transient popup (`C-c C-f`) under the Region se
 | `f90-ts-mark-region-prev-sibling`       | `[`       | Move selected region to previous sibling                                 |
 | `f90-ts-mark-region-next-sibling`       | `]`       | Move selected region to next sibling                                     |
 | `f90-ts-mark-region-last-sibling`       | `}`       | Move selected region to last sibling                                     |
+
+
+### Folding
+
+The mode supports `hs-minor-mode` and `outline-minor-mode`. Both are optional and independent.
+
+Hideshow folds blocks from their start to their own end statement.
+Outline treats program units (and other nodes matching `f90-ts--outline-predicate`) as headings,
+with the heading level given by the nesting depth in the syntax tree. Outline provides
+level-based overviews (`outline-hide-sublevels`) and sibling/parent navigation.
+
+Neither mode is enabled automatically. These can be enable by hooks (see [Setup](#setup)).
+Their most common commands are available in the transient popup (`@` and `$`) while the mode is active.
+
+*Remarks:*
+- Some outline functions like `outline-promote` and `outline-demote` have no meaning in this context,
+  as levels come from the code structure.
+- The body of a heading extends to the next heading, so closing `end` lines can be hidden together
+  with the preceding heading.
+- Support for external package `treesit-fold` is submitted but still pending. Use a local clone of
+  the fork `https://github.com/mscfd/treesit-fold`, checkout the branch `f90-ts` and setup the
+  cloned repository via use-package.
 
 
 ## Development and Testing

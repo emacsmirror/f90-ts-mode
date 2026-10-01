@@ -1,7 +1,7 @@
 # f90-ts-mode
 
 Tree-sitter-based major mode for editing Fortran (Fortran 90 / 2003 and
-newer) in free source form in Emacs. It requires Emacs 30+.
+newer) in free source form in Emacs. It requires Emacs 29+.
 
 The mode is inspired by f90-mode in Emacs core. Alongside modern
 Tree-sitter-based functionality, it aims to provide and enhance features
@@ -11,9 +11,30 @@ productive and enjoyable to use.
 This project is under active [development](#roadmap).
 For a comprehensive overview see [MANUAL.md](MANUAL.md).
 
-### Recently added, changed or improved
+### Changelog (recent)
+
+**10-2026**
+- Transient menu restructured and decomposed.
+- Support for hideshow and outline added.
 
 **09-2026**
+ - `f90-ts-mode.el` decomposed into several smaller packages. Experimental
+   `f90-ts-nav` (tree in fortran menu and tree view in side panel) has been
+   made optional and requires a separate use-package to load it.
+ - `f90-ts-indent-delete-trailing-whitespace` added to automatically delete
+   trailing whitespace after indentation operation.
+ - Font locking of interface name in deferred procedure declaration fixed.
+ - Handling of trailing whitespace characters in thing-end-of-X navigation added.
+ - Support for Emacs 29 + tree-sitter 0.20.x added (tested with 29.1, 29.3 and tree-sitter 0.20.8).
+ - Fontification of error nodes fixed if line limitting is enabled.
+ - Some issues in comment-region operations fixed (preserve indentation,
+   preserve trailing whitespace where possible, keep existing alignment
+   with keep options, do not operate outside of region boundaries, add
+   missing function `f90-ts-indent-region`).
+ - Indentation after uncommenting lines in comment-region operation on
+   commented lines of code containing leading ampersand or statement label fixed.
+ - Missing option `keep-or-continued-line` added to
+   `f90-ts--indent-options-alist` for indentation selection options.
  - Syntax highlighting, indentation, break/join/fill etc. for string literals improved.
    This requires a proposed (but not yet merged) tree-sitter language grammar extension.
    See issues [Continued strings at grammar repo](https://github.com/stadelmanma/tree-sitter-fortran/issues/193)
@@ -42,13 +63,9 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
  - About, README and MANUAL entries in the fortran and transient
    popup menu to view information about the mode added.
  - Additional font-locking for error regions added.  This can be customized by
-   `f90-ts-font-lock-error' and `f90-ts-font-lock-error-face'.
+   `f90-ts-font-lock-error` and `f90-ts-font-lock-error-face`.
  - Smart end completion of coarray "change team ... end team" blocks fixed. It was
    wrongly assumed that the end statement is "end change team".
-
-**07-2026**
- - Inherit attribute of some font lock faces fixed.
- - Alignment of unary expressions with leading minus or plus improved.
 
 
 ## Overview
@@ -77,24 +94,24 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Coarray keywords and statements
 - Imenu and a Fortran menu in the menu bar
 - Navigation (defun, things, Xref, side panel tree)
-
+- Hideshow and outline support (support for external treesit-fold is pending)
 
 ## Keybindings
 
 The mode provides direct keybindings for the most frequent operations like indentation with `TAB`
 and a **transient popup** for discoverability of all commands:
 
-| Key                            | Description                      |
-|--------------------------------|----------------------------------|
-| `C-c C-f`                      | Open the transient command popup |
+| Key                            | Description                            |
+|--------------------------------|----------------------------------------|
+| `C-c C-f`                      | Open the transient command popup       |
 | `<tab>`                        | Indent and complete line               |
 | `C-<tab>`                      |  Indent and complete statement (block) |
 | `<backtab>` (shift `<tab>`)    | Indent and complete line variant 2     |
 | `C-S-<iso-lefttab>` (Linux)    | Indent and complete line variant 3     |
 | `C-<backtab>`       (Windows?) | Indent and complete line variant 3     |
-| `C-<return>`                   | Break line                       |
-| `C-c ;`                        | Comment region (default prefix)  |
-| `C-c '`                        | Comment region (custom prefix)   |
+| `C-<return>`                   | Break line                             |
+| `C-c ;`                        | Comment region (default prefix)        |
+| `C-c '`                        | Comment region (custom prefix)         |
 
 Pressing `C-c C-f` opens a transient popup, grouping all major commands by category.
 
@@ -104,9 +121,17 @@ For the full keybinding reference see the
 
 ## Installation
 
-This mode requires **Emacs 30+** and a compatible Tree-sitter Fortran grammar.
-In particular tree-sitter ABI version 15 and tree-sitter library version 0.25.x for Emacs 30.x.
-Emacs 31 supports tree-sitter 0.26.
+This mode requires **Emacs 29+** and a compatible Tree-sitter Fortran grammar and compatible
+shared core libraries.
+
+The mode is tested with:
+* Emacs 29.1 + tree-sitter 0.20.8 (ABI version 14)
+* Emacs 29.3 + tree-sitter 0.20.8 (ABI version 14)
+* Emacs 30.1 + tree-sitter 0.24.7 (ABI version 14)
+* Emacs 30.1 + tree-sitter 0.25.10 (ABI version 15)
+* Emacs 30.2 + tree-sitter 0.24.7 (ABI version 14)
+* Emacs 30.2 + tree-sitter 0.25.10 (ABI version 15)
+* Emacs 31.1 + tree-sitter 0.26.11 (ABI version 15)
 
 Detailed technical requirements and troubleshooting can be found
 in [MANUAL.md](MANUAL.md#installation).
@@ -168,6 +193,10 @@ It will automatically be loaded when opening a file with extension `.f90`.
   ;; uncomment if Imenu entry in menu bar is desired
   ;; :hook (f90-ts-mode . (lambda () (imenu-add-to-menubar "Imenu")))
 
+  ;; uncomment to switch on hideshow and outline minor mode automatically
+  ;; :hook (f90-ts-mode . hs-minor-mode)
+  ;; :hook (f90-ts-mode . outline-minor-mode)
+
   :config
   (message "f90-ts-mode loaded")
 
@@ -192,6 +221,20 @@ It will automatically be loaded when opening a file with extension `.f90`.
          ("A-]"           . #'f90-ts-mark-region-next-sibling)
          ("A-}"           . #'f90-ts-mark-region-last-sibling)))
 ```
+
+4. Enable optional packages
+
+A navigation tree in the fortran menu and a side panel with the tree
+can be enabled by loading optional package `f90-ts-nav`:
+
+```elisp
+(use-package f90-ts-nav
+  :after f90-ts-mode
+  ;; demand loading after f90-ts-mode, otherwise entries for nav-tree functions
+  ;; do not show up in menus
+  :demand t)
+```
+
 
 *Remark:*
 The readme and manual documents can be easily loaded from github and opened via the fortran menu
@@ -218,8 +261,6 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
-- Provide code folding: add support for hideshow `hs-minor-mode`, `outline-mode` (both provided by emacs core)
-  and external `treesit-fold` package.
 - Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
 - Fill operations with lower column width (before joining).
 - Fill operation similar to `f90-fill-paragraph`. In conjunction with mark operations: determine interesting
@@ -232,8 +273,10 @@ The following list provides features planned for implementation (somewhat ordere
   alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.
 - Indentation for labeled do loops, like:
+```f90
   do 123 i = 1,10
      do 123 j = 1,10
         print *, i, j
   123 end do
+```
   (Remark: the end do statement has one real and one virtual node to match the number of nested loops.)

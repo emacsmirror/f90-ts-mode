@@ -31,6 +31,9 @@
 (require 'cl-lib)
 (require 'ert)
 (require 'ert-x)
+(unless (>= emacs-major-version 30)
+  (require 'ert-font-lock))
+
 (require 'treesit)
 (require 'xref)
 (require 'f90-ts-mode)
@@ -142,6 +145,7 @@ without final newline."
     (f90-ts-indent-expr-assign-default . 2)
     (f90-ts-indent-expr-assign-assoc-op . 1)
     (f90-ts-indent-declaration . 3)
+    (f90-ts-indent-delete-trailing-whitespace . nil)
     (f90-ts-smart-end . no-message)
     (f90-ts-leading-ampersand . nil)
     (f90-ts-leading-ampersand-style . (indent . 3))
@@ -181,6 +185,14 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
                  collect (cons var (default-value var)))))
 
 
+(defun f90-ts-mode-test--font-lock-recompute-features ()
+  "Wrapper to invoke the treesit function depending on Emacs version."
+  (apply #'treesit-font-lock-recompute-features
+         (if (>= emacs-major-version 30)
+             '(nil nil fortran)
+           '(nil nil))))
+
+
 ;;;###autoload
 (defun f90-ts-mode-test-set-custom-testing ()
   "Save current values and apply temporary ones for testing purposes."
@@ -192,8 +204,7 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
                   (set var val))
                 (set-default var val)))
   ;; treesit-font-lock-level requires a recompute
-  (treesit-font-lock-recompute-features nil nil 'fortran))
-
+  (f90-ts-mode-test--font-lock-recompute-features))
 
 ;;;###autoload
 (defun f90-ts-mode-test-restore-custom ()
@@ -206,7 +217,7 @@ Relevant variables are listed as keys in `f90-ts-mode-test-custom-settings'."
                   ;; if current buffer has a local copy, set it as well
                   (set var val))
                 (set-default var val)))
-  (treesit-font-lock-recompute-features nil nil 'fortran)
+  (f90-ts-mode-test--font-lock-recompute-features)
   (setq f90-ts-mode-test-custom-saved nil))
 
 
@@ -237,11 +248,11 @@ test values for specific tests."
                 do (set var val))
        (unwind-protect
            (progn
-             (treesit-font-lock-recompute-features nil nil 'fortran)
+             (f90-ts-mode-test--font-lock-recompute-features))
              (progn ,@body))
          (cl-loop for (var . val) in saved-locals
                   do (set var val))
-         (treesit-font-lock-recompute-features nil nil 'fortran)))))
+         (f90-ts-mode-test--font-lock-recompute-features))))
 
 
 (defun f90-ts-mode-test--run-with-testing (file body-fn)
@@ -546,9 +557,6 @@ PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
                        (ert-test-erts-file (ert-resource-file ,file))))))))))))
 
 
-;;------------------------------------------------------------------------------
-;; ERT: font locking
-
 (defun f90-ts-mode-test--next-boundary (beg end)
   "Find next face or blank/non-blank boundary from BEG to END."
   (let ((next-face-change (next-single-property-change beg 'face nil end))
@@ -844,6 +852,40 @@ PREFIX is the test name prefix, usually \"f90-ts-mode-test-std\"."
 
 
 ;;------------------------------------------------------------------------------
+;; helper for checking point movement
+;; | marks the initial point position
+;; @ marks the final point position
+;; the @ is removed, command is executed, then @ is inserted at current position
+;; and point is moved by initial measured difference of @ and |, so that the
+;; point should be at its initial position and the normal erts checks succeed
+
+(defun f90-ts-mode-test--move-point-check (command)
+  "Pre- and post process buffer to test point movement done by COMMAND.
+Remove final position marker \"@\", execute command, re-insert \"@\" and final
+position and move point to its expected original position, so that a test
+does not need a separate after block.
+
+Use \"(lambda () (fun arg1 arg2 ...))))\" as command if arguments are
+expected."
+  (let* ((pos1 (point))
+         (pos2 (save-excursion
+                 (goto-char (point-min))
+                 (search-forward "@")
+                 ;; point is after marker @, so delete before
+                 (delete-char -1)
+                 (1+ (point))))
+         (offset (- pos1 pos2)))
+    ;; move point around by command
+    (funcall command)
+    ;; if everything is as intended, restore to original buffer state
+    ;; and point position
+    (insert "@")
+    (goto-char (max (point-min)
+                    (min (point-max)
+                         (+ (point) offset))))))
+
+
+;;------------------------------------------------------------------------------
 ;; mark region helpers
 
 (defun f90-ts-mode-test--mark-region-pre (command)
@@ -987,6 +1029,8 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "indent_line_align.erts"
    "indent_line_leading_amp.erts"
    "indent_stmt_misc.erts"
+   "indent_keep_align.erts"
+   "indent_trailing_whitespace.erts"
    "break_line.erts"
    "join_line.erts"
    "fill_region_aux.erts"
@@ -994,7 +1038,10 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "mark_region.erts"
    "comment_region.erts"
    "comment_prefix.erts"
-   "modified_bit.erts"))
+   "modified_bit.erts"
+   "navigate_thing_procedure.erts"
+   "navigate_thing_interface.erts"
+   "navigate_thing_type.erts"))
 
 
 ;; expensive tests
@@ -1060,7 +1107,8 @@ If buffer was modified, insert `**' otherwise insert '--'."
      ;; note that assertions are also part of the fontified buffer,
      ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
      ;; which is what we want to see in font_lock_error5
-     ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9))))))
+     ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))
+     ("font_lock_error6.f90" . ((f90-ts-font-lock-error-show . 6))))))
 
 
 ;; xref tests
