@@ -17,9 +17,9 @@ for implementation.
   - [Tree-sitter based mode](#tree-sitter-based-mode)
   - [Setup](#setup)
     - [Standard installation via package manager](#standard-installation-via-package-manager)
-    - [Optional packages](#ptional-packages)
+    - [Optional packages](#optional-packages)
     - [Development setup via local clone](#development-setup-via-local-clone)
-    - [Loading test package](#Loading test package)
+    - [Loading test package](#loading-test-package)
 - [Keybindings](#keybindings)
 - [Features](#features)
   - [Syntax highlight and font lock faces](#syntax-highlight-and-font-lock-faces)
@@ -45,6 +45,7 @@ for implementation.
   - [Filling lines and regions](#filling-lines-and-regions)
   - [Comment region](#comment-region)
   - [Mark regions based on tree-sitter nodes](#mark-regions-based-on-tree-sitter-nodes)
+  - [Folding](#folding)
 - [Development and Testing](#development-and-testing)
   - [Logging](#logging)
   - [Testing with ERT](#testing-with-ert)
@@ -154,12 +155,15 @@ git clone https://github.com/mscfd/emacs-f90-ts-mode.git path_to/emacs-f90-ts-mo
 The mode itself and optionally the testing module can be loaded with `use-package`
 placed somewhere in `init.el` (or elsewhere).
 
+Example setups provided below should be adjusted to ones requirements.
+
 #### Standard installation via package manager
 
 ```elisp
 (use-package f90-ts-mode
   :ensure t
   :mode (("\\.f90\\'" . f90-ts-mode)
+         ;; preprocessor files
          ("\\.i90\\'" . f90-ts-mode))
 
   :init
@@ -168,16 +172,20 @@ placed somewhere in `init.el` (or elsewhere).
   ;; uncomment if Imenu entry in menu bar is desired
   ;; :hook (f90-ts-mode . (lambda () (imenu-add-to-menubar "Imenu")))
 
+  ;; uncomment to switch on hideshow and outline minor mode automatically
+  ;; :hook (f90-ts-mode . hs-minor-mode)
+  ;; :hook (f90-ts-mode . outline-minor-mode)
+
   :config
   (message "f90-ts-mode loaded")
 
-  :bind (;; mode-specific bindings, adjust to your needs
-         ;; (just some examples)
+  :bind (;; mode-specific bindings, adjust to your needs by
+         ;; changing or adding new key bindings
+         ;; (below are just some examples)
          :map f90-ts-mode-map
          ;; transient popup (additional shorter binding to "C-c C-f")
          ("A-<up>"        . #'f90-ts-transient)
 
-         ("A-<return>"    . #'f90-ts-break-line)
          ("A-<return>"    . #'f90-ts-break-line)
          ("C-<return>"    . #'f90-ts-shift-line-break)
          ("A-<backspace>" . #'f90-ts-join-line-prev)
@@ -284,28 +292,28 @@ The mode sets the following default mode-local keybindings:
 
 #### Transient popup (`C-c C-f`)
 
-Pressing `C-c C-f` opens a transient keymap window, which lists all major
-commands grouped by category.
+Pressing `C-c C-f` opens a transient popup with the most frequently used commands.
+Less frequently used commands are grouped in sub-menus (`C-g` returns to the parent menu).
+Each sub-menu is also an ordinary command and can be bound directly.
 
-The popup is defined as `f90-ts-transient` and covers:
+| Section                | Keys                  | Commands                                                |
+|------------------------|-----------------------|---------------------------------------------------------|
+| **Indentation**        | `TAB` `s` `I`         | Indent and complete line / statement / region           |
+|                        | `C-TAB` `C-I`         | Indent line / region                                    |
+| **Line editing**       | `b` `j` `J` `C-s`     | Break line, join with prev/next, shift line break       |
+| **Filling**            | `C-f` `C-b`           | Set fill column and fill method                         |
+|                        | `f` `M-f` `M-j` `M-J` | Fill region, line, with prev/next line                  |
+| **Mark region**        | `r` `0` `9`           | Enlarge, shrink to first / last child                   |
+|                        | `{` `[` `]` `}`       | First, prev, next and last sibling                      |
+|                        | `X`                   | Exchange mark and point                                 |
+| **Comment region**     | `c` `C`               | Default and custom prefix                               |
+| **Procedure**          | `a` `e` `p` `n`       | Beginning, end, previous, next                          |
+| **Xref**               | `.` `,` `/` `<` `>`   | Definitions, references, apropos, back, forward         |
+| **More...**            | `t`                   | Sub-menu: derived types (`a e p n`), interfaces (`A E P N`) |
+|                        | `h`                   | Sub-menu: hideshow (only if `hs-minor-mode` is active)  |
+|                        | `o`                   | Sub-menu: outline (only if `outline-minor-mode` is active) |
+|                        | `m`                   | Sub-menu: About, README, MANUAL (`a r m`), nav side panel (`B F`, if `f90-ts-nav` is loaded) |
 
-| Section                   | Keys                            | Commands                                          |
-|---------------------------|---------------------------------|---------------------------------------------------|
-| **Indentation**           | `TAB` `s` `I`   `               | Indent and complete line / statement / region     |
-|                           | `C-Tab` `C-I`                   | Indent line / region                              |
-| **Line editing**          | `b` `j` `J` `C-s`               | Break line, join with prev/next, shift line break |
-| **Filling**               | `C-f` `C-b`                     | Set fill column and fill method                   |
-|                           | `f` `M-f` `M-j` `M-J`           | fill line, region, with prev/next line            |
-| **Mark region**           | `r` `0` `9`                     | Enlarge, first and last,                          |
-|                           | `{` `[` `]` `}`                 | first, prev, next and last sibling                |
-|                           | `X`                             | Exchange mark and point                           |
-| **Comment region**        | `c` `C`                         | Default and custom prefix                         |
-| **Structural navigation** | `a` `e` `p` `n`                 | Procedure (beginning, end, prev, next)            |
-|                           | `M-a` `M-e` `M-p` `M-n`         | Type (beginning, end, prev, next)                 |
-|                           | `C-M-a` `C-M-e` `C-M-p` `C-M-n` | Interface (beginning, end, prev, next)            |
-| **Xref**                  | `.` `,` `/` `<` `>`             | Definitions, references, apropos, back, forward   |
-| **Navigation side panel** (alpha!) | `B` `F`                | Open and focus nav buffer                         |
-| **Documentation**         | `C-h a` `C-h r` 'C-h m'         | Show About, README and MANUAL                     |
 
 The entire transient popup can be bound to a different prefix with a use-package statement
 in the `:bind` section as shown above, or simply by:
@@ -415,7 +423,7 @@ Customizable variables for indentations are:
 Additionally `f90-ts-indent-delete-trailing-whitespace` can be used to enable automatic deletion of
 trailing whitespace characters of indented lines after each indentation operation.
 
-*Remarks*
+*Remarks:*
 - statement blocks are features such as `functions`, `subroutines`, control statements (`do`, `if`, `select`)
   and other block structures (`associate`, `block` etc.)
 - `f90-ts-indent-toplevel` is intended to reduce the indentation of anything which is right below the program
@@ -447,7 +455,7 @@ used by functions bound to `<backtab>` (S-`TAB`) and `C-S-<iso-lefttab>` / `C-<b
 
 Also check out [Continued statements and blocks](#indentation-of-continued-statements-and-blocks).
 
-Remark: three variants are offerend to allow selection of primary and continued line offset additionally
+*Remark:* three variants are offerend to allow selection of primary and continued line offset additionally
 to the rotation option. The current setup offers keybindings for all three variants.
 
 
@@ -490,7 +498,7 @@ subroutine sub(arg1, arg2)
 end subroutine sub
 ```
 
-Remark: Indentation hints `context` and `indented` are ignored if comment is within a continued line.
+*Remark:* Indentation hints `context` and `indented` are ignored if comment is within a continued line.
 Only `column-0` is applied in the continued line context.
 
 
@@ -558,7 +566,8 @@ Entries are grouped by `module`, `submodule`, `subroutine`, `function`, `module 
 Additionally to the Imenu grouping, the optional `Fortran` menu offers a submenu where the
 same imenu items are structured as a tree reflecting the hierarchical structure of the source file,
 with submenus for structures that contain other items.
-This requires and extra use-package statement to load the optional package, see #
+This requires and extra use-package statement to load the optional package,
+see [Optional packages](#ptional-packages).
 
 ### Navigation buffer
 
@@ -711,7 +720,7 @@ This behavior is controlled by the customizable variable `f90-ts-fill-select-bre
     * `q` to skip the line and keep as is.
     * `C-g` to abort the fill session.
 
-Remark: The current `fill-column` and breakpoint selection method can be overwritten on the fly
+*Remark:* The current `fill-column` and breakpoint selection method can be overwritten on the fly
 using `C-f` and `C-b` inside the transient menu.
 
 
@@ -767,6 +776,28 @@ Key bindings are provided in the transient popup (`C-c C-f`) under the Region se
 | `f90-ts-mark-region-prev-sibling`       | `[`       | Move selected region to previous sibling                                 |
 | `f90-ts-mark-region-next-sibling`       | `]`       | Move selected region to next sibling                                     |
 | `f90-ts-mark-region-last-sibling`       | `}`       | Move selected region to last sibling                                     |
+
+
+### Folding
+
+The mode supports `hs-minor-mode` and `outline-minor-mode`. Both are optional and independent.
+
+Hideshow folds blocks from their start to their own end statement.
+Outline treats program units (and other nodes matching `f90-ts--outline-predicate`) as headings,
+with the heading level given by the nesting depth in the syntax tree. Outline provides
+level-based overviews (`outline-hide-sublevels`) and sibling/parent navigation.
+
+Neither mode is enabled automatically. These can be enable by hooks (see [Setup](#setup)).
+Their most common commands are available in the transient popup (`@` and `$`) while the mode is active.
+
+*Remarks:*
+- Some outline functions like `outline-promote` and `outline-demote` have no meaning in this context,
+  as levels come from the code structure.
+- The body of a heading extends to the next heading, so closing `end` lines can be hidden together
+  with the preceding heading.
+- Support for external package `treesit-fold` is submitted but still pending. Use a local clone of
+  the fork `https://github.com/mscfd/treesit-fold`, checkout the branch `f90-ts` and setup the
+  cloned repository via use-package.
 
 
 ## Development and Testing

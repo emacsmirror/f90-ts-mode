@@ -31,7 +31,11 @@
 ;; f90-ts-mode is a major mode for editing Fortran 90/2003 (and newer) source
 ;; files, based on Emacs's built-in tree-sitter support (requires Emacs 29+)
 ;;
-;; Changelog:
+;; Changelog (recent):
+;; [10-2026]
+;;   - Transient menu restructured and decomposed.
+;;   - Support for hideshow and outline added.
+;;
 ;; [09-2026]
 ;;   - `f90-ts-mode.el' decomposed into several smaller packages.  Experimental
 ;;     `f90-ts-nav' (tree in fortran menu and tree view in side panel) has been
@@ -80,10 +84,6 @@
 ;;   - Smart end completion of coarray "change team ... end team" blocks fixed.
 ;;     It was wrongly assumed that the end statement is "end change team".
 ;;
-;; [07-2026]
-;;   - Inherit attribute of some font lock faces fixed.
-;;   - Alignment of unary expressions with leading minus or plus improved.
-;;
 ;; Features:
 ;;   - Almost all statements up to F2023
 ;;   - Syntax highlighting, including syntactically incorrect code
@@ -103,6 +103,7 @@
 ;;   - Coarray keywords and statements
 ;;   - Imenu and a Fortran menu in the menu bar
 ;;   - Navigation (defun, things, Xref, side panel tree)
+;;   - Hideshow and outline support (support for external treesit-fold is pending)
 ;;
 ;; Features can be found by the fortran menu or a transient popup bound
 ;; to the key C-c C-f.
@@ -140,7 +141,7 @@
 (require 'f90-ts-custom)
 
 ;; provide workarounds (mostly tree-sitter bugs), and some missing
-;; functions for Emacs 29
+;; functions for Emacs 29 and Emacs 30
 (require 'f90-ts-workaround)
 
 ;; auxiliary stuff
@@ -157,7 +158,7 @@
 (require 'f90-ts-xref)
 (require 'f90-ts-imenu)
 (require 'f90-ts-thing)
-
+(require 'f90-ts-fold)
 
 ;;;-----------------------------------------------------------------------------
 
@@ -174,7 +175,11 @@
 source files, based on Emacs's built-in tree-sitter support
 (requires Emacs 29+).
 
-Changelog:
+Changelog (recent):
+
+[10-2026]
+- Transient menu restructured and decomposed.
+- Support for hideshow and outline added.
 
 [09-2026]
 - `f90-ts-mode.el' decomposed into several smaller packages. Experimental
@@ -223,10 +228,6 @@ Changelog:
 - Smart end completion of coarray \"change team ... end team\"
   blocks fixed.  It was wrongly assumed that the end statement is
   \"end change team\".
-
-[07-2026]
-- Inherit attribute of some font-lock faces fixed.
-- Alignment of unary expressions with leading minus or plus improved.
 ")
 
 
@@ -410,7 +411,7 @@ package `markdown-mode' are available, then use these."
 
 
 ;;;-----------------------------------------------------------------------------
-;;; transient
+;; transient auxiliary
 
 (transient-define-infix f90-ts-transient--indent-list-line ()
   "Transient infix for indent-line alignment variant."
@@ -449,12 +450,86 @@ package `markdown-mode' are available, then use these."
           'interactive)))
 
 
+;;;-----------------------------------------------------------------------------
+;; transient sub-menus
+
+(defun f90-ts--outline-active-p ()
+  "Return non-nil if `outline-minor-mode' is active in the current buffer."
+  (bound-and-true-p outline-minor-mode))
+
+
+(transient-define-prefix f90-ts-transient-things ()
+  "Navigation for derived types and interfaces in `f90-ts-mode'."
+  [["Derived Type"
+    ("a" "Beginning"                f90-ts-thing-beginning-of-type)
+    ("e" "End"                      f90-ts-thing-end-of-type)
+    ("p" "Previous"                 f90-ts-thing-prev-type)
+    ("n" "Next"                     f90-ts-thing-next-type)]
+   ["Interface"
+    ("A" "Beginning"                f90-ts-thing-beginning-of-interface)
+    ("E" "End"                      f90-ts-thing-end-of-interface)
+    ("P" "Previous"                 f90-ts-thing-prev-interface)
+    ("N" "Next"                     f90-ts-thing-next-interface)]])
+
+
+(transient-define-prefix f90-ts-transient-hideshow ()
+  "Hideshow commands for `f90-ts-mode'."
+  [["Hideshow"
+    ("c" "Toggle block"             hs-toggle-hiding)
+    ("h" "Hide block"               hs-hide-block)
+    ("s" "Show block"               hs-show-block)
+    ("l" "Hide level"               hs-hide-level)
+    ("H" "Hide all"                 hs-hide-all)
+    ("S" "Show all"                 hs-show-all)
+    ("C" "Cycle block"              hs-cycle
+     :if (lambda () (fboundp 'hs-cycle)))]])
+
+
+(transient-define-prefix f90-ts-transient-outline ()
+  "Outline commands for `f90-ts-mode'."
+  [["Show"
+    ("e" "Entry"                    outline-show-entry)
+    ("s" "Subtree"                  outline-show-subtree)
+    ("a" "All"                      outline-show-all)
+    ("k" "Branches"                 outline-show-branches)
+    ("i" "Children"                 outline-show-children)]
+   ["Hide"
+    ("c" "Entry"                    outline-hide-entry)
+    ("d" "Subtree"                  outline-hide-subtree)
+    ("q" "Sublevels"                outline-hide-sublevels)
+    ("t" "Body"                     outline-hide-body)
+    ("l" "Leaves"                   outline-hide-leaves)]
+   ["Move & cycle"
+    ("n" "Next heading"             outline-next-visible-heading)
+    ("p" "Previous heading"         outline-previous-visible-heading)
+    ("f" "Next same level"          outline-forward-same-level)
+    ("b" "Previous same level"      outline-backward-same-level)
+    ("u" "Up heading"               outline-up-heading)
+    ("TAB" "Cycle subtree"          outline-cycle
+     :if (lambda () (fboundp 'outline-cycle)))]])
+
+
+(transient-define-prefix f90-ts-transient-misc ()
+  "Miscellaneous commands for `f90-ts-mode'."
+  [["Side panel (alpha!)"
+    :if (lambda () (featurep 'f90-ts-nav))
+    ("B" "Open nav buffer"          f90-ts-nav-buffer-open)
+    ("F" "Focus nav buffer"         f90-ts-nav-buffer-focus)]
+   ["About & Doc"
+    ("a" "About"                    f90-ts-mode-about)
+    ("r" "README"                   f90-ts--browse-readme)
+    ("m" "MANUAL"                   f90-ts--browse-manual)]])
+
+
+;;;-----------------------------------------------------------------------------
+;; transient main menu
+
 (transient-define-prefix f90-ts-transient ()
   "F90 Tree-sitter Mode."
   ;; Modify
   [["Indentation, break & join"
     ("L"     "Indent list line:"          f90-ts-transient--indent-list-line)
-    ("TAB"   "Indent & comlete line"      f90-ts-indent-and-complete-line)
+    ("TAB"   "Indent & complete line"     f90-ts-indent-and-complete-line)
     ("s"     "Indent & complete stmt"     f90-ts-indent-and-complete-stmt)
     ("I"     "Indent & complete region"   f90-ts-indent-and-complete-region)
     ("C-TAB" "Indent line"                f90-ts-indent-line)
@@ -476,47 +551,37 @@ package `markdown-mode' are available, then use these."
     ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]
    ["Fill/Rebalance"
     ("C-f" "Fill column:"               f90-ts-transient--fill-column)
-    ("C-b"                              f90-ts-transient--fill-select-breakpoint-by) ; text is in description slot
+    ;; description text for "C-b" is in description slot
+    ;; of `f90-ts-transient--fill-select-breakpoint-by'
+    ("C-b"                              f90-ts-transient--fill-select-breakpoint-by)
     ("f"   "Fill region/buffer"         f90-ts-fill-region)
     ("M-f" "Fill at line"               f90-ts-fill-at-line)
     ("M-j" "Fill with prev line"        f90-ts-fill-prev-line)
     ("M-J" "Fill with next line"        f90-ts-fill-next-line)]]
 
-  ;; Navigate
+  ;; Navigate and sub-menus
   [["Procedure"
     ("a"   "Beginning"                  f90-ts-thing-beginning-of-procedure)
     ("e"   "End"                        f90-ts-thing-end-of-procedure)
     ("p"   "Previous"                   f90-ts-thing-prev-procedure)
     ("n"   "Next"                       f90-ts-thing-next-procedure)]
-   ["Derived Type"
-    ("M-a" "Beginning"                  f90-ts-thing-beginning-of-type)
-    ("M-e" "End"                        f90-ts-thing-end-of-type)
-    ("M-p" "Previous"                   f90-ts-thing-prev-type)
-    ("M-n" "Next"                       f90-ts-thing-next-type)]
-  ["Interface"
-    ("C-M-a" "Beginning"                f90-ts-thing-beginning-of-interface)
-    ("C-M-e" "End"                      f90-ts-thing-end-of-interface)
-    ("C-M-p" "Previous"                 f90-ts-thing-prev-interface)
-    ("C-M-n" "Next"                     f90-ts-thing-next-interface)]]
-
-  [["Xref"
+   ["Xref"
     ("."   "Find definition"            xref-find-definitions)
     (","   "Find references"            xref-find-references)
     ("/"   "Find apropos"               xref-find-apropos)
     ("<"   "Go back"                    xref-go-back)
     (">"   "Go forward"                 xref-go-forward)]
-   ["Side panel (alpha!)"
-    :if (lambda () (featurep 'f90-ts-nav))
-    ("B"   "Open nav buffer"            f90-ts-nav-buffer-open)
-    ("F"   "Focus nav buffer"           f90-ts-nav-buffer-focus)]
-   ["About & Doc"
-    ("C-h a" "About"                    f90-ts-mode-about)
-    ("C-h r" "README"                   f90-ts--browse-readme)
-    ("C-h m" "MANUAL"                   f90-ts--browse-manual)]])
+   ["More"
+    ("t"   "Types & interfaces..."      f90-ts-transient-things)
+    ("@"   "Hideshow..."                f90-ts-transient-hideshow
+     :if (lambda () (bound-and-true-p hs-minor-mode)))
+    ("$"   "Outline..."                 f90-ts-transient-outline
+     :if f90-ts--outline-active-p)
+    ("m"   "Misc & help..."             f90-ts-transient-misc)]])
 
 
 ;;;-----------------------------------------------------------------------------
-;;; menu definition
+;; menu definition
 
 (easy-menu-define f90-ts-mode-menu f90-ts-mode-map
   "Menu for `f90-ts-mode'."
@@ -638,6 +703,9 @@ package `markdown-mode' are available, then use these."
   (setq-local indent-region-function #'f90-ts-indent-and-complete-region)
 
   (add-hook 'xref-backend-functions #'f90-ts-xref-backend nil t)
+
+  ;; hideshow and outline support (hs-minor-mode, outline-minor-mode)
+  (f90-ts-fold-setup)
 
   ;;(setq-local treesit--font-lock-verbose t)
   ;;(setq-local treesit--indent-verbose t)

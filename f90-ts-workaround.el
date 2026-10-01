@@ -3,11 +3,6 @@
 ;; Copyright (C) 2025-2026 Martin Stein
 
 ;; Author: Martin Stein <mscfd@gmx.net>
-;; Maintainer: Martin Stein <mscfd@gmx.net>
-;; URL: https://github.com/mscfd/emacs-f90-ts-mode
-;; Keywords: languages, treesitter, fortran
-;; Version: 0.4.0-snapshot
-;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -407,6 +402,63 @@ THING is actually mapped to a pattern as required by Emacs 29."
                    ('interface (car f90-ts--thing-interface-regexp-pred))
                    ('type      (car f90-ts--thing-type-regexp-pred)))))
     (treesit-end-of-thing pattern arg)))
+
+
+;;;-----------------------------------------------------------------------------
+;;; Thing predicates:
+;;  `treesit-node-match-p': not available before Emacs 30
+;;  `treesit-thing-at': not available before Emacs 31
+
+(defun f90-ts--node-match-p-fallback (node predicate &optional _ignore-missing)
+  "Return non-nil if NODE matches PREDICATE.
+Fallback for `treesit-node-match-p'.  Supports the predicate forms
+usable on Emacs 29: a regexp matched against the node type, a function
+called with NODE, and a cons cell (REGEXP . FUNCTION) requiring both.
+Thing symbols are not supported."
+  (and node
+       (cond
+        ((stringp predicate)
+         (string-match-p predicate (treesit-node-type node)))
+        ((and (consp predicate)
+              (stringp (car predicate)))
+         (and (string-match-p (car predicate) (treesit-node-type node))
+              (or (null (cdr predicate))
+                  (funcall (cdr predicate) node))))
+        ((functionp predicate)
+         (funcall predicate node))
+        (t
+         (error "Unsupported tree-sitter predicate: %S" predicate)))))
+
+
+(defun f90-ts--thing-at-fallback (pos predicate &optional _strict)
+  "Return the smallest node at POS matching PREDICATE, or nil.
+Fallback for `treesit-thing-at': take the leaf node at POS and walk up
+through its ancestors until one matches.
+The STRICT argument is not implemented and ignored."
+  (cl-loop
+   for n = (treesit-node-at pos)
+   then (treesit-node-parent n)
+   while n
+   when (f90-ts--node-match-p n predicate)
+   return n))
+
+
+(defalias 'f90-ts--node-match-p
+  (if (fboundp 'treesit-node-match-p)
+      #'treesit-node-match-p
+    #'f90-ts--node-match-p-fallback)
+  "Return non-nil if NODE matches PREDICATE.
+Native `treesit-node-match-p' if available, else a regexp/function-only
+fallback.")
+
+
+(defalias 'f90-ts--thing-at
+  (if (fboundp 'treesit-thing-at)
+      #'treesit-thing-at
+    #'f90-ts--thing-at-fallback)
+  "Return the smallest node at POS matching a predicate or thing.
+Native `treesit-thing-at' if available, else a fallback built on
+`treesit-node-at' and `treesit-node-parent'.")
 
 
 ;;;-----------------------------------------------------------------------------
