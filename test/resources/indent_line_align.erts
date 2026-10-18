@@ -46,3 +46,24 @@ subroutine vardecl2()
             |alpha = 'transparent'
 end subroutine vardecl2
 =-=-=
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (let ((f90-ts-indent-list-line 'primary))
+      (f90-ts-indent-and-complete-line)))
+
+Name: align vardecl force primary assignment
+=-=
+! primary should not be the equal sign on the first declaration line
+subroutine sub()
+     integer :: a = 1, b &
+|= 2
+end subroutine sub
+=-=
+! primary should not be the equal sign on the first declaration line
+subroutine sub()
+     integer :: a = 1, b &
+            |= 2
+end subroutine sub
+=-=-=

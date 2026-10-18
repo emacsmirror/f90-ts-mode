@@ -261,16 +261,16 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
-- Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
+- More list contexts for alignment in continued lines.
+  There are a number of list like contexts, which are not yet supported, but for which proper
+  alignment would be nice.
 - Fill operations with lower column width (before joining).
 - Fill operation similar to `f90-fill-paragraph`. In conjunction with mark operations: determine interesting
   nodes within tree as region (like: statements, structure block, subroutine/function level).
 - Node based sibling walk operations (like goto trimmed beginning or trimmed end of next sibling). This would
   complement the mark region operations to easily extend an existing region.
+- Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
 - Support for (context-aware) `completion-at-point-function` (capf).
-- More list contexts for alignment in continued lines.
-  There are a number of list like contexts, which are not yet supported, but for which proper
-  alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.
 - Indentation for labeled do loops, like:
 ```f90
