@@ -1011,11 +1011,12 @@ before and after \"::\")."
              (attr-children (f90-ts--children-by-fields list-context '("attribute")))
              (decl-children (f90-ts--children-by-fields list-context '("declarator")))
 
-             ;;(attr-end (seq-max (seq-map (lambda (child) (treesit-node-end child))
-             ;;                            attr-children)))
-             (decl-start (seq-min (seq-map (lambda (child) (treesit-node-start child))
-                                           decl-children))))
-        (if (< pos decl-start)
+             ;; decl-children should not be empty, but might be in incomplete code
+             ;; depending on how error recovery works out; just use first decl child,
+             ;; as the children should be sorted by buffer position
+             (first-decl (car decl-children)))
+        (if (or (null first-decl)
+                (< pos (treesit-node-start first-decl)))
             attr-children
           ;; for init declarator children, add assignment nodes as well
           (cl-mapcan (lambda (n)
