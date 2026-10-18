@@ -1472,6 +1472,17 @@ The predicate compares line number of NODE with CONTEXT-LINE."
     (< context-line (f90-ts--node-line n))))
 
 
+(defun f90-ts--align-list-unary-arg-delta (node)
+  "Delta from NODE start to its unary argument start, nil if on another line."
+  (let ((arg (treesit-node-child-by-field-name
+              (f90-ts--node-leftmost-unary node) "argument")))
+    (when (and arg
+               (= (f90-ts--node-line node)
+                  (f90-ts--node-line arg)))
+      (- (treesit-node-start arg)
+         (treesit-node-start node)))))
+
+
 (defun f90-ts--align-list-nsym-offset (loc item-nsym)
   "Compute alignment offset for ITEM-NSYM depending on LOC.
 LOC is the location data at point, and provides a reference symbol and the
@@ -1491,28 +1502,16 @@ unary_expression, to handle blanks between the minus and the value content."
     (cond
      ((and (memq nsym-loc '(named operator-unary-other))
            (eq nsym 'operator-unary-minusplus))
-      (let* ((node (car item-nsym))
-             (unary-leftm (f90-ts--node-leftmost-unary node))
-             (arg (treesit-node-child-by-field-name unary-leftm
-                                                    "argument")))
-        (if (= (f90-ts--node-line node) (f90-ts--node-line arg))
-            (- (treesit-node-start arg) (treesit-node-start node))
-          ;; argument of unary expression is not on the same line
-          ;; TODO: this should be resolved at the anchor level (do not the
-          ;; unary-minus node as anchor, instead use argument as anchor...)
-          1)))
+      (or (f90-ts--align-list-unary-arg-delta (car item-nsym))
+          1))
 
      ((and (eq nsym-loc 'operator-unary-minusplus)
            (memq nsym '(named operator-unary-other)))
-      (let* ((node (alist-get 'node loc))
-             (unary-leftm (f90-ts--node-leftmost-unary node))
-             (arg (treesit-node-child-by-field-name unary-leftm "argument")))
-        (if (= (f90-ts--node-line node) (f90-ts--node-line arg))
-            (- (treesit-node-start node) (treesit-node-start arg))
-          ;; argument of unary expression is not on the same line, there is not much we
-          ;; can do about this, just move the minus one character to the left of the
-          ;; '(named operator-unary-other) anchor
-          -1)))
+      (if-let* ((delta (f90-ts--align-list-unary-arg-delta (alist-get 'node loc))))
+          (- delta)
+        ;; no usable argument on this line: just move the minus one
+        ;; character to the left of the `named'/`operator-unary-other' anchor
+        -1))
 
      (t 0))))
 
