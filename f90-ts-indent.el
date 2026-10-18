@@ -797,7 +797,7 @@ If NODE is nil return nil."
             ("relational_expression"     'operator-relation)
             ;; map concatenation to math_expression, as user defined
             ;; operators are also handled by that way
-            ("concatentation_expression" 'operator-math)
+            ("concatenation_expression"  'operator-math)
             (_                           'operator) ; anything still missing?
             )))
 
@@ -1280,7 +1280,11 @@ the align-list-other family."
                                  f90-ts-indent-paren-close
                                f90-ts-indent-paren-default))
                             ((or "=" ",")
-                             (if (member node-sym '(operator-logical operator-math))
+                             ;; relational operators like "<" are indented with
+                             ;; additional offset f90-ts-indent-expr-assign-default
+                             ;; (should we add f90-ts-indent-expr-assign-assoc-relational?)
+                             (if (member node-sym '(operator-logical
+                                                    operator-math))
                                  f90-ts-indent-expr-assign-assoc-op
                                f90-ts-indent-expr-assign-default))
                             (_ 0))))
