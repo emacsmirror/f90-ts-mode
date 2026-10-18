@@ -2661,6 +2661,25 @@ handled as well."
     (point)))
 
 
+(defun f90-ts--complete-replace-end-struct (node-struct beg end completion)
+  "Replace BEG..END by COMPLETION and return new NODE-STRUCT if updated.
+If the completion is exactly what the buffer already contains, then nothing is
+changed and the function returns nil, signalling that NODE-STRUCT is still
+valid."
+  (let (beg-marker
+        end-marker)
+    (unwind-protect
+        (progn
+          (setq beg-marker (copy-marker (treesit-node-start node-struct) t))
+          (setq end-marker (copy-marker (treesit-node-end node-struct) t))
+          (f90-ts--complete-replace-if-changed beg end completion)
+          (when (treesit-node-check node-struct 'outdated)
+            (treesit-node-on (marker-position beg-marker)
+                             (marker-position end-marker))))
+      (when beg-marker (set-marker beg-marker nil))
+      (when end-marker (set-marker end-marker nil)))))
+
+
 (defun f90-ts--complete-smart-end-node (node)
   "If NODE is an end struct statement, construct the completion.
 It looks for structure type and name or label.
@@ -2670,36 +2689,24 @@ Example: complete \"end\" closing a subroutine of name mysub by
 After the changes, NODE will become stale.  The function returns the new
 statement node representing the whole block.  This is used for the blink
 option or statement indentation."
-  ;; the region check ensures that end statements on continued lines are left alone
-  (let ((type (treesit-node-type node))
-        (beg (treesit-node-start node))
-        (end (f90-ts--complete-smart-end-end node))
-        (text (treesit-node-text node)))
-    ;; make sure that we are looking at and end statement, the parser might add
-    ;; and end_xyz_statement node in error recovery mode (e.g. at end of file)
-    (when (and (= (line-number-at-pos beg) (line-number-at-pos end))
-               (and text (string-match-p "^end" text))
-               (member type f90-ts--complete-end-structs))
-      (let ((node-struct (treesit-node-parent node))
-            node-struct-new)
-        (when-let* ((completion (f90-ts--complete-smart-end-compose node-struct)))
-          (let (beg-marker
-                end-marker)
-            (unwind-protect
-                (progn
-                  ;; beg marker should move with inserted/deleted text
-                  ;; to stay at start of node
-                  (setq beg-marker (copy-marker (treesit-node-start node-struct) t))
-                  (setq end-marker (copy-marker (treesit-node-end node-struct) t))
-                  ;; returns true if text was changed
-                  (f90-ts--complete-replace-if-changed beg end completion)
-                  (when (treesit-node-check node-struct 'outdated)
-                    (setq node-struct-new (treesit-node-on (marker-position beg-marker)
-                                                          (marker-position end-marker)))))
-              (when beg-marker (set-marker beg-marker nil))
-              (when end-marker (set-marker end-marker nil)))))
-        ;; if nothing has changed new node is nil, return the original one
-        (or node-struct-new node-struct)))))
+  ;; make sure that we are looking at and end statement, the parser might add
+  ;; and end_xyz_statement node in error recovery mode (e.g. at end of file)
+  (when (and (member (treesit-node-type node)
+                     f90-ts--complete-end-structs)
+             ;; t: ignore case in end prefix comparison
+             (string-prefix-p "end" (treesit-node-text node) t))
+    ;; the region check ensures that end statements spread over several lines
+    ;; are left alone
+    (let ((beg (treesit-node-start node))
+          (end (f90-ts--complete-smart-end-end node)))
+      (when (save-excursion
+              (goto-char beg)
+              (<= end (line-end-position)))
+        (let ((node-struct (treesit-node-parent node)))
+          (or (when-let* ((completion (f90-ts--complete-smart-end-compose node-struct)))
+                (f90-ts--complete-replace-end-struct node-struct beg end completion))
+              ;; if nothing has changed new node is nil, return the original one
+              node-struct))))))
 
 
 (defun f90-ts--complete-smart-end-indent (node-struct)
