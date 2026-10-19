@@ -1110,7 +1110,6 @@ Both occur in the contains part of a derived type definition."
 ;; The final primary position is determined in one place, see
 ;; `f90-ts--align-list-anchor-offset'.
 
-
 (defun f90-ts--align-list-pstmt1-anoff ()
   "Return the standard continued line indentation.
 This is start position of pstmt-1 as anchor and `f90-ts-indent-continued'
@@ -1225,6 +1224,35 @@ column), ITEMS-PLIST the items lists from `f90-ts--align-list-anoff-items'."
        :others (list anoff-lead anoff-hang)))))
 
 
+(defun f90-ts--align-list-other-paren-offset (nsym)
+  "Return the offset relative to an opening parenthesis for node symbol NSYM.
+This is `f90-ts-indent-paren-close' for a closing parenthesis, and
+`f90-ts-indent-paren-default' for everything else.
+Note that if nsym is `parenthesis', then it must be a closing parenthesis.
+The opening parenthesis would not be possible as an op-expr list context."
+  (if (eq nsym 'parenthesis)
+      f90-ts-indent-paren-close
+    f90-ts-indent-paren-default))
+
+
+(defun f90-ts--align-list-other-op-expr-offset-aux (psib-type nsym)
+  "Return the offset of NSYM relative to the aux context of an op-expr.
+PSIB-TYPE is the node type of the previous sibling of the operator expression,
+or nil if there is no previous sibling.  If there is an auxiliary context, one
+of the following cases is true:
+\"(\": parenthesis offsets, see `f90-ts--align-list-other-paren-offset';
+\"=\" or \",\": `f90-ts-indent-expr-assign-assoc-op' if NSYM is a math operator,
+                `f90-ts-indent-expr-assign-default' otherwise;
+anything else: 0."
+  (pcase psib-type
+    ("(" (f90-ts--align-list-other-paren-offset nsym))
+    ((or "=" ",")
+     (if (memq nsym '(operator-logical operator-math))
+         f90-ts-indent-expr-assign-assoc-op
+       f90-ts-indent-expr-assign-default))
+    (_ 0)))
+
+
 (defun f90-ts--align-list-other-paren (context loc items-plist)
   "Return the other plist for parenthesized list contexts.
 See `f90-ts--align-list-other-paren-expr-core' for the shared logic.
@@ -1245,9 +1273,7 @@ the align-list-other family."
          (indent-at-paren (f90-ts--indent-pos-at-node open-paren))
          (start-paren     (treesit-node-start open-paren))
          (offset-paren    (+ (1- (length (treesit-node-text open-paren)))
-                             (if (eq node-sym 'parenthesis)
-                                 f90-ts-indent-paren-close
-                               f90-ts-indent-paren-default))))
+                             (f90-ts--align-list-other-paren-offset node-sym))))
     (f90-ts--align-list-other-paren-expr-core
      node-sym list-context start-paren offset-paren indent-at-paren items-plist)))
 
@@ -1272,22 +1298,8 @@ the align-list-other family."
            (psib-type     (and psib-context (treesit-node-type psib-context)))
            (start-aux     (treesit-node-start aux-context))
            (indent-at-aux (f90-ts--indent-pos-at-node aux-context))
-           (offset-aux    (pcase psib-type
-                            ;; if there is an auxiliary context, one of the
-                            ;; three cases is true
-                            ("("
-                             (if (eq node-sym 'parenthesis)
-                                 f90-ts-indent-paren-close
-                               f90-ts-indent-paren-default))
-                            ((or "=" ",")
-                             ;; relational operators like "<" are indented with
-                             ;; additional offset f90-ts-indent-expr-assign-default
-                             ;; (should we add f90-ts-indent-expr-assign-assoc-relational?)
-                             (if (member node-sym '(operator-logical
-                                                    operator-math))
-                                 f90-ts-indent-expr-assign-assoc-op
-                               f90-ts-indent-expr-assign-default))
-                            (_ 0))))
+           (offset-aux    (f90-ts--align-list-other-op-expr-offset-aux psib-type
+                                                                       node-sym)))
       (f90-ts--align-list-other-paren-expr-core
        node-sym aux-context start-aux offset-aux indent-at-aux items-plist))))
 
