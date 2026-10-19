@@ -98,7 +98,7 @@ endef
 # ----------------------------------------------------------------------
 
 .PHONY: test-all
-test-all: test-checkdoc test-byte-compile test-ert-all
+test-all: test-checkdoc test-byte-compile test-ert
 	@echo "test-all: all checks passed"
 
 
@@ -157,7 +157,7 @@ test-ert-discover:
 # ----------------------------------------------------------------------
 
 .PHONY: test-ert-parallel
-test-ert-parallel: test-checkdoc test-byte-compile
+test-ert-parallel:
 	@set -e; \
 	tmp_tests=$$(mktemp); \
 	tmp_make=$$(mktemp); \
@@ -274,16 +274,6 @@ test-byte-compile:
 # directly rather than using lazy discovery.
 # ----------------------------------------------------------------------
 
-.PHONY: test-ert-std
-test-ert-std:
-	$(call run-ert-single,^f90-ts-mode-test-std--)
-
-
-.PHONY: test-ert-extra
-test-ert-extra:
-	$(call run-ert-single,^f90-ts-mode-test-extra--)
-
-
-.PHONY: test-ert-all
-test-ert-all:
+.PHONY: test-ert
+test-ert:
 	$(call run-ert-single,^f90-ts-mode-test)

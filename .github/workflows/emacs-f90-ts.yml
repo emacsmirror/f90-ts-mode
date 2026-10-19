@@ -420,5 +420,5 @@ jobs:
             echo
             echo "Running ERT tests for $branch"
 
-            make test-ert-all
+            make test-ert
           done

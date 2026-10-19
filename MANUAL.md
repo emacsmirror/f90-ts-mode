@@ -839,13 +839,13 @@ By default nothing is logged and the buffer is empty.
 The mode comes with a number of tests in `test/resources`.
 Registering and running tests is done in `test/f90-ts-mode-test.el`
 
-Standard tests are named `f90-ts-mode-test-std--...`, whereas additional tests start with `f90-ts-mode-test-extra--...`.
 Registering of tests is done semi-automatic in `f90-ts-mode-test-indent-register`, `f90-ts-mode-test-font-lock-register`
 and other functions in `f90-ts-mode-test.el`.
 
 Tests are run with a prescribed set of custom variables. In particular, indentation values are chosen
-all differently, such that errors can be spotted more easily. Within erts files, custom variable can
-and sometimes are overwritten to allow testing various aspects of the mode.
+all differently (and thus using a rather unsual non-practical setup), such that errors can be spotted
+more easily. Within erts files, custom variables can and sometimes are overwritten to allow testing
+various aspects of the mode.
 
 
 #### Makefile
@@ -853,12 +853,15 @@ and sometimes are overwritten to allow testing various aspects of the mode.
 There is a Makefile for running various tests. Relevant targets are:
 * test-checkdoc
 * test-byte-compile
-* test-ert-std
-* test-ert-extra
+* test-all
+* test-all-parallel
 * test-ert-all
-* test-ert-parallel (use with `make -j<N> test-ert-parallel` to run all ert tests in parallel)
+* test-ert-parallel
 
-During development if functions from `f90-ts-log.el` are used, testing fails as the log package
+Targets ending with parallel run one emacs instance per ert test to allow parallel execution
+with `make -j<N> test-*-parallel`. Otherwise one emacs process runs all ert tests sequentially.
+
+During development, if functions from `f90-ts-log.el` are used, testing fails (intended!) as the log package
 is not loaded (see [Logging](#logging)). To avoid this and suppress logging, the make command should be invoked by
 ```bash
 make test-target-name DEV=1
