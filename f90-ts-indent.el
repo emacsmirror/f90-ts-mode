@@ -1368,6 +1368,38 @@ the align-list-other family."
           :others anoffs-opp)))
 
 
+(defun f90-ts--align-list-other-var-decl-anoff (decl cur-line)
+  "Return the alignment candidate anoff for DECL on line CUR-LINE, or nil.
+DECL is a variable_declaration.  The candidate is the position of \"::\" plus
+`f90-ts-indent-declaration'.  If there is no \"::\", it is the end of the last
+type or attribute node minus the length of \"::\" plus
+`f90-ts-indent-declaration'.  In both cases the node must be on a line before
+CUR-LINE, otherwise there is no candidate."
+  (if-let* ((node-colons (treesit-search-subtree decl
+                                                 "::"
+                                                 nil ; search forward
+                                                 t   ; include anonymous nodes
+                                                 1   ; maximal depth of 1, search only children
+                                                 )))
+      (when (< (f90-ts--node-line node-colons) cur-line)
+        ;; start of "::" plus f90-ts-indent-declaration
+        (cons (treesit-node-start node-colons)
+              f90-ts-indent-declaration))
+    ;; no colons, take last node (type or attribute) and add to end position
+    ;; of that node f90-ts-indent-declaration minus the length of "::"
+    (when-let* ((node-last (treesit-search-subtree
+                            decl
+                            (lambda (n) (f90-ts--field-names-any-p
+                                         n '("type" "attribute")))
+                            t   ; search backward to find last attribute node
+                            t   ; only named nodes
+                            1   ; maximal depth of 1, search only children
+                            ))
+                ((< (f90-ts--node-line node-last) cur-line)))
+      (cons (treesit-node-end node-last)
+            (- f90-ts-indent-declaration (length "::"))))))
+
+
 (defun f90-ts--align-list-other-var-decl (context loc items-plist)
   "Return the other plist for variable declarations.
 Car of CONTEXT is a variable_declaration.
@@ -1394,38 +1426,10 @@ keep-or-* variants.
 
 CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
 the align-list-other family."
-  (let* ((list-context (car context))
-         (items-head (plist-get items-plist :head))
-         (nsym (alist-get 'nsym loc))
-         (cur-line (alist-get 'line loc))
-         (node-colons (treesit-search-subtree list-context
-                                              "::"
-                                              nil ; search forward
-                                              t   ; include anonymous nodes
-                                              1   ; maximal depth of 1, search only children
-                                              ))
-         (node-type-attr (unless node-colons
-                           (treesit-search-subtree list-context
-                                                   (lambda (n) (f90-ts--field-names-any-p
-                                                                n '("type" "attribute")))
-                                                   t   ; search backward to find last attribute node
-                                                   t   ; only named nodes
-                                                   1   ; maximal depth of 1, search only children
-                                                   )))
-         (anoff-decl
-          (cond
-           ((and node-colons
-                 (< (f90-ts--node-line node-colons) cur-line))
-            ;; start of "::" plus f90-ts-indent-declaration
-            (cons (treesit-node-start node-colons)
-                  f90-ts-indent-declaration))
-           ((and node-type-attr
-                 (< (f90-ts--node-line node-type-attr) cur-line))
-            ;; no colons, take last node (type or attribute, and add to end position of that node
-            ;; f90-ts-indent-declaration minus 2 (subtracting length of "::")
-            (cons (treesit-node-end node-type-attr)
-                  (- f90-ts-indent-declaration 2)))))
-         (assignment-p (eq nsym 'assignment)))
+  (let* ((items-head   (plist-get items-plist :head))
+         (assignment-p (eq (alist-get 'nsym loc) 'assignment))
+         (anoff-decl   (f90-ts--align-list-other-var-decl-anoff (car context)
+                                                                (alist-get 'line loc))))
     (list :primary (and items-head (not assignment-p) anoff-decl)
           :force   assignment-p
           :others  (and anoff-decl (list anoff-decl)))))
