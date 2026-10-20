@@ -36,6 +36,7 @@
 
 (require 'treesit)
 (require 'xref)
+(require 'hideshow)
 (require 'f90-ts-mode)
 
 ;;; Code:
@@ -965,6 +966,31 @@ If buffer was modified, insert `**' otherwise insert '--'."
 
 
 ;;------------------------------------------------------------------------------
+;; hideshow helpers
+
+(defun f90-ts-mode-test--hs-replace-overlays ()
+  "Replace invisible hideshow overlays with literal \"[...]\" text in buffer."
+  (cl-loop
+   for ov in (overlays-in (point-min) (point-max))
+   when (eq (overlay-get ov 'invisible) 'hs)
+   do (let ((beg (overlay-start ov))
+            (end (overlay-end ov)))
+        (delete-overlay ov)
+        (delete-region beg end)
+        (goto-char beg)
+        (insert "[...]"))))
+
+
+(defmacro f90-ts-mode-test-with-hs (action)
+  "Enable `hs-minor-mode', execute ACTION, and replace overlays with text."
+  (declare (indent 0))
+  `(progn
+     (hs-minor-mode 1)
+     ,action
+     (f90-ts-mode-test--hs-replace-overlays)))
+
+
+;;------------------------------------------------------------------------------
 ;; register tests
 
 
@@ -1041,7 +1067,8 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "modified_bit.erts"
    "navigate_thing_procedure.erts"
    "navigate_thing_interface.erts"
-   "navigate_thing_type.erts"))
+   "navigate_thing_type.erts"
+   "hideshow.erts"))
 
 
 ;; register font lock tests
