@@ -33,6 +33,8 @@
 ;;
 ;; Changelog (recent):
 ;; [10-2026]
+;;   - Prefix of ERT test names shortened `f90-ts-mode-test--' (no distinction
+;;     between std and extra anymore).
 ;;   - Transient menu restructured and decomposed.
 ;;   - Support for hideshow and outline added.
 ;;
@@ -178,6 +180,8 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog (recent):
 
 [10-2026]
+- Prefix of ERT test names shortened `f90-ts-mode-test--' (no distinction
+  between std and extra anymore).
 - Transient menu restructured and decomposed.
 - Support for hideshow and outline added.
 
