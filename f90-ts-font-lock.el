@@ -189,7 +189,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
        "public" "private" "protected" "contains"
        "use" "include" "only" "import"
        "implicit" "none" "external" "intrinsic" "non_intrinsic"
-       "pure" "impure" "elemental" "recursive" ; "non_recursive" not yet included in grammar
+       "pure" "impure" "elemental" "recursive"
        "type" "class" "is" "typeof" "classof"
        "if" "then" "else" "elseif" "endif"
        "do" "while"
@@ -305,14 +305,21 @@ Restrict fontification to the region between START and END, using OVERRIDE."
       (identifier)               @font-lock-type-face)
 
      (end_type_statement
-      (name)                     @font-lock-type-face)
+      (name)                     @font-lock-type-face))
 
-   ;; special declarations (e.g. within allocate statements)
-   ;; TODO: should the grammar use type_name instead of identifier as done elsewhere?
-   ((allocate_statement
-      type: (identifier)         @font-lock-type-face))
-     (type_statement
-      type: (identifier)         @font-lock-type-face))))
+   :language 'fortran
+   :feature 'type
+   (if (f90-ts--grammar-derived-type-name-p)
+       '((allocate_statement
+          type: (derived_type
+                 name: (type_name) @font-lock-type-face))
+         (type_statement
+          type: (derived_type
+                 name: (type_name) @font-lock-type-face)))
+     '((allocate_statement
+        type: (identifier) @font-lock-type-face)
+       (type_statement
+        type: (identifier) @font-lock-type-face)))))
 
 
 (defun f90-ts--font-lock-rules-function ()

@@ -650,6 +650,18 @@ Result is detected once and cached for the session."
    '((string_literal_part) @x)))
 
 
+(defun f90-ts--grammar-derived-type-name-p ()
+  "Return non-nil if grammar wraps type names in `derived_type'/`type_name'.
+Newer grammar version fixes a bug in statements like \"allocate(my_t :: x)\",
+which changes the tree structure slightly.
+The tree structure for \"type is\" and \"class is\" in \"select type\" clauses
+was also changed in the same grammar commit."
+  (f90-ts--grammar-feature-p
+   'derived-type-name
+   '((allocate_statement
+      type: (derived_type name: (type_name) @x)))))
+
+
 ;;;-----------------------------------------------------------------------------
 
 (provide 'f90-ts-workaround)
