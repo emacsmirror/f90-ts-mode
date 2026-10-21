@@ -37,6 +37,7 @@
 (require 'treesit)
 (require 'xref)
 (require 'hideshow)
+(require 'outline)
 (require 'f90-ts-mode)
 
 ;;; Code:
@@ -966,19 +967,30 @@ If buffer was modified, insert `**' otherwise insert '--'."
 
 
 ;;------------------------------------------------------------------------------
-;; hideshow helpers
+;; hideshow and outline helpers
 
-(defun f90-ts-mode-test--hs-replace-overlays ()
-  "Replace invisible hideshow overlays with literal \"[...]\" text in buffer."
+(defun f90-ts-mode-test--replace-overlays (kind)
+  "Replace invisible overlays of KIND with literal \"[...]\" text in buffer.
+KIND is the value of the `invisible' property, like `hs' or `outline'
+for hideshow and outline testing.
+Point is placed after the first \"[...]\" replacement."
   (cl-loop
-   for ov in (overlays-in (point-min) (point-max))
-   when (eq (overlay-get ov 'invisible) 'hs)
-   do (let ((beg (overlay-start ov))
-            (end (overlay-end ov)))
+   ;; process backwards, this ensures that buffer positions of the prior
+   ;; overlays stay valid
+   for ov in (sort (overlays-in (point-min) (point-max))
+                   (lambda (a b) (> (overlay-start a) (overlay-start b))))
+   when (eq (overlay-get ov 'invisible) kind)
+   do (let* ((beg (overlay-start ov))
+             (end (overlay-end ov))
+             (at-eob (= end (point-max))))
         (delete-overlay ov)
         (delete-region beg end)
         (goto-char beg)
-        (insert "[...]"))))
+        (insert "[...]")
+        ;; add newline if not present, as the erts-after block always has
+        ;; a final newline (outline hiding actually hides the final newline)
+        (when at-eob
+          (save-excursion (insert "\n"))))))
 
 
 (defmacro f90-ts-mode-test-with-hs (action)
@@ -987,7 +999,16 @@ If buffer was modified, insert `**' otherwise insert '--'."
   `(progn
      (hs-minor-mode 1)
      ,action
-     (f90-ts-mode-test--hs-replace-overlays)))
+     (f90-ts-mode-test--replace-overlays 'hs)))
+
+
+(defmacro f90-ts-mode-test-with-outline (action)
+  "Enable `outline-minor-mode', execute ACTION, and replace overlays with text."
+  (declare (indent 0))
+  `(progn
+     (outline-minor-mode 1)
+     ,action
+     (f90-ts-mode-test--replace-overlays 'outline)))
 
 
 ;;------------------------------------------------------------------------------
@@ -1068,7 +1089,9 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "navigate_thing_procedure.erts"
    "navigate_thing_interface.erts"
    "navigate_thing_type.erts"
-   "hideshow.erts"))
+   "hideshow.erts"
+   "outline_hide.erts"
+   "outline_navigate.erts"))
 
 
 ;; register font lock tests
