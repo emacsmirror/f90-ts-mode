@@ -372,7 +372,8 @@ subroutine str8()
 end subroutine str8
 =-=
 subroutine str8()
-     str = "012& |! comment
+     str = "012&   
+           |! comment
             345"
 end subroutine str8
 =-=-=
@@ -382,18 +383,17 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 9
 =-=
 subroutine str9()
-     str = "012&
-           ! comment
+     str = "012&   
 
 
-
-|            345"
+           ! comment|
+            345"
 end subroutine str9
 =-=
 subroutine str9()
-     str = "012&
-           ! comment
-            |345"
+     str = "012&   
+           |! comment
+            345"
 end subroutine str9
 =-=-=
 =-=-=
@@ -402,12 +402,18 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 10
 =-=
 subroutine str10()
-     str = "012"&
-     |      &"345"
+     str = "012&
+           ! comment
+
+
+
+|            345"
 end subroutine str10
 =-=
 subroutine str10()
-     str = "012"|"345"
+     str = "012&
+           ! comment
+            |345"
 end subroutine str10
 =-=-=
 =-=-=
@@ -416,37 +422,13 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 11
 =-=
 subroutine str11()
-     ! not proper code, but join should do the expected
-     s = "Lorem ipsum dolor &
-            &   
-   |       sit amet, ..."
+     str = "012"&
+     |      &"345"
 end subroutine str11
 =-=
 subroutine str11()
-     ! not proper code, but join should do the expected
-     s = "Lorem ipsum dolor &
-            |sit amet, ..."
+     str = "012"|"345"
 end subroutine str11
-=-=-=
-=-=-=
-
-Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
-Name: join prev string 12
-=-=
-subroutine str12()
-     ! not proper code, but join should do the expected
-     ! (keep trailing blanks)
-     s = "Lorem ipsum dolor &
-            & sit  
-   |       amet, ..."
-end subroutine str12
-=-=
-subroutine str12()
-     ! not proper code, but join should do the expected
-     ! (keep trailing blanks)
-     s = "Lorem ipsum dolor &
-            & sit  |amet, ..."
-end subroutine str12
 =-=-=
 =-=-=
 
@@ -916,7 +898,8 @@ subroutine str8()
 end subroutine str8
 =-=
 subroutine str8()
-     str = "012& |! comment
+     str = "012&|   
+           ! comment
             345"
 end subroutine str8
 =-=-=
@@ -926,17 +909,16 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 9
 =-=
 subroutine str9()
-     str = "012&
-           ! |comment
+     str = "012&   |
 
 
-
+           ! comment
             345"
 end subroutine str9
 =-=
 subroutine str9()
-     str = "012&
-           ! comment|
+     str = "012&|   
+           ! comment
             345"
 end subroutine str9
 =-=-=
@@ -946,12 +928,18 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 10
 =-=
 subroutine str10()
-     str = "012"& |
-           &"345"
+     str = "012&
+           ! |comment
+
+
+
+            345"
 end subroutine str10
 =-=
 subroutine str10()
-     str = "012"|"345"
+     str = "012&
+           ! comment|
+            345"
 end subroutine str10
 =-=-=
 =-=-=
@@ -960,39 +948,16 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 11
 =-=
 subroutine str11()
-     ! not proper code, but join should do the expected
-     s = "Lorem ipsum dolor &
-            &   |   
-          sit amet, ..."
+     str = "012"& |
+           &"345"
 end subroutine str11
 =-=
 subroutine str11()
-     ! not proper code, but join should do the expected
-     s = "Lorem ipsum dolor &
-            |sit amet, ..."
+     str = "012"|"345"
 end subroutine str11
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
-Name: join next string 12
-=-=
-subroutine str12()
-     ! not proper code, but join should do the expected
-     ! (keep all trailing blanks, even those after point)
-     s = "Lorem ipsum dolor &
-            & sit  |   
-          amet, ..."
-end subroutine str12
-=-=
-subroutine str12()
-     ! not proper code, but join should do the expected
-     ! (keep all trailing blanks, even those after point)
-     s = "Lorem ipsum dolor &
-            & sit     amet, ..."
-end subroutine str12
-=-=-=
-=-=-=
 
 remark
 erts functions parse the expected block always adding a final newline for the last line, which cannot be stripped.

@@ -336,13 +336,13 @@ Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 8
 =-=
 subroutine str8
-     s = "Lorem ipsum dolor &    !!% comment|
+     s = "Lorem ipsum dolor &    !!% not a comment| &
          &sit amet, consetetur sadipscing elitr, ..."
 end subroutine str8
 =-=
 subroutine str8
-     s = "Lorem ipsum dolor &    !!% comment
-                                 !!% |
+     s = "Lorem ipsum dolor &    !!% not a comment&
+         &| &
          &sit amet, consetetur sadipscing elitr, ..."
 end subroutine str8
 =-=-=

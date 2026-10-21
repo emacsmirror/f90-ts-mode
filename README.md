@@ -14,6 +14,7 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Changes required by updates to the proposed string_literal branch added.
 - Support for new keyword `non_recursive` added (requires new grammar).
 - Support for new grammar version with a different tree structure in some
   type related statements (allocate, select type) added.  Both new and old
@@ -100,7 +101,7 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Coarray keywords and statements
 - Imenu and a Fortran menu in the menu bar
 - Navigation (defun, things, Xref, side panel tree)
-- Hideshow and outline support (support for external treesit-fold is pending)
+- Hideshow, outline and treesit-fold support
 
 ## Keybindings
 

@@ -194,6 +194,23 @@ ampersand before POS1 and within the string_literal to be joined."
     (goto-char beg)))
 
 
+(defun f90-ts--join-action-trimmed-end (node)
+  "Return the end position of NODE, moved back over trailing blanks."
+  (save-excursion
+    (goto-char (treesit-node-end node))
+    (skip-chars-backward " \t")
+    (point)))
+
+
+(defun f90-ts--join-action-replace-with-blank (beg end action)
+  "Return (THUNK . ACTION), with THUNK replacing region BEG..END by one blank."
+  (cons (lambda ()
+          (delete-region beg end)
+          (goto-char beg)
+          (insert " "))
+        action))
+
+
 (defun f90-ts--join-line-action-common (first secnd is-prev)
   "Compute an action pair for joining lines at FIRST and SECND.
 The pair (THUNK . ACTION) provides a THUNK to perform the join and an ACTION
@@ -204,13 +221,19 @@ for example in a `fill-region' loop context.
 
 Argument IS-PREV signals whether the function was called from the
 `join-line-prev' or the `join-line-next' function."
-  (let ((is-amp-1st     (f90-ts--node-type-p first "&"))
-        (is-amp-2nd     (f90-ts--node-type-p secnd "&"))
-        (is-comment-1st (f90-ts--node-type-p first "comment"))
-        (is-comment-2nd (f90-ts--node-type-p secnd "comment")))
+  (let* ((is-amp-1st     (f90-ts--node-type-p first "&"))
+         (is-amp-2nd     (f90-ts--node-type-p secnd "&"))
+         (is-comment-1st (f90-ts--node-type-p first "comment"))
+         (is-comment-2nd (f90-ts--node-type-p secnd "comment"))
+         ;; a comment can be put after FIRST, except when FIRST is an
+         ;; ampersand continuing a string_literal;
+         ;; a comment after the ampersand is part of the string literal,
+         ;; and thus not a comment anymore
+         (appendable-comment (and is-comment-2nd
+                                  (not is-comment-1st)
+                                  (not (f90-ts--node-string first)))))
     (cond
-     ((and is-amp-1st
-           is-amp-2nd)
+     ((and is-amp-1st is-amp-2nd)
       (let ((beg (treesit-node-start first))
             (end (treesit-node-end secnd)))
         (cons (lambda ()
@@ -220,50 +243,29 @@ Argument IS-PREV signals whether the function was called from the
                 (skip-chars-forward " \t"))
               'join-continued-lines)))
 
-     ((and is-amp-1st
-           is-comment-2nd)
-      (let ((beg (treesit-node-end first))
-            (end (treesit-node-start secnd)))
-        (cons (lambda ()
-                (delete-region beg end)
-                (goto-char beg)
-                (insert " "))
-              'append-comment-after-amp)))
+     (appendable-comment
+      (f90-ts--join-action-replace-with-blank
+       (f90-ts--join-action-trimmed-end first)
+       (treesit-node-start secnd)
+       (if is-amp-1st
+           'append-comment-after-amp
+         'append-comment-after-stmt)))
 
      ((and is-comment-1st
            is-comment-2nd
            (string= (f90-ts--comment-prefix first 'trimmed)
                     (f90-ts--comment-prefix secnd 'trimmed)))
-      (let ((beg (save-excursion
-                   (goto-char (treesit-node-end first))
-                   (skip-chars-backward " \t")
-                   (point)))
-            (end (+ (treesit-node-start secnd)
-                    (length (f90-ts--comment-prefix secnd 'with-blanks)))))
-        (cons (lambda ()
-                (delete-region beg end)
-                (goto-char beg)
-                (insert " "))
-              ;; join and fill operation behave differently: do not join in
-              ;; fill operation, if indentation is different, so signal whether
-              ;; prefixes including blanks or only trimmed
-              (if (string= (f90-ts--comment-prefix first 'with-blanks)
-                           (f90-ts--comment-prefix secnd 'with-blanks))
-                  'join-comments-same-prefix-with-blanks
-                'join-comments-same-prefix-trimmed))))
-
-     ((and (null is-comment-1st)
-           is-comment-2nd)
-      (let ((beg (save-excursion
-                   (goto-char (treesit-node-end first))
-                   (skip-chars-backward " \t")
-                   (point)))
-            (end (treesit-node-start secnd)))
-        (cons (lambda ()
-                (delete-region beg end)
-                (goto-char beg)
-                (insert " "))
-              'append-comment-after-stmt)))
+      (f90-ts--join-action-replace-with-blank
+       (f90-ts--join-action-trimmed-end first)
+       (+ (treesit-node-start secnd)
+          (length (f90-ts--comment-prefix secnd 'with-blanks)))
+       ;; join and fill behave differently: do not join in fill operation
+       ;; if indentation differs, so signal whether the prefixes match
+       ;; including blanks or only trimmed
+       (if (string= (f90-ts--comment-prefix first 'with-blanks)
+                    (f90-ts--comment-prefix secnd 'with-blanks))
+           'join-comments-same-prefix-with-blanks
+         'join-comments-same-prefix-trimmed)))
 
      (t
       (let ((beg (save-excursion
@@ -329,9 +331,13 @@ THUNK and for messaging on failure."
                    (point)))
            (first (f90-ts--node-on-pos pos1 'left))
            (secnd (f90-ts--node-on-pos pos2 'right))
+           ;; this is nil if first and secnd are within a string_literal,
+           ;; but not within its proper parts (for example first is ampersand
+           ;; and second is a comment)
            (is-cont-str (f90-ts--join-line-is-cont-str first secnd)))
       ;;(f90-ts-log-msg :joinprev "pos1: %s, %s" pos1 first)
       ;;(f90-ts-log-msg :joinprev "pos2: %s, %s" pos2 secnd)
+      ;;(f90-ts-log-msg :joinprev "node-str: %s, %s" (f90-ts--node-string first) (f90-ts--node-string secnd))
       ;;(f90-ts-log-msg :joinprev "is-cont-str: %s" is-cont-str)
       (cl-assert (or first (= pos1 (point-min)))
                  nil "first node is nil with wrong pos1")
