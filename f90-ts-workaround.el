@@ -639,6 +639,27 @@ is cached so that the detection runs at most once for the session."
         accepted))))
 
 
+(defun f90-ts--grammar-keyword-p (token)
+  "Return non-nil if the Fortran grammar has anonymous node TOKEN.
+TOKEN is the keyword string as emitted by the grammar (like \"non_recursive\").
+Results are cached in `f90-ts--grammar-feature-cache', using TOKEN as key."
+  (let ((entry (assoc token f90-ts--grammar-feature-cache)))
+    (if entry
+        (cdr entry)
+      (let ((accepted
+             (condition-case nil
+                 (progn
+                   (treesit-query-compile 'fortran `((,(vector token) @x)) t)
+                   (push (cons token t) f90-ts--grammar-feature-cache)
+                   t)
+               (treesit-query-error
+                (push (cons token nil) f90-ts--grammar-feature-cache)
+                nil)
+               (error nil))))
+        ;;(message "f90-ts-mode: probed token \"%s\" = %s" token accepted)
+        accepted))))
+
+
 (defun f90-ts--grammar-string-literal-decomposed-p ()
   "Return non-nil if string_literal is decomposed by the Fortran grammar.
 The original grammar provided `string_literal' as a named leaf node.

@@ -1095,34 +1095,44 @@ Point is placed after the first \"[...]\" replacement."
 
 
 ;; register font lock tests
+(f90-ts-mode-test--font-lock-register
+ "f90-ts-mode-test"
+ '("font_lock_comment.f90"
+   "font_lock_builtin.f90"
+   "font_lock_interface.f90"
+   "font_lock_type.f90"
+   "font_lock_enum.f90"
+   "font_lock_do_concurrent.f90"
+   "font_lock_where.f90"
+   "font_lock_forall.f90"
+   "font_lock_special_var.f90"
+   "font_lock_error1.f90"
+   "font_lock_error2.f90"
+   "font_lock_error3.f90"
+   "font_lock_error4.f90"
+   ;; note that assertions are also part of the fontified buffer,
+   ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
+   ;; which is what we want to see in font_lock_error5
+   ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))
+   ("font_lock_error6.f90" . ((f90-ts-font-lock-error-show . 6)))))
+
+
 (when (f90-ts--grammar-string-literal-decomposed-p)
   (f90-ts-mode-test--font-lock-register
    "f90-ts-mode-test"
    '("font_lock_progmod.f90"
-     "font_lock_comment.f90"
-     "font_lock_builtin.f90"
-     "font_lock_operator.f90"
-     "font_lock_interface.f90"
-     "font_lock_type.f90"
-     "font_lock_enum.f90"
-     "font_lock_select.f90"
-     "font_lock_do_concurrent.f90"
-     "font_lock_where.f90"
-     "font_lock_forall.f90"
-     "font_lock_openmp.f90"
-     "font_lock_coarray.f90"
-     "font_lock_value.f90"
      "font_lock_continued_string.f90"
-     "font_lock_special_var.f90"
-     "font_lock_error1.f90"
-     "font_lock_error2.f90"
-     "font_lock_error3.f90"
-     "font_lock_error4.f90"
-     ;; note that assertions are also part of the fontified buffer,
-     ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
-     ;; which is what we want to see in font_lock_error5
-     ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))
-     ("font_lock_error6.f90" . ((f90-ts-font-lock-error-show . 6))))))
+     "font_lock_select.f90"
+     "font_lock_value.f90"
+     "font_lock_operator.f90"
+     "font_lock_openmp.f90"
+     "font_lock_coarray.f90")))
+
+
+(when (f90-ts--grammar-keyword-p "non_recursive")
+  (f90-ts-mode-test--font-lock-register
+   "f90-ts-mode-test"
+   '("font_lock_keywords.f90")))
 
 
 ;; xref tests

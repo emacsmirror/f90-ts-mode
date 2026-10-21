@@ -33,6 +33,7 @@
 ;;
 ;; Changelog (recent):
 ;; [10-2026]
+;;   - Support for new keyword "non_recursive" added (requires new grammar).
 ;;   - Support for new grammar version with a different tree structure in some
 ;;     type related statements (allocate, select type) added.  Both new and old
 ;;     grammar CST variants are supported.
@@ -183,6 +184,7 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog (recent):
 
 [10-2026]
+- Support for new keyword \"non_recursive\" added (requires new grammar).
 - Support for new grammar version with a different tree structure in some
   type related statements (allocate, select type) added.  Both new and old
   grammar CST variants are supported.
