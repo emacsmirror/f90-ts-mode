@@ -600,38 +600,54 @@ Uses the native `treesit-navigate-thing' on Emacs 30+, and
 
 
 ;;;-----------------------------------------------------------------------------
-;;; switches for grammar variant
+;; switches for grammar variant:
+;; * leaf nodes (string_literal) or decomposed string literals with
+;;   children for its parts
+;; * bug fix and fixes related to type_name, like in allocate(my_t :: x)
 
-(defvar f90-ts--string-literal-variant-cached 'unknown
-  "Cached grammar variant for string_literal of loaded fortran grammar.
-Original grammar just had a named leaf node `string_literal'.
-New grammar decomposes it into its parts and ampersand, comment and
-quote symbols.
-Value is `unknown' until first detection, then t for new and nil
-for original grammar rule.")
+(defvar f90-ts--grammar-feature-cache nil
+  "Alist mapping grammar feature symbols to t or nil.
+An entry (FEATURE . t) signals that a query associated with FEATURE is
+accepted.
+If FEATURE is not listed in the cache, it has not yet been probed.")
 
 
-(defun f90-ts--string-literal-decomposed-p ()
+(defun f90-ts--grammar-feature-p (feature query)
+  "Return non-nil if Fortran grammar accepts QUERY associated with FEATURE.
+FEATURE is the cache key.  A `treesit-query-error' means the grammar
+does conform to QUERY (like lacks the node or field structure) and is cached
+as nil.
+The result of `treesit-query-error', used to probe whether query is valid,
+is cached so that the detection runs at most once for the session."
+  (let ((entry (assq feature f90-ts--grammar-feature-cache)))
+    (if entry
+        (cdr entry)
+      (let ((accepted
+             (condition-case nil
+                 (progn
+                   ;; eagerly compile a query, if it fails, this signals
+                   ;; a `treesit-query-error', otherwise a `treesit-compiled-query'
+                   ;; object is returned
+                   (treesit-query-compile 'fortran query t)
+                   (push (cons feature t) f90-ts--grammar-feature-cache)
+                   t)
+               (treesit-query-error
+                (push (cons feature nil) f90-ts--grammar-feature-cache)
+                nil)
+               (error nil))))
+        ;;(message "f90-ts-mode: probed feature %s = %s" feature accepted)
+        accepted))))
+
+
+(defun f90-ts--grammar-string-literal-decomposed-p ()
   "Return non-nil if string_literal is decomposed by the Fortran grammar.
 The original grammar provided `string_literal' as a named leaf node.
 Newer grammars decompose it into its parts (with `string_literal_part',
 quotation, comment etc. as children of `string_literal').
 Result is detected once and cached for the session."
-  (when (eq f90-ts--string-literal-variant-cached 'unknown)
-    (setq f90-ts--string-literal-variant-cached
-          (condition-case nil
-              (progn
-                ;; eagerly compile a query with `string_literal_part',
-                ;; if it is unknown, this signals a `treesit-query-error',
-                ;; otherwise a `treesit-compiled-query' object is returned
-                (treesit-query-compile 'fortran '((string_literal_part) @x) t)
-                t)
-            (treesit-query-error nil)
-            (error nil)))
-    ;;(f90-ts-log-msg :grammar "discovered string literal: %s" f90-ts--string-literal-variant-cached)
-    )
-  ;; return cached value
-  f90-ts--string-literal-variant-cached)
+  (f90-ts--grammar-feature-p
+   'string_literal_part
+   '((string_literal_part) @x)))
 
 
 ;;;-----------------------------------------------------------------------------

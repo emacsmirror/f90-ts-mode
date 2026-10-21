@@ -314,7 +314,7 @@ subroutine str6
 end subroutine str6
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 7
 =-=
 ! insert double & on new line with point in between to allow continue adding text
@@ -332,7 +332,7 @@ end subroutine str7
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 8
 =-=
 subroutine str8
@@ -348,7 +348,7 @@ end subroutine str8
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 9
 =-=
 subroutine str9
@@ -366,7 +366,7 @@ end subroutine str9
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 10
 =-=
 subroutine str10
@@ -382,7 +382,7 @@ end subroutine str10
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 11
 =-=
 subroutine str11
@@ -398,7 +398,7 @@ end subroutine str11
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: break string 12
 =-=
 ! aligned using continued offset as primary position

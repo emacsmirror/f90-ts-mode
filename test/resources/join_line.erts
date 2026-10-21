@@ -345,7 +345,7 @@ subroutine str6()
 end subroutine str6
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 7
 =-=
 subroutine str7()
@@ -362,7 +362,7 @@ end subroutine str7
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 8
 =-=
 subroutine str8()
@@ -378,7 +378,7 @@ end subroutine str8
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 9
 =-=
 subroutine str9()
@@ -398,7 +398,7 @@ end subroutine str9
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 10
 =-=
 subroutine str10()
@@ -412,7 +412,7 @@ end subroutine str10
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 11
 =-=
 subroutine str11()
@@ -430,7 +430,7 @@ end subroutine str11
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join prev string 12
 =-=
 subroutine str12()
@@ -889,7 +889,7 @@ subroutine str6()
 end subroutine str6
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 7
 =-=
 subroutine str7()
@@ -906,7 +906,7 @@ end subroutine str7
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 8
 =-=
 subroutine str8()
@@ -922,7 +922,7 @@ end subroutine str8
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 9
 =-=
 subroutine str9()
@@ -942,7 +942,7 @@ end subroutine str9
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 10
 =-=
 subroutine str10()
@@ -956,7 +956,7 @@ end subroutine str10
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 11
 =-=
 subroutine str11()
@@ -974,7 +974,7 @@ end subroutine str11
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: join next string 12
 =-=
 subroutine str12()

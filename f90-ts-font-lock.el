@@ -227,7 +227,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
    :language 'fortran
    :feature 'preproc
    ;; highlight macro names in definitions
-   (if (f90-ts--string-literal-decomposed-p)
+   (if (f90-ts--grammar-string-literal-decomposed-p)
        '((preproc_include
           "#include"                                  @font-lock-preprocessor-face
           path: (string_literal (string_literal_part) @font-lock-string-face)))
@@ -440,7 +440,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
 
 (defun f90-ts--font-lock-rules-string ()
   "Font-lock rules for strings."
-  (if (f90-ts--string-literal-decomposed-p)
+  (if (f90-ts--grammar-string-literal-decomposed-p)
       (treesit-font-lock-rules
        :language 'fortran
        :feature 'string
@@ -481,7 +481,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
    :language 'fortran
    :feature 'delimiter
    `(["," ":" ";" "::" "=>" "&"
-      ,@(when (f90-ts--string-literal-decomposed-p) '("\""))]
+      ,@(when (f90-ts--grammar-string-literal-decomposed-p) '("\""))]
      @f90-ts-font-lock-delimiter-face)))
 
 

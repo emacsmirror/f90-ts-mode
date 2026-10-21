@@ -627,7 +627,7 @@ subroutine sub()
 end subroutine sub
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Code:
   (lambda ()
     (f90-ts-mode)
@@ -655,7 +655,7 @@ end subroutine sub
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Code:
   (lambda ()
     (f90-ts-mode)
@@ -695,7 +695,7 @@ end subroutine sub
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: fill all string 3
 =-=
 !1 test filling with comments within string
@@ -734,7 +734,7 @@ end subroutine sub
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: fill all string 4
 =-=
 ! use any position in string
@@ -751,7 +751,7 @@ end subroutine break_anywhere
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: fill all string 5
 =-=
 !1 using any position in string if necessary

@@ -108,7 +108,7 @@
    ;; before the in-string predicate (in fac in-comment-p and in-string-p can both be true
    ((f90-ts--in-string-p (point))
     (cl-assert (not (f90-ts--in-comment-p (point))) nil "unexpectedly within comment")
-    (if (not (f90-ts--string-literal-decomposed-p))
+    (if (not (f90-ts--grammar-string-literal-decomposed-p))
         ;; old style continued string (this does not handle all cases properly
         (insert "&\n&")
       ;; first determine where point is within string
@@ -171,7 +171,7 @@ Positions POS1 and POS2 are end of previous line and start of current line.
 If the grammar variant does not decompose the string_literal, then NODE is
 of type string_literal.  For the decomposed variant, NODE is the first
 ampersand before POS1 and within the string_literal to be joined."
-  (cl-assert (if (f90-ts--string-literal-decomposed-p)
+  (cl-assert (if (f90-ts--grammar-string-literal-decomposed-p)
                  (and (f90-ts--node-type-p node '("&" "string_literal_part" "\""))
                       (f90-ts--node-type-p (treesit-node-parent node) "string_literal"))
                (f90-ts--node-type-p node "string_literal"))
@@ -288,7 +288,7 @@ which are at end of first and beginning of second line.
 The predicate only returns non-nil if FIRST and SECND are ampersand nodes,
 without any comments in-between (the non-decomposed grammar variant fails to
 parse comments within strings)."
-  (if (f90-ts--string-literal-decomposed-p)
+  (if (f90-ts--grammar-string-literal-decomposed-p)
       (and (f90-ts--node-type-p first '("&"
                                         ;; these are only posssible within a
                                         ;; malformed continued string without &
@@ -723,7 +723,7 @@ restricted to preferred positions."
    ((f90-ts--node-type-p node "comment")
     (f90-ts--find-breakpoint-in-comment node fill-col))
 
-   ((and (f90-ts--string-literal-decomposed-p)
+   ((and (f90-ts--grammar-string-literal-decomposed-p)
          (f90-ts--node-type-p node "string_literal_part"))
     (f90-ts--find-breakpoint-in-string (treesit-node-parent node)
                                        beg fill-col

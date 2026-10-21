@@ -1095,7 +1095,7 @@ Point is placed after the first \"[...]\" replacement."
 
 
 ;; register font lock tests
-(when (f90-ts--string-literal-decomposed-p)
+(when (f90-ts--grammar-string-literal-decomposed-p)
   (f90-ts-mode-test--font-lock-register
    "f90-ts-mode-test"
    '("font_lock_progmod.f90"
@@ -1146,7 +1146,7 @@ Point is placed after the first \"[...]\" replacement."
 
 
 ;; complex font lock tests
-(when (f90-ts--string-literal-decomposed-p)
+(when (f90-ts--grammar-string-literal-decomposed-p)
   (f90-ts-mode-test--font-lock-register
    "f90-ts-mode-test"
    '("font_lock_integration_collatz.f90")))
