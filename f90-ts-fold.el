@@ -59,6 +59,9 @@
 ;; auxiliary stuff
 (require 'f90-ts-auxiliary)
 
+;; provides f90-ts--thing-defun-regexp-pred
+(require 'f90-ts-thing)
+
 
 ;;;-----------------------------------------------------------------------------
 ;; hideshow
@@ -360,10 +363,6 @@ This is for Emacs 31+."
 
 
 ;;;-----------------------------------------------------------------------------
-
-;; defined in f90-ts-mode.el
-(defvar f90-ts--thing-defun-regexp-pred)
-
 
 (defvar f90-ts--outline-predicate f90-ts--thing-defun-regexp-pred
   "Predicate matching outline headings in `f90-ts-mode'.
