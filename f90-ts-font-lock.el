@@ -148,72 +148,84 @@ Restrict fontification to the region between START and END, using OVERRIDE."
 
 (defun f90-ts--font-lock-rules-keyword ()
   "Font-lock rules for Fortran keywords."
-  (treesit-font-lock-rules
-   :language 'fortran
-   :feature 'keyword
-   ;; match type qualifiers/attributes
-   '((type_qualifier) @font-lock-keyword-face)
+  (let ((keywords
+         (vconcat
+          ["program" "module" "submodule"
+           "function" "subroutine" "procedure" "interface"
+           "bind" "result" "end" "call"
+           "public" "private" "protected" "contains"
+           "use" "include" "only" "import"
+           "implicit" "none" "external" "intrinsic" "non_intrinsic"
+           "pure" "impure" "elemental" "recursive"
+           "type" "class" "is" "typeof" "classof"
+           "if" "then" "else" "elseif" "endif"
+           "do" "while"
+           "cycle" "exit" "error" "stop" "return" "entry"
+           "associate" "block" "critical"
+           "enum" "enumeration" "enumerator"
+           "where" "elsewhere" "forall" "concurrent"
+           "select" "case" "rank" "default"
+           "shared" "local" "local_init" "reduce"
+           "extends" "abstract"
+           "pass" "nopass" "deferred" "non_overridable"
+           "operator" "assignment" "generic" "final"
+           "allocatable"
+           "intent" "in" "out" "inout" "optional"
+           "parameter" "save" "target" "pointer" "value"
+           "dimension" "codimension" "contiguous" "volatile" "asynchronous"
+           "open" "close" "print" "read" "write" "format"
+           "inquire" "wait" "backspace" "endfile" "rewind" "flush"
+           "nullify" "allocate" "deallocate"
+           "sync" "all" "images" "memory"
+           "form" "team" "change"
+           "lock" "unlock"
+           "fail" "image"]
+          ;; keywords which only exist in some grammar variants
+          (when (f90-ts--grammar-keyword-p "non_recursive")
+            ["non_recursive"]))))
 
-   :language 'fortran
-   :feature 'keyword
-   '(;; match keywords in select case statements
-     ;; (which are not covered by simple keywords below)
-     (case_statement
-      "case"    @font-lock-keyword-face
-      (default) @font-lock-keyword-face)
-     ;; match keywords in select type statements
-     ;; (which are not covered by simple keywords below)
-     (type_statement
-      (default) @font-lock-keyword-face)
-     ;; match keywords in select rank statements
-     ;; (which are not covered by simple keywords below)
-     (rank_statement
-      (default) @font-lock-keyword-face))
+    (treesit-font-lock-rules
+     :language 'fortran
+     :feature 'keyword
+     ;; match type qualifiers/attributes
+     ;; match this before keyword matching, as this highlights the whole
+     ;; attribute (like "dimension(1:N)" instead of just the keyword);
+     ;; TODO: do we want to match the whole attribute uniformly, or should
+     ;; we use separate faces like operator face for "+" in "dimension(1:M+N)"?
+     '((type_qualifier) @font-lock-keyword-face)
 
-   :language 'fortran
-   :feature 'keyword
-   ;; "none" is a named node in "implicit none", but an anonymous node
-   ;; in "do concurrent(...) default(none)"
-   '((implicit_statement
-      (none) @font-lock-keyword-face))
+     :language 'fortran
+     :feature 'keyword
+     '(;; match keywords in select case statements
+       ;; (which are not covered by simple keywords below)
+       (case_statement
+        "case"    @font-lock-keyword-face
+        (default) @font-lock-keyword-face)
+       ;; match keywords in select type statements
+       ;; (which are not covered by simple keywords below)
+       (type_statement
+        (default) @font-lock-keyword-face)
+       ;; match keywords in select rank statements
+       ;; (which are not covered by simple keywords below)
+       (rank_statement
+        (default) @font-lock-keyword-face))
 
-   :language 'fortran
-   :feature 'keyword
-   ;; match keywords exposed by the grammar
-   ;; note that this matches anonymous nodes representing the keyword,
-   ;; not the keyword text itself, and these nodes are always stored lower-case
-   ;; (hence no need to match case insensitive as is necessary with builtins)
-   '((["program" "module" "submodule"
-       "function" "subroutine" "procedure" "interface"
-       "bind" "result" "end" "call"
-       "public" "private" "protected" "contains"
-       "use" "include" "only" "import"
-       "implicit" "none" "external" "intrinsic" "non_intrinsic"
-       "pure" "impure" "elemental" "recursive" ; "non_recursive" not yet included in grammar
-       "type" "class" "is" "typeof" "classof"
-       "if" "then" "else" "elseif" "endif"
-       "do" "while"
-       "cycle" "exit" "error" "stop" "return" "entry"
-       "associate" "block" "critical"
-       "enum" "enumeration" "enumerator"
-       "where" "elsewhere" "forall" "concurrent"
-       "select" "case" "rank" "default"
-       "shared" "local" "local_init" "reduce"
-       "extends" "abstract"
-       "pass" "nopass" "deferred" "non_overridable"
-       "operator" "assignment" "generic" "final"
-       "allocatable"
-       "intent" "in" "out" "inout" "optional"
-       "parameter" "save" "target" "pointer" "value"
-       "dimension" "codimension" "contiguous" "volatile" "asynchronous"
-       "open" "close" "print" "read" "write" "format"
-       "inquire" "wait" "backspace" "endfile" "rewind" "flush"
-       "nullify" "allocate" "deallocate"
-       "sync" "all" "images" "memory"
-       "form" "team" "change"
-       "lock" "unlock"
-       "fail" "image"]
-      @font-lock-keyword-face))))
+     :language 'fortran
+     :feature 'keyword
+     ;; "none" is a named node in "implicit none", but an anonymous node
+     ;; in "do concurrent(...) default(none)"
+     '((implicit_statement
+        (none) @font-lock-keyword-face))
+
+     :language 'fortran
+     :feature 'keyword
+     ;; match keywords exposed by the grammar, but last to allow more
+     ;; specific rules to overwrite simple keyword highlightling (see
+     ;; above at type_qualifier rule);
+     ;; note that this matches anonymous nodes representing the keyword,
+     ;; not the keyword text itself, and these nodes are always stored lower-case
+     ;; (hence no need to match case insensitive as is necessary with builtins)
+     `((,keywords @font-lock-keyword-face)))))
 
 
 (defun f90-ts--font-lock-rules-preproc ()
@@ -227,7 +239,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
    :language 'fortran
    :feature 'preproc
    ;; highlight macro names in definitions
-   (if (f90-ts--string-literal-decomposed-p)
+   (if (f90-ts--grammar-string-literal-decomposed-p)
        '((preproc_include
           "#include"                                  @font-lock-preprocessor-face
           path: (string_literal (string_literal_part) @font-lock-string-face)))
@@ -305,14 +317,21 @@ Restrict fontification to the region between START and END, using OVERRIDE."
       (identifier)               @font-lock-type-face)
 
      (end_type_statement
-      (name)                     @font-lock-type-face)
+      (name)                     @font-lock-type-face))
 
-   ;; special declarations (e.g. within allocate statements)
-   ;; TODO: should the grammar use type_name instead of identifier as done elsewhere?
-   ((allocate_statement
-      type: (identifier)         @font-lock-type-face))
-     (type_statement
-      type: (identifier)         @font-lock-type-face))))
+   :language 'fortran
+   :feature 'type
+   (if (f90-ts--grammar-derived-type-name-p)
+       '((allocate_statement
+          type: (derived_type
+                 name: (type_name) @font-lock-type-face))
+         (type_statement
+          type: (derived_type
+                 name: (type_name) @font-lock-type-face)))
+     '((allocate_statement
+        type: (identifier) @font-lock-type-face)
+       (type_statement
+        type: (identifier) @font-lock-type-face)))))
 
 
 (defun f90-ts--font-lock-rules-function ()
@@ -440,7 +459,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
 
 (defun f90-ts--font-lock-rules-string ()
   "Font-lock rules for strings."
-  (if (f90-ts--string-literal-decomposed-p)
+  (if (f90-ts--grammar-string-literal-decomposed-p)
       (treesit-font-lock-rules
        :language 'fortran
        :feature 'string
@@ -481,7 +500,7 @@ Restrict fontification to the region between START and END, using OVERRIDE."
    :language 'fortran
    :feature 'delimiter
    `(["," ":" ";" "::" "=>" "&"
-      ,@(when (f90-ts--string-literal-decomposed-p) '("\""))]
+      ,@(when (f90-ts--grammar-string-literal-decomposed-p) '("\""))]
      @f90-ts-font-lock-delimiter-face)))
 
 

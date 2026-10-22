@@ -1035,7 +1035,7 @@ before and after \"::\")."
 There is one small exception:
 Always drop the second quote in an escape double quote sequence,
 which is represented as a string_literal_part."
-  (cl-assert (f90-ts--string-literal-decomposed-p)
+  (cl-assert (f90-ts--grammar-string-literal-decomposed-p)
              nil "wrong grammar, string_literal not decomposed by parser")
   ;; example code (where we want to primarily try to align the text):
   ;; s = """start with quoted quote&
@@ -1346,7 +1346,7 @@ the primary position.
 
 CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
 the align-list-other family."
-  (cl-assert (f90-ts--string-literal-decomposed-p)
+  (cl-assert (f90-ts--grammar-string-literal-decomposed-p)
              nil "wrong grammar, string_literal not decomposed by parser")
   (let* ((list-context (car context))
          (nsym (alist-get 'nsym loc))
@@ -1850,7 +1850,7 @@ Finally use VARIANT to select one pair to align with."
       (cons "parenthesized_expression" paren-prop)
       (cons "argument_list"            paren-prop)
       (cons "array_literal"            paren-prop)
-      (when (f90-ts--string-literal-decomposed-p)
+      (when (f90-ts--grammar-string-literal-decomposed-p)
         (cons "string_literal"
               '(:get-items-fn f90-ts--align-items-string
                 :get-other-fn f90-ts--align-other-string)))
@@ -2116,7 +2116,7 @@ and (unless COND (MATCHER ANCHRO OFFSET)).
 COND is evaluated at runtime, and the entry contributes its triple only when
 COND is non-nil (when) or nil (unless).  As the condition is evaluated after
 the grammar is loaded, it can be used to adjust for grammar variants (like
-`f90-ts--string-literal-decomposed-p', which checks for string_literal
+`f90-ts--grammar-string-literal-decomposed-p', which checks for string_literal
 parser variant)."
  `(cl-loop
    for rule in (list ,@(mapcar
@@ -2198,7 +2198,7 @@ The main purpose is to fill the indentation cache for a new run."
    ;; continued strings need special care, the ampersands do not appear as
    ;; separate nodes, (treesit-node-at pos) at indentation position returns
    ;; the string_literal, which starts at some previous line
-   (unless (f90-ts--string-literal-decomposed-p)
+   (unless (f90-ts--grammar-string-literal-decomposed-p)
      ((nopp-n-p-gp nil "string_literal" nil) nopp-parent 0))
 
    ;; it is easy to see whether we are on a continued line (not the first line
