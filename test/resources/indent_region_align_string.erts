@@ -33,7 +33,7 @@ subroutine string2()
 end subroutine string2
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: continued string 3
 =-=
 subroutine string3()
@@ -48,7 +48,7 @@ end subroutine string3
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: continued string 4
 =-=
 subroutine sub()
@@ -92,7 +92,7 @@ subroutine sub()
 end subroutine sub
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: continued string 5
 =-=
 subroutine sub()
@@ -119,7 +119,7 @@ end subroutine sub
 =-=-=
 =-=-=
 
-Skip: (not (f90-ts--string-literal-decomposed-p))
+Skip: (not (f90-ts--grammar-string-literal-decomposed-p))
 Name: continued string 6
 =-=
 subroutine sub()

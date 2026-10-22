@@ -1,0 +1,295 @@
+Point-Char: |
+
+Name: outline next heading 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-next-heading))
+=-=
+module mod
+ |use other
+contains
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=
+module mod
+ use other
+contains
+| subroutine sub()
+ end subroutine sub
+end module mod
+=-=-=
+
+Name: outline next heading 2
+=-=
+|subroutine a()
+end subroutine a
+subroutine b()
+end subroutine b
+=-=
+subroutine a()
+end subroutine a
+|subroutine b()
+end subroutine b
+=-=-=
+
+
+Name: outline previous heading 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-previous-heading))
+=-=
+subroutine sub()
+     |print *, "x"
+end subroutine sub
+=-=
+|subroutine sub()
+     print *, "x"
+end subroutine sub
+=-=-=
+
+Name: outline previous heading 2
+=-=
+subroutine a()
+end subroutine a
+|subroutine b()
+end subroutine b
+=-=
+|subroutine a()
+end subroutine a
+subroutine b()
+end subroutine b
+=-=-=
+
+
+Name: outline up heading 0 body 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-up-heading 0))
+=-=
+module mod
+contains
+ subroutine sub()
+      |print *, "x"
+ end subroutine sub
+end module mod
+=-=
+module mod
+contains
+| subroutine sub()
+      print *, "x"
+ end subroutine sub
+end module mod
+=-=-=
+
+Name: outline up heading 0 derived type 1
+=-=
+module mod
+ type :: some_t
+      complex :: z
+ contains
+      |procedure :: set => some_set
+ end type some_t
+end module mod
+=-=
+module mod
+| type :: some_t
+      complex :: z
+ contains
+      procedure :: set => some_set
+ end type some_t
+end module mod
+=-=-=
+
+
+Name: outline up heading 1 heading line 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-up-heading 1))
+=-=
+module mod
+contains
+ |subroutine sub()
+      print *, "x"
+ end subroutine sub
+end module mod
+=-=
+|module mod
+contains
+ subroutine sub()
+      print *, "x"
+ end subroutine sub
+end module mod
+=-=-=
+
+Name: outline up heading 1 body 1
+=-=
+module mod
+contains
+ subroutine sub()
+      |print *, "x"
+ end subroutine sub
+end module mod
+=-=
+|module mod
+contains
+ subroutine sub()
+      print *, "x"
+ end subroutine sub
+end module mod
+=-=-=
+
+Name: outline up heading interface 1
+=-=
+module mod
+ interface
+      |subroutine foo()
+      end subroutine foo
+ end interface
+end module mod
+=-=
+module mod
+| interface
+      subroutine foo()
+      end subroutine foo
+ end interface
+end module mod
+=-=-=
+
+Name: outline up heading module procedure 1
+=-=
+submodule (mod) mod_s
+contains
+ |module procedure a
+ end procedure a
+end submodule mod_s
+=-=
+|submodule (mod) mod_s
+contains
+ module procedure a
+ end procedure a
+end submodule mod_s
+=-=-=
+
+
+Name: outline up heading interface 2
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-up-heading 2))
+=-=
+module mod
+ interface
+      |subroutine foo()
+      end subroutine foo
+ end interface
+end module mod
+=-=
+|module mod
+ interface
+      subroutine foo()
+      end subroutine foo
+ end interface
+end module mod
+=-=-=
+
+Name: outline up heading function interface 1
+=-=
+module mod
+ interface
+      |function fun()
+      end function fun
+ end interface
+end module mod
+=-=
+|module mod
+ interface
+      function fun()
+      end function fun
+ end interface
+end module mod
+=-=-=
+
+
+Name: outline forward same level 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-forward-same-level 1))
+=-=
+module mod
+contains
+ |subroutine a()
+ end subroutine a
+ subroutine b()
+ end subroutine b
+end module mod
+=-=
+module mod
+contains
+ subroutine a()
+ end subroutine a
+| subroutine b()
+ end subroutine b
+end module mod
+=-=-=
+
+Name: outline forward same level 2
+=-=
+module mod
+contains
+ |subroutine a()
+ contains
+  subroutine inner()
+  end subroutine inner
+ end subroutine a
+ subroutine b()
+ end subroutine b
+end module mod
+=-=
+module mod
+contains
+ subroutine a()
+ contains
+  subroutine inner()
+  end subroutine inner
+ end subroutine a
+| subroutine b()
+ end subroutine b
+end module mod
+=-=-=
+
+
+Name: outline backward same level 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (outline-minor-mode 1)
+    (outline-backward-same-level 1))
+=-=
+module mod
+contains
+ subroutine a()
+ end subroutine a
+ |subroutine b()
+ end subroutine b
+end module mod
+=-=
+module mod
+contains
+| subroutine a()
+ end subroutine a
+ subroutine b()
+ end subroutine b
+end module mod
+=-=-=

@@ -10,6 +10,37 @@
 !         ^ f90-ts-font-lock-delimiter-face
 !          ^^^^^^ font-lock-string-face
 !                ^ f90-ts-font-lock-delimiter-face
+  print*, """"
+! ^^^^^ font-lock-keyword-face
+!      ^ nil
+!       ^ f90-ts-font-lock-delimiter-face
+!         ^ f90-ts-font-lock-delimiter-face
+!          ^ f90-ts-font-lock-escape-face
+!           ^ font-lock-string-face
+!            ^ f90-ts-font-lock-delimiter-face
+  print*, "'"
+! ^^^^^ font-lock-keyword-face
+!      ^ nil
+!       ^ f90-ts-font-lock-delimiter-face
+!         ^ f90-ts-font-lock-delimiter-face
+!          ^ font-lock-string-face
+!           ^ f90-ts-font-lock-delimiter-face
+  print*, "   ""   "
+! ^^^^^ font-lock-keyword-face
+!      ^ nil
+!       ^ f90-ts-font-lock-delimiter-face
+!         ^ f90-ts-font-lock-delimiter-face
+!          ^^^ font-lock-string-face
+!             ^ f90-ts-font-lock-escape-face
+!              ^^^^ font-lock-string-face
+!                  ^ f90-ts-font-lock-delimiter-face
+  print*, "   &  x   "
+! ^^^^^ font-lock-keyword-face
+!      ^ nil
+!       ^ f90-ts-font-lock-delimiter-face
+!         ^ f90-ts-font-lock-delimiter-face
+!          ^^^^^^^^^^ font-lock-string-face
+!                    ^ f90-ts-font-lock-delimiter-face
   print*, "&
 ! ^^^^^ font-lock-keyword-face
 !      ^ nil
@@ -119,28 +150,34 @@
 !        ^ f90-ts-font-lock-delimiter-face
 !         ^^^ font-lock-string-face
 !            ^ f90-ts-font-lock-delimiter-face
-  str4 = "with trailing blanks: 987&    
+  str4 = "   with leading blanks: 987&
+! ^^^^ nil
+!      ^ f90-ts-font-lock-operator-face
+!        ^ f90-ts-font-lock-delimiter-face
+!         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ font-lock-string-face
+!                                    ^ f90-ts-font-lock-delimiter-face
+         &   654"
+!        ^ f90-ts-font-lock-delimiter-face
+!         ^^^^^^ font-lock-string-face
+!               ^ f90-ts-font-lock-delimiter-face
+  str5 = "with trailing blanks: 987&    
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
 !         ^^^^^^^^^^^^^^^^^^^^^^^^^ font-lock-string-face
 !                                  ^ f90-ts-font-lock-delimiter-face
-         &654"
+!                                   ^^^^ nil
+         &654  "
 !        ^ f90-ts-font-lock-delimiter-face
-!         ^^^ font-lock-string-face
-!            ^ f90-ts-font-lock-delimiter-face
-  str5 = "with trailing comment: ijk&  ! comment
+!         ^^^^^ font-lock-string-face
+!              ^ f90-ts-font-lock-delimiter-face
+  str6 = "with trailing comment which is not a comment: ijk&  ! comment"
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
-!         ^^^^^^^^^^^^^^^^^^^^^^^^^^ font-lock-string-face
-!                                   ^ f90-ts-font-lock-delimiter-face
-!                                      ^^^^^^^^^ font-lock-comment-face
-         &lmn"
-!        ^ f90-ts-font-lock-delimiter-face
-!         ^^^ font-lock-string-face
-!            ^ f90-ts-font-lock-delimiter-face
-  str6 = "with comment: !@#&
+!         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ font-lock-string-face
+!                                                                      ^ f90-ts-font-lock-delimiter-face
+  str7 = "with comment: !@#&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
@@ -152,7 +189,7 @@
 !        ^ f90-ts-font-lock-delimiter-face
 !         ^^^ font-lock-string-face
 !            ^ f90-ts-font-lock-delimiter-face
-  str6 = "with comments and empty lines: ###&
+  str8 = "with comments and empty lines: ###&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
@@ -168,7 +205,7 @@
 !        ^ f90-ts-font-lock-delimiter-face
 !         ^^^ font-lock-string-face
 !            ^ f90-ts-font-lock-delimiter-face
-  str7 = "without second amp: def&
+  str9 = "without second amp: def&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
@@ -177,13 +214,13 @@
          ghi"
 !        ^^^ font-lock-string-face
 !           ^ f90-ts-font-lock-delimiter-face
-  str8 = "&
+  strA = "&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^^ f90-ts-font-lock-delimiter-face
          &"
 !        ^^ f90-ts-font-lock-delimiter-face
-  str9 = "&
+  strB = "&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^^ f90-ts-font-lock-delimiter-face
@@ -191,7 +228,7 @@
 !        ^^^^^^^^^ font-lock-comment-face
          &"
 !        ^^ f90-ts-font-lock-delimiter-face
-  strA = "&
+  strC = "&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^^ f90-ts-font-lock-delimiter-face
@@ -199,7 +236,7 @@
 !        ^ f90-ts-font-lock-delimiter-face
 !         ^ font-lock-string-face
 !          ^ f90-ts-font-lock-delimiter-face
-  strB = "0&
+  strD = "0&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
@@ -207,7 +244,7 @@
 !          ^ f90-ts-font-lock-delimiter-face
          &"
 !        ^^ f90-ts-font-lock-delimiter-face
-  strC = "&&
+  strE = "&&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^ f90-ts-font-lock-delimiter-face
@@ -215,7 +252,7 @@
 !          ^ f90-ts-font-lock-delimiter-face
          &"
 !        ^^ f90-ts-font-lock-delimiter-face
-  strD = "&
+  strF = "&
 ! ^^^^ nil
 !      ^ f90-ts-font-lock-operator-face
 !        ^^ f90-ts-font-lock-delimiter-face

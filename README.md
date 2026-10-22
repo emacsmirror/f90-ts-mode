@@ -14,6 +14,13 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Changes required by updates to the proposed string_literal branch added.
+- Support for new keyword `non_recursive` added (requires new grammar).
+- Support for new grammar version with a different tree structure in some
+  type related statements (allocate, select type) added.  Both new and old
+  grammar CST variants are supported.
+- Prefix of ERT test names shortened `f90-ts-mode-test--' (no distinction
+  between std and extra anymore).
 - Transient menu restructured and decomposed.
 - Support for hideshow and outline added.
 
@@ -94,7 +101,7 @@ including syntax highlighting, indentation, navigation, and structural editing f
 - Coarray keywords and statements
 - Imenu and a Fortran menu in the menu bar
 - Navigation (defun, things, Xref, side panel tree)
-- Hideshow and outline support (support for external treesit-fold is pending)
+- Hideshow, outline and treesit-fold support
 
 ## Keybindings
 
@@ -261,16 +268,16 @@ When reporting a bug, please include a small code snippet, showing the issue or 
 There are a number of features still missing or incomplete.
 The following list provides features planned for implementation (somewhat ordered by priority):
 
-- Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
+- More list contexts for alignment in continued lines.
+  There are a number of list like contexts, which are not yet supported, but for which proper
+  alignment would be nice.
 - Fill operations with lower column width (before joining).
 - Fill operation similar to `f90-fill-paragraph`. In conjunction with mark operations: determine interesting
   nodes within tree as region (like: statements, structure block, subroutine/function level).
 - Node based sibling walk operations (like goto trimmed beginning or trimmed end of next sibling). This would
   complement the mark region operations to easily extend an existing region.
+- Make indentation and alignment aware of fill-column: Do not suggest an indentation if the line exceeds fill-column.
 - Support for (context-aware) `completion-at-point-function` (capf).
-- More list contexts for alignment in continued lines.
-  There are a number of list like contexts, which are not yet supported, but for which proper
-  alignment would be nice.
 - Electric insert similar to `f90-electric-insert`.
 - Indentation for labeled do loops, like:
 ```f90

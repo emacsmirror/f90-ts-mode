@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.5.0
+;; Version: 0.5.0-snapshot
 ;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -33,6 +33,13 @@
 ;;
 ;; Changelog (recent):
 ;; [10-2026]
+;;   - Changes required by updates to the proposed string_literal branch added.
+;;   - Support for new keyword "non_recursive" added (requires new grammar).
+;;   - Support for new grammar version with a different tree structure in some
+;;     type related statements (allocate, select type) added.  Both new and old
+;;     grammar CST variants are supported.
+;;   - Prefix of ERT test names shortened `f90-ts-mode-test--' (no distinction
+;;     between std and extra anymore).
 ;;   - Transient menu restructured and decomposed.
 ;;   - Support for hideshow and outline added.
 ;;
@@ -162,7 +169,7 @@
 
 ;;;-----------------------------------------------------------------------------
 
-(defconst f90-ts-mode-version "0.5.0"
+(defconst f90-ts-mode-version "0.5.0-snapshot"
   "Version of `f90-ts-mode'.")
 
 
@@ -178,6 +185,13 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog (recent):
 
 [10-2026]
+- Changes required by updates to the proposed string_literal branch added.
+- Support for new keyword \"non_recursive\" added (requires new grammar).
+- Support for new grammar version with a different tree structure in some
+  type related statements (allocate, select type) added.  Both new and old
+  grammar CST variants are supported.
+- Prefix of ERT test names shortened `f90-ts-mode-test--' (no distinction
+  between std and extra anymore).
 - Transient menu restructured and decomposed.
 - Support for hideshow and outline added.
 

@@ -56,7 +56,7 @@ implementation when the logging package is loaded.
 Set `f90-ts-allow-log' to allow log instruction as no-op without `f90-ts-log'.
 This is used by the Makefile to run ert tests during development."
   (unless (bound-and-true-p f90-ts-allow-log)
-  (error "Function f90-ts-log-msg not available: load f90-ts-log.el first")))
+    (error "Function f90-ts-log-msg not available: load f90-ts-log.el first")))
 
 
 (defun f90-ts-log-line (_category _msg &optional _pos-marker _pos)

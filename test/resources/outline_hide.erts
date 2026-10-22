@@ -1,0 +1,218 @@
+Point-Char: |
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test-with-outline (outline-hide-subtree)))
+
+Name: outline program 1
+=-=
+program main
+     |print *, "hide"
+end program main
+=-=
+program main[...]|
+=-=-=
+
+Name: outline module 1
+=-=
+module mod
+ |use other
+contains
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=
+module mod[...]|
+=-=-=
+
+Name: outline subroutine siblings 1
+=-=
+subroutine a()
+     |print *, "a"
+end subroutine a
+subroutine b()
+     print *, "b"
+end subroutine b
+=-=
+subroutine a()[...]|
+subroutine b()
+     print *, "b"
+end subroutine b
+=-=-=
+
+Name: outline subroutine siblings 2
+=-=
+subroutine a()
+     print *, "a"
+end subroutine a
+subroutine b()
+     |print *, "b"
+end subroutine b
+=-=
+subroutine a()
+     print *, "a"
+end subroutine a
+subroutine b()[...]|
+=-=-=
+
+Name: outline module procedures 1
+=-=
+module mod
+contains
+ subroutine a()
+      |print *, "a"
+ end subroutine a
+ subroutine b()
+ end subroutine b
+end module mod
+=-=
+module mod
+contains
+ subroutine a()[...]|
+ subroutine b()
+ end subroutine b
+end module mod
+=-=-=
+
+Name: outline internal procedure 1
+=-=
+subroutine outer()
+     |print *, "outer"
+contains
+     subroutine inner()
+     end subroutine inner
+end subroutine outer
+=-=
+subroutine outer()[...]|
+=-=-=
+
+Name: outline interface 1
+=-=
+module mod
+ interface|
+      subroutine foo()
+      end subroutine foo
+ end interface
+end module mod
+=-=
+module mod
+ interface[...]|
+=-=-=
+
+Name: outline submodule 1
+=-=
+submodule (mod) mod_s
+|contains
+ subroutine a()
+ end subroutine a
+end submodule mod_s
+=-=
+submodule (mod) mod_s[...]|
+=-=-=
+
+Name: outline function 1
+=-=
+subroutine a()
+end subroutine a
+function fun()
+     integer :: fun
+     |fun = 1
+end function fun
+subroutine b()
+end subroutine b
+=-=
+subroutine a()
+end subroutine a
+function fun()[...]|
+subroutine b()
+end subroutine b
+=-=-=
+
+Name: outline module procedure 1
+=-=
+submodule (mod) mod_s
+contains
+ module procedure a
+      |print *, "a"
+ end procedure a
+ module procedure b
+ end procedure b
+end submodule mod_s
+=-=
+submodule (mod) mod_s
+contains
+ module procedure a[...]|
+ module procedure b
+ end procedure b
+end submodule mod_s
+=-=-=
+
+Name: outline derived type definition 1
+=-=
+module mod
+ type :: a_t
+      |integer :: x
+ end type a_t
+ type :: b_t
+      integer :: y
+ end type b_t
+end module mod
+=-=
+module mod
+ type :: a_t[...]|
+ type :: b_t
+      integer :: y
+ end type b_t
+end module mod
+=-=-=
+
+Name: outline derived type definition 2
+=-=
+module mod
+ type :: some_t
+      complex :: z
+ contains
+      |procedure :: set => some_set
+ end type some_t
+contains
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=
+module mod
+ type :: some_t[...]|
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=-=
+
+
+Name: outline hide entry 1
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test-with-outline (outline-hide-entry)))
+=-=
+module mod
+ |use other
+contains
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=
+module mod[...]|
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=-=
+
+Name: outline hide entry 2
+=-=
+program main
+     |print *, "hide"
+end program main
+=-=
+program main[...]|
+=-=-=
+

@@ -36,6 +36,8 @@
 
 (require 'treesit)
 (require 'xref)
+(require 'hideshow)
+(require 'outline)
 (require 'f90-ts-mode)
 
 ;;; Code:
@@ -271,7 +273,7 @@ so that selection of indentation rules is tested properly."
 ;;------------------------------------------------------------------------------
 ;; ERT: basic stuff
 
-(ert-deftest f90-ts-mode-test-std--activates ()
+(ert-deftest f90-ts-mode-test--activates ()
   "Check whether `f90-ts-mode' properly starts."
   (skip-unless (treesit-ready-p 'fortran))
   (with-temp-buffer
@@ -491,7 +493,7 @@ can be observed and checked."
 All FILES are assumed to be in erts format.  One ert-test per file is created.
 Preparations and actions to test must be given in the Code preamble
 within the erts test.
-PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
+PREFIX is the test name prefix (like \"f90-ts-mode-test\")."
   (cl-loop
    for file in files
    for name-base = (string-replace
@@ -519,7 +521,7 @@ PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
 FILES are assumed to be in erts format.  One test per file and per
 prep-fn/action-fn combination is created, with prep-fn and action-fn taken
 from PREP_FNS and ACTION_FNS, respectively.
-PREFIX is the test name prefix, usual \"f90-ts-mode\" or \"f90-ts-mode-extra\"."
+PREFIX is the test name prefix (like \"f90-ts-mode-test\")."
   (cl-loop
    for file in files
    for name-base = (string-replace
@@ -689,8 +691,7 @@ of (defcustom-var . value).  This overrides default test values, but
 only for this specific test file.  All test values are set by the
 macro `f90-ts-mode-test-with-custom-testing'.
 
-PREFIX is the prefix of the test file name, either \"f90-ts-mode\"
-or \"f90-ts-mode-extra\"."
+PREFIX is the prefix of the test file name (like \"f90-ts-mode-test\")."
   (cl-loop
    for entry in files
    for file = (if (consp entry) (car entry) entry)
@@ -835,7 +836,7 @@ derived from !@def and !@ref statements."
 
 (defun f90-ts-mode-test--xref-register (prefix files)
   "Dynamically generate ert-tests for xref in FILES.
-PREFIX is the test name prefix, usually \"f90-ts-mode-test-std\"."
+PREFIX is the test name prefix (like \"f90-ts-mode-test\")."
   (cl-loop
    for file in files
    for name-base = (string-replace
@@ -966,13 +967,58 @@ If buffer was modified, insert `**' otherwise insert '--'."
 
 
 ;;------------------------------------------------------------------------------
+;; hideshow and outline helpers
+
+(defun f90-ts-mode-test--replace-overlays (kind)
+  "Replace invisible overlays of KIND with literal \"[...]\" text in buffer.
+KIND is the value of the `invisible' property, like `hs' or `outline'
+for hideshow and outline testing.
+Point is placed after the first \"[...]\" replacement."
+  (cl-loop
+   ;; process backwards, this ensures that buffer positions of the prior
+   ;; overlays stay valid
+   for ov in (sort (overlays-in (point-min) (point-max))
+                   (lambda (a b) (> (overlay-start a) (overlay-start b))))
+   when (eq (overlay-get ov 'invisible) kind)
+   do (let* ((beg (overlay-start ov))
+             (end (overlay-end ov))
+             (at-eob (= end (point-max))))
+        (delete-overlay ov)
+        (delete-region beg end)
+        (goto-char beg)
+        (insert "[...]")
+        ;; add newline if not present, as the erts-after block always has
+        ;; a final newline (outline hiding actually hides the final newline)
+        (when at-eob
+          (save-excursion (insert "\n"))))))
+
+
+(defmacro f90-ts-mode-test-with-hs (action)
+  "Enable `hs-minor-mode', execute ACTION, and replace overlays with text."
+  (declare (indent 0))
+  `(progn
+     (hs-minor-mode 1)
+     ,action
+     (f90-ts-mode-test--replace-overlays 'hs)))
+
+
+(defmacro f90-ts-mode-test-with-outline (action)
+  "Enable `outline-minor-mode', execute ACTION, and replace overlays with text."
+  (declare (indent 0))
+  `(progn
+     (outline-minor-mode 1)
+     ,action
+     (f90-ts-mode-test--replace-overlays 'outline)))
+
+
+;;------------------------------------------------------------------------------
 ;; register tests
 
 
-;; general indentation with indent-region
+;; general indentation with indent-region and line-by-line indentation
 ;; (with three different prep functions to vary initial indentation)
 (f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-std"
+ "f90-ts-mode-test"
  '("indent_region_progmod.erts"
    "indent_region_comments.erts"
    "indent_region_interface.erts"
@@ -987,21 +1033,13 @@ If buffer was modified, insert `**' otherwise insert '--'."
  '(nil ; no modification
    f90-ts-mode-test--remove-indent
    f90-ts-mode-test--add-indent)
- '(f90-ts-mode-test--indent-by-region))
-
-
-;; smart end with specific shorten-to-end preparation
-(f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-std"
- '("indent_region_smart_end.erts")
- '(nil ; no modification
-   f90-ts-mode-test--shorten-to-end)
- '(f90-ts-mode-test--indent-by-region))
+ '(f90-ts-mode-test--indent-by-region
+   f90-ts-mode-test--indent-by-line))
 
 
 ;; incomplete code with ERROR nodes
 (f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-std"
+ "f90-ts-mode-test"
  '("indent_line_incomplete.erts"
    "indent_line_empty.erts")
  '(nil ; no modification
@@ -1009,10 +1047,19 @@ If buffer was modified, insert `**' otherwise insert '--'."
  '(f90-ts-indent-and-complete-line))
 
 
+;; smart end with specific shorten-to-end preparation
+(f90-ts-mode-test--prep-act-register
+ "f90-ts-mode-test"
+ '("indent_region_smart_end.erts")
+ '(nil ; no modification
+   f90-ts-mode-test--shorten-to-end)
+ '(f90-ts-mode-test--indent-by-region))
+
+
 ;; alignment tests, leave as is, apply no preparation,
 ;; (otherwise alignment might change depending on keep-or-primary etc. options)
 (f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-std"
+ "f90-ts-mode-test"
  '("indent_region_align_misc.erts"
    "indent_region_align_expr.erts"
    "indent_region_align_string.erts"
@@ -1024,7 +1071,7 @@ If buffer was modified, insert `**' otherwise insert '--'."
 
 ;; indentation tests with custom erts Code block
 (f90-ts-mode-test--erts-simple-register
- "f90-ts-mode-test-std"
+ "f90-ts-mode-test"
  '("indent_region_partial.erts"
    "indent_line_align.erts"
    "indent_line_leading_amp.erts"
@@ -1041,12 +1088,64 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "modified_bit.erts"
    "navigate_thing_procedure.erts"
    "navigate_thing_interface.erts"
-   "navigate_thing_type.erts"))
+   "navigate_thing_type.erts"
+   "hideshow.erts"
+   "outline_hide.erts"
+   "outline_navigate.erts"))
 
 
-;; expensive tests
+;; register font lock tests
+(f90-ts-mode-test--font-lock-register
+ "f90-ts-mode-test"
+ '("font_lock_comment.f90"
+   "font_lock_builtin.f90"
+   "font_lock_interface.f90"
+   "font_lock_type.f90"
+   "font_lock_enum.f90"
+   "font_lock_do_concurrent.f90"
+   "font_lock_where.f90"
+   "font_lock_forall.f90"
+   "font_lock_special_var.f90"
+   "font_lock_error1.f90"
+   "font_lock_error2.f90"
+   "font_lock_error3.f90"
+   "font_lock_error4.f90"
+   ;; note that assertions are also part of the fontified buffer,
+   ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
+   ;; which is what we want to see in font_lock_error5
+   ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))
+   ("font_lock_error6.f90" . ((f90-ts-font-lock-error-show . 6)))))
+
+
+(when (f90-ts--grammar-string-literal-decomposed-p)
+  (f90-ts-mode-test--font-lock-register
+   "f90-ts-mode-test"
+   '("font_lock_progmod.f90"
+     "font_lock_continued_string.f90"
+     "font_lock_select.f90"
+     "font_lock_value.f90"
+     "font_lock_operator.f90"
+     "font_lock_openmp.f90"
+     "font_lock_coarray.f90")))
+
+
+(when (f90-ts--grammar-keyword-p "non_recursive")
+  (f90-ts-mode-test--font-lock-register
+   "f90-ts-mode-test"
+   '("font_lock_keywords.f90")))
+
+
+;; xref tests
+(f90-ts-mode-test--xref-register
+ "f90-ts-mode-test"
+ '("xref_misc.f90"
+   "xref_interface.f90"
+   "xref_type.f90"))
+
+
+;; complex indentation tests
 (f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-extra"
+ "f90-ts-mode-test"
  '("indent_integration_collatz.erts")
  '(nil ; no modification
    f90-ts-mode-test--remove-indent
@@ -1055,74 +1154,11 @@ If buffer was modified, insert `**' otherwise insert '--'."
  '(f90-ts-mode-test--indent-by-region
    f90-ts-mode-test--indent-by-line))
 
-;; more expensive test variant of tests already registered
-;; with indent-by-region action
-(f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-extra"
- '("indent_region_progmod.erts"
-   "indent_region_comments.erts"
-   "indent_region_interface.erts"
-   "indent_region_constructs.erts"
-   "indent_region_select.erts"
-   "indent_region_preproc.erts"
-   "indent_region_stmt_label.erts")
- '(nil ; no modification
-   f90-ts-mode-test--remove-indent
-   f90-ts-mode-test--add-indent)
- '(f90-ts-mode-test--indent-by-line))
 
-
-(f90-ts-mode-test--prep-act-register
- "f90-ts-mode-test-extra"
- '("indent_region_smart_end.erts")
- '(nil ; no modification
-   f90-ts-mode-test--shorten-to-end)
- '(f90-ts-mode-test--indent-by-line))
-
-
-;; register font lock tests
-(when (f90-ts--string-literal-decomposed-p)
+;; complex font lock tests
+(when (f90-ts--grammar-string-literal-decomposed-p)
   (f90-ts-mode-test--font-lock-register
-   "f90-ts-mode-test-std"
-   '("font_lock_progmod.f90"
-     "font_lock_comment.f90"
-     "font_lock_builtin.f90"
-     "font_lock_operator.f90"
-     "font_lock_interface.f90"
-     "font_lock_type.f90"
-     "font_lock_enum.f90"
-     "font_lock_select.f90"
-     "font_lock_do_concurrent.f90"
-     "font_lock_where.f90"
-     "font_lock_forall.f90"
-     "font_lock_openmp.f90"
-     "font_lock_coarray.f90"
-     "font_lock_value.f90"
-     "font_lock_continued_string.f90"
-     "font_lock_special_var.f90"
-     "font_lock_error1.f90"
-     "font_lock_error2.f90"
-     "font_lock_error3.f90"
-     "font_lock_error4.f90"
-     ;; note that assertions are also part of the fontified buffer,
-     ;; fontifying 9 lines translates into 3 proper lines and 6 assertions,
-     ;; which is what we want to see in font_lock_error5
-     ("font_lock_error5.f90" . ((f90-ts-font-lock-error-show . 9)))
-     ("font_lock_error6.f90" . ((f90-ts-font-lock-error-show . 6))))))
-
-
-;; xref tests
-(f90-ts-mode-test--xref-register
- "f90-ts-mode-test-std"
- '("xref_misc.f90"
-   "xref_interface.f90"
-   "xref_type.f90"))
-
-
-;; register extra font lock tests
-(when (f90-ts--string-literal-decomposed-p)
-  (f90-ts-mode-test--font-lock-register
-   "f90-ts-mode-test-extra"
+   "f90-ts-mode-test"
    '("font_lock_integration_collatz.f90")))
 
 
@@ -1132,13 +1168,12 @@ If buffer was modified, insert `**' otherwise insert '--'."
 (defun f90-ts-mode-test-run (&optional regexp-test diff-tool)
   "Run all ert-tests matching REGEXP-TEST.
 If DIFF-TOOL is specified, use it in case of failure to show the difference.
-If REGEXP-TEST is nil, then use \"^f90-ts-mode-test-std--\" to execute all
-standard tests.  Extra tests can be selected by \"^f90-ts-mode-test-extra--\"."
+If REGEXP-TEST is nil, then use \"^f90-ts-mode-test--\" to execute all tests."
   (interactive
    (let* (;; map from ert tests to ert test name to string
           (regexp-choice
            (completing-read
-            "Additional regexp appended to \"^f90-ts-mode-test-\": "
+            "Additional regexp appended to \"^f90-ts-mode-test--\": "
             nil nil nil nil nil nil))
 
           ;; diff tool selection
@@ -1146,7 +1181,7 @@ standard tests.  Extra tests can be selected by \"^f90-ts-mode-test-extra--\"."
            (completing-read "diff tool (empty for none): "
                          (list "" f90-ts-mode-test-diff-command)
                          nil nil "")))
-     (list (concat "^f90-ts-mode-test-" regexp-choice)
+     (list (concat "^f90-ts-mode-test--" regexp-choice)
            diff-tool-choice)))
 
   (let (;; set defvar to the selected test, we cannot pass diff-tool directly
@@ -1156,7 +1191,7 @@ standard tests.  Extra tests can be selected by \"^f90-ts-mode-test-extra--\"."
               diff-tool)))
     (if regexp-test
         (ert regexp-test)
-      (ert "^f90-ts-mode-test-std--"))))
+      (ert "^f90-ts-mode-test--"))))
 
 
 (provide 'f90-ts-mode-test)

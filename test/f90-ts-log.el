@@ -78,7 +78,7 @@ by CATEGORY and a time stamp."
         (goto-char (point-max))))
 
     ;; scroll window if buffer is displayed
-    (when-let ((win (get-buffer-window buf t))) ; visible in any frame
+    (when-let* ((win (get-buffer-window buf t))) ; visible in any frame
       (with-selected-window win
         (goto-char (point-max))))))
 

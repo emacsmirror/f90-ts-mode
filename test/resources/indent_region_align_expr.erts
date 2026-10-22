@@ -213,6 +213,32 @@ subroutine sub()
 end subroutine sub
 =-=-=
 
+Name: align operators 1
+=-=
+subroutine sub()
+s = a &
++ b
+t = a &
+// b
+v =      a &
+.and. b
+u =   a &
+< b
+end subroutine sub
+=-=
+subroutine sub()
+     s = a &
+        + b
+     t = a &
+        // b
+     v =      a &
+        .and. b
+     u =   a &
+         < b
+end subroutine sub
+=-=-=
+
+
 Name: align unary expression 1
 =-=
 subroutine sub()
