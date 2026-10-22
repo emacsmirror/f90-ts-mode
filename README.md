@@ -14,6 +14,8 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Right-align-at-comma options for array literals added,
+  see `f90-ts-indent-array-align`.
 - Changes required by updates to the proposed string_literal branch added.
 - Support for new keyword `non_recursive` added (requires new grammar).
 - Support for new grammar version with a different tree structure in some

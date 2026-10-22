@@ -1,19 +1,24 @@
-! use commata as anchor, maybe like:
-! if node is not a commata and directly followed by a commata, then a previous commata
-! is a good anchor with offset -lenght of node?
+! primary should be different not, this one (RADDOM_...+cont_off)
+! and: second choice (aligne with ::) should not be there
+! and: align with = is missing
 subroutine array
-   use, intrinsic :: iso_fortran_env, only : real64
-   integer, parameter :: dp = real64
-   real(kind=dp), parameter :: g = (1.0 + sqrt(5.0)) / 2.0
-
-   real(kind=dp), dimension(1:3,1:4), parameter :: &
-          arr = reshape( &
-          [      g,      1.0_dp,     1.0_dp, &
-                -g,      2.0_dp,     2.0_dp, &
-            1.0_dp,           g,         -g, &
-           -1.0_dp,          -g,          g], &
-          [3,4])
+     integer, dimension(1:10), parameter, public :: &
+            lebedev_N = &
+            [6, 14, 26, 38, 50, 74, 86, 110, 146, 170]
 end subroutine array
+
+! we need to include init_declarator context to indent
+! "[ & ..." after "=" relative to "rgb =" ...
+subroutine arr3()
+     character(len=5), dimension(1:3) :: & ! comment
+                                         ! comment
+        &   rgb = &
+        &   [ &
+        &    'red  ', &
+        &    'green', &
+        &    'blue ' ], &
+        &   alpha = 'trnsp'
+end subroutine arr3
 
 
 ! there is no proper context node for "! comment 2", but "! comment 1"
@@ -39,20 +44,6 @@ subroutine math()
             y
 end subroutine math
 
-
-
-! we need to include init_declarator context to indent
-! "[ & ..." after "=" relative to "rgb =" ...
-subroutine arr3()
-     character(len=5), dimension(1:3) :: & ! comment
-                                         ! comment
-        &   rgb = &
-        &   [ &
-        &    'red  ', &
-        &    'green', &
-        &    'blue ' ], &
-        &   alpha = 'trnsp'
-end subroutine arr3
 
 
 ! list context for case range

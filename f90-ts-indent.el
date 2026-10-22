@@ -1095,16 +1095,19 @@ Both occur in the contains part of a derived type definition."
 ;;
 ;; and return nil or a plist with the keys
 ;;
-;;   :primary ANOFF   context specific default for the primary position
-;;   :force   BOOL    non-nil: :primary (or the standard continued line
-;;                    position if :primary is nil) is the primary position,
-;;                    even if there are earlier items compatible with the
-;;                    current node (see `f90-ts--align-other-var-decl'
-;;                    for an example)
-;;   :others  ANOFFS  further candidate positions
+;;   :primary ANOFF      context specific default for the primary position
+;;   :force   BOOL       non-nil: :primary (or the standard continued line
+;;                       position if :primary is nil) is the primary position,
+;;                       even if there are earlier items compatible with the
+;;                       current node (see `f90-ts--align-other-var-decl'
+;;                       for an example)
+;;   :others  ANOFFS     further candidate positions
+;;   :no-items-sym BOOL  non-nil: the earlier items compatible with the current
+;;                       node are not candidate positions (see
+;;                       `f90-ts--align-other-array-commas' for an example)
 ;;
 ;; An ANOFF is a cons (ANCHOR . OFFSET) with ANCHOR a node or a buffer
-;; position.  :primary is always a candidate position as well, it does not
+;; position.  :primary is the primary candidate position, it does not
 ;; need to be repeated in :others.  The standard continued line position
 ;; (pstmt-1 plus `f90-ts-indent-continued') is always a candidate, too.
 ;;
@@ -1435,6 +1438,129 @@ the align-list-other family."
           :force   assignment-p
           :others  (and anoff-decl (list anoff-decl)))))
 
+
+
+;;++++++++++++++
+;; list context: array literals, alignment at commata
+
+(defun f90-ts--align-comma-delta (node)
+  "Return the distance in columns from the start of NODE to its comma, or nil.
+If the next sibling of NODE is a comma on the same line, it is its comma.
+If NODE is not followed by a comma on its line, but by the closing bracket
+\"]\" or \"/)\" of the array literal, an ampersand or a comment, a virtual
+comma right after NODE is assumed.  Return nil for other siblings or if NODE
+spans several lines."
+  (when-let* ((next (treesit-node-next-sibling node))
+              ((f90-ts--node-type-p next '("," "]" "/)" "&" "comment")))
+              ;; if node spans more than one line, right alignment makes no sense
+              ((f90-ts--same-line-p (treesit-node-start node)
+                                    (treesit-node-end node)))
+              (pos-comma (if (and (f90-ts--node-type-p next ",")
+                                  (f90-ts--same-line-p (treesit-node-start node)
+                                                       (treesit-node-start next)))
+                             (treesit-node-start next)
+                           (treesit-node-end node))))
+    (- (f90-ts--column-number-at-pos pos-comma)
+       (f90-ts--node-column node))))
+
+
+(defun f90-ts--align-comma-anoff-less-p (anoff1 anoff2)
+  "Return non-nil if ANOFF1 is before ANOFF2 columnwise.
+Compare the final columns for the two anoffs, see
+`f90-ts--continued-line-cache-get-col'.  For equal columns compare the start
+positions of the anchors, which must be nodes."
+  (let ((col1 (f90-ts--continued-line-cache-get-col anoff1))
+        (col2 (f90-ts--continued-line-cache-get-col anoff2)))
+    (or (< col1 col2)
+        (and (= col1 col2)
+             (> (treesit-node-start (car anoff1))
+                (treesit-node-start (car anoff2)))))))
+
+
+(defun f90-ts--align-other-array-commas (context loc items-plist other)
+  "Return the other plist for alignment at commata, or nil if not applicable.
+This is used for array literals, if `f90-ts-indent-array-align' is `right',
+`both-left-primary' or `both-right-primary', the node at LOC is a direct child
+of the array literal in CONTEXT, and it is followed by a comma or a closing
+bracket on its line.
+
+Every comma on a previous line of the array literal yields a candidate
+represented as \(COMMA . -DELTA), with DELTA the distance of the current node
+to its (virtual) comma, see `f90-ts--align-comma-delta'.  This right-aligns
+the current node at that comma.  Candidates placing the node left of the
+position of the first element after the opening bracket are dropped.  Among the
+candidates, the one with the smallest column is the right-aligned primary
+position (if several have the same column, the one with the smaller anchor
+position).
+
+The value of `f90-ts-indent-array-align' selects:
+`right'               the right-aligned primary is forced, earlier items are
+                      no candidates (:no-items-sym),
+`both-right-primary'  the right-aligned primary is forced, earlier items
+                      remain candidates,
+`both-left-primary'   the primary of OTHER and the usual selection among
+                      earlier items stay in charge, the commata are further
+                      candidates.
+For `left' there is nothing to do and nil is returned.
+
+OTHER is the plist returned by `f90-ts--align-other-paren'; its :others (the
+positions relative to the opening bracket) are always kept as candidates.
+CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
+the align-list-other family."
+  (when (memq f90-ts-indent-array-align '(right
+                                          both-left-primary
+                                          both-right-primary))
+    (when-let* ((list-context (car context))
+                (node         (alist-get 'node loc))
+                ((f90-ts--align-nsym-compatible-p (alist-get 'nsym loc) 'named))
+                ((treesit-node-eq (treesit-node-parent node) list-context))
+                (delta        (f90-ts--align-comma-delta node))
+                (open         (treesit-node-child list-context 0))
+                ((f90-ts--node-type-p open '("[" "(/")))
+                (col-min      (f90-ts--continued-line-cache-get-col
+                               (cons open
+                                     (+ (1- (length (treesit-node-text open)))
+                                        f90-ts-indent-paren-default))))
+                (anoffs       (cl-loop
+                               for (n . s) in (plist-get items-plist :prev)
+                               for anoff = (cons n (- delta))
+                               when (and (eq s 'comma)
+                                         (>= (f90-ts--continued-line-cache-get-col anoff)
+                                             col-min))
+                               collect anoff))
+                (sorted       (seq-sort #'f90-ts--align-comma-anoff-less-p
+                                        anoffs)))
+      (let ((others (append sorted (plist-get other :others))))
+        (pcase f90-ts-indent-array-align
+          ;; right-aligned only: forced primary, no left-aligned candidates
+          ('right
+           (list :primary (car sorted)
+                 :force t
+                 :no-items-sym t
+                 :others others))
+          ;; both: right-aligned is primary
+          ('both-right-primary
+           (list :primary (car sorted)
+                 :force t
+                 :others others))
+          ;; both: left-aligned is primary, the commata are further candidates
+          (_
+           (list :primary (plist-get other :primary)
+                 :force   (plist-get other :force)
+                 :others  others)))))))
+
+
+(defun f90-ts--align-other-array (context loc items-plist)
+  "Return the other plist for array literals.
+Use alignment at commata, if enabled and applicable, see
+`f90-ts--align-other-array-commas'.  Otherwise this is the same as for other
+parenthesized lists, see `f90-ts--align-other-paren'.
+
+CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
+the align-list-other family."
+  (let ((other (f90-ts--align-other-paren context loc items-plist)))
+    (or (f90-ts--align-other-array-commas context loc items-plist other)
+        other)))
 
 
 ;;++++++++++++++
@@ -1809,7 +1935,8 @@ Finally use VARIANT to select one pair to align with."
          (anoff-final (append (list anoff-continued)
                               (and anoff-default (list anoff-default))
                               (plist-get anoff-other :others)
-                              anoff-items-sym)))
+                              (unless (plist-get anoff-other :no-items-sym)
+                                anoff-items-sym))))
     ;;(f90-ts-log-msg :anoff "items-other = %s" anoff-other)
     ;;(f90-ts-log-msg :anoff "items-final = %s" anoff-final)
     ;;(f90-ts-log-msg :anoff "item-primary = %s" anoff-primary)
@@ -1850,7 +1977,9 @@ Finally use VARIANT to select one pair to align with."
       (cons "final_statement"          bind-prop)
       (cons "parenthesized_expression" paren-prop)
       (cons "argument_list"            paren-prop)
-      (cons "array_literal"            paren-prop)
+      (cons "array_literal"
+            '(:get-items-fn f90-ts--align-items-children-no-paren
+              :get-other-fn f90-ts--align-other-array))
       (when (f90-ts--grammar-string-literal-decomposed-p)
         (cons "string_literal"
               '(:get-items-fn f90-ts--align-items-string
