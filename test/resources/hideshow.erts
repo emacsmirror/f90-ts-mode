@@ -1,0 +1,351 @@
+Point-Char: |
+
+Code:
+  (lambda ()
+    (f90-ts-mode)
+    (f90-ts-mode-test-with-hs (hs-hide-block)))
+
+Name: hideshow program 1
+=-=
+program main
+     |print *, "hide"
+end program main
+=-=
+program main[...]|
+end program main
+=-=-=
+
+Name: hideshow module 1
+=-=
+module mod
+     |integer :: x
+end module mod
+=-=
+module mod[...]|
+end module mod
+=-=-=
+
+Name: hideshow module 2
+=-=
+module mod
+ |use other
+contains
+ subroutine sub()
+ end subroutine sub
+end module mod
+=-=
+module mod[...]|
+end module mod
+=-=-=
+
+Name: hideshow module 3
+=-=
+module mod
+ use other
+contains
+ |subroutine sub()
+ end subroutine sub
+end module mod
+=-=
+module mod[...]|
+end module mod
+=-=-=
+
+Name: hideshow submodule 1
+=-=
+submodule (mod) mod_s
+|contains
+ subroutine hide()
+ end subroutine hide
+end submodule mod_s
+=-=
+submodule (mod) mod_s[...]|
+end submodule mod_s
+=-=-=
+
+Name: hideshow subroutine 1
+=-=
+subroutine sub()
+     |print *, "hide"
+end subroutine sub
+=-=
+subroutine sub()[...]|
+end subroutine sub
+=-=-=
+
+Name: hideshow function 1
+=-=
+function fun()
+     integer :: fun
+     |fun = 1
+end function fun
+=-=
+function fun()[...]|
+end function fun
+=-=-=
+
+Name: hideshow module procedure 1
+=-=
+submodule (mod) mod_s
+contains
+ module procedure sub
+      |print *, "hide"
+ end procedure sub
+end submodule mod_s
+=-=
+submodule (mod) mod_s
+contains
+ module procedure sub[...]|
+ end procedure sub
+end submodule mod_s
+=-=-=
+
+Name: hideshow derived type definition 1
+=-=
+module mod
+ type :: some_t
+      |logical :: a
+ end type some_t
+end module mod
+=-=
+module mod
+ type :: some_t[...]|
+ end type some_t
+end module mod
+=-=-=
+
+Name: hideshow derived type definition 2
+=-=
+module mod
+ type :: some_t
+      complex :: z
+ contains
+      |procedure :: set => some_set
+ end type some_t
+end module mod
+=-=
+module mod
+ type :: some_t[...]|
+ end type some_t
+end module mod
+=-=-=
+
+Name: hideshow enum 1
+=-=
+subroutine sub()
+     enum, bind(c)
+|          enumerator :: a
+     end enum
+end subroutine sub
+=-=
+subroutine sub()
+     enum, bind(c)[...]|
+     end enum
+end subroutine sub
+=-=-=
+
+Name: hideshow enumeration type 1
+=-=
+subroutine sub()
+     enumeration type :: some_e
+          enumerator :: a|
+     end enumeration type some_e
+end subroutine sub
+=-=
+subroutine sub()
+     enumeration type :: some_e[...]|
+     end enumeration type some_e
+end subroutine sub
+=-=-=
+
+Name: hideshow interface 1
+=-=
+module mod
+ interface
+|      subroutine foo()
+      end subroutine foo
+ end interface
+end module mod
+=-=
+module mod
+ interface[...]|
+ end interface
+end module mod
+=-=-=
+
+Name: hideshow preproc if 1
+=-=
+subroutine sub()
+#if _PRINT_
+     |print *, "hide"
+#endif
+end subroutine sub
+=-=
+subroutine sub()
+#if _PRINT_[...]|
+#endif
+end subroutine sub
+=-=-=
+
+Name: hideshow preproc ifdef
+=-=
+subroutine sub()
+#ifdef _PRINT_
+     |print *, "hide"
+#endif
+end subroutine sub
+=-=
+subroutine sub()
+#ifdef _PRINT_[...]|
+#endif
+end subroutine sub
+=-=-=
+
+Name: hideshow do loop 1
+=-=
+subroutine sub()
+     do i = 1, 10
+          |print *, i
+     end do
+end subroutine sub
+=-=
+subroutine sub()
+     do i = 1, 10[...]|
+     end do
+end subroutine sub
+=-=-=
+
+Name: hideshow block construct 1
+=-=
+subroutine sub()
+     block
+          |print *, "hide"
+     end block
+end subroutine sub
+=-=
+subroutine sub()
+     block[...]|
+     end block
+end subroutine sub
+=-=-=
+
+Name: hideshow associate statement 1
+=-=
+subroutine sub()
+     associate (x => y)
+          |print *, x
+     end associate
+end subroutine sub
+=-=
+subroutine sub()
+     associate (x => y)[...]|
+     end associate
+end subroutine sub
+=-=-=
+
+Name: hideshow select case statement 1
+=-=
+subroutine sub()
+     select case (x)
+     case (1)
+          |print *, "one"
+     case (2)
+          print *, "two"
+     end select
+end subroutine sub
+=-=
+subroutine sub()
+     select case (x)[...]|
+     end select
+end subroutine sub
+=-=-=
+
+Name: hideshow select type statement 1
+=-=
+subroutine sub()
+     select type (x)
+     type is (integer)
+          print *, "integer"|
+     class default
+          print *, "unknown"
+     end select
+end subroutine sub
+=-=
+subroutine sub()
+     select type (x)[...]|
+     end select
+end subroutine sub
+=-=-=
+
+Name: hideshow select rank statement 1
+=-=
+subroutine sub()
+     select rank (x)
+     rank (1)
+          print *, "rank1"
+     rank (*)
+          |print *, "*"
+     end select
+end subroutine sub
+=-=
+subroutine sub()
+     select rank (x)[...]|
+     end select
+end subroutine sub
+=-=-=
+
+Name: hideshow coarray critical statement 1
+=-=
+subroutine sub()
+     critical
+          |print *, "hide"
+     end critical
+end subroutine sub
+=-=
+subroutine sub()
+     critical[...]|
+     end critical
+end subroutine sub
+=-=-=
+
+Name: hideshow coarray team statement 1
+=-=
+subroutine sub()
+     change team (team1)
+          |print *, "hide"
+     end team
+end subroutine sub
+=-=
+subroutine sub()
+     change team (team1)[...]|
+     end team
+end subroutine sub
+=-=-=
+
+Name: hideshow where statement 1
+=-=
+subroutine sub()
+     where (a > 0)
+          |a = 1
+     end where
+end subroutine sub
+=-=
+subroutine sub()
+     where (a > 0)[...]|
+     end where
+end subroutine sub
+=-=-=
+
+Name: hideshow forall statement 1
+=-=
+subroutine sub()
+     forall (i = 1:10)
+          |a(i) = i
+     end forall
+end subroutine sub
+=-=
+subroutine sub()
+     forall (i = 1:10)[...]|
+     end forall
+end subroutine sub
+=-=-=

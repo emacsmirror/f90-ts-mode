@@ -36,6 +36,8 @@
 
 (require 'treesit)
 (require 'xref)
+(require 'hideshow)
+(require 'outline)
 (require 'f90-ts-mode)
 
 ;;; Code:
@@ -965,6 +967,51 @@ If buffer was modified, insert `**' otherwise insert '--'."
 
 
 ;;------------------------------------------------------------------------------
+;; hideshow and outline helpers
+
+(defun f90-ts-mode-test--replace-overlays (kind)
+  "Replace invisible overlays of KIND with literal \"[...]\" text in buffer.
+KIND is the value of the `invisible' property, like `hs' or `outline'
+for hideshow and outline testing.
+Point is placed after the first \"[...]\" replacement."
+  (cl-loop
+   ;; process backwards, this ensures that buffer positions of the prior
+   ;; overlays stay valid
+   for ov in (sort (overlays-in (point-min) (point-max))
+                   (lambda (a b) (> (overlay-start a) (overlay-start b))))
+   when (eq (overlay-get ov 'invisible) kind)
+   do (let* ((beg (overlay-start ov))
+             (end (overlay-end ov))
+             (at-eob (= end (point-max))))
+        (delete-overlay ov)
+        (delete-region beg end)
+        (goto-char beg)
+        (insert "[...]")
+        ;; add newline if not present, as the erts-after block always has
+        ;; a final newline (outline hiding actually hides the final newline)
+        (when at-eob
+          (save-excursion (insert "\n"))))))
+
+
+(defmacro f90-ts-mode-test-with-hs (action)
+  "Enable `hs-minor-mode', execute ACTION, and replace overlays with text."
+  (declare (indent 0))
+  `(progn
+     (hs-minor-mode 1)
+     ,action
+     (f90-ts-mode-test--replace-overlays 'hs)))
+
+
+(defmacro f90-ts-mode-test-with-outline (action)
+  "Enable `outline-minor-mode', execute ACTION, and replace overlays with text."
+  (declare (indent 0))
+  `(progn
+     (outline-minor-mode 1)
+     ,action
+     (f90-ts-mode-test--replace-overlays 'outline)))
+
+
+;;------------------------------------------------------------------------------
 ;; register tests
 
 
@@ -1041,7 +1088,10 @@ If buffer was modified, insert `**' otherwise insert '--'."
    "modified_bit.erts"
    "navigate_thing_procedure.erts"
    "navigate_thing_interface.erts"
-   "navigate_thing_type.erts"))
+   "navigate_thing_type.erts"
+   "hideshow.erts"
+   "outline_hide.erts"
+   "outline_navigate.erts"))
 
 
 ;; register font lock tests
