@@ -850,9 +850,24 @@ For empty NODES, return an empty list."
 
 
 (defun f90-ts--first-node-on-line (pos)
-  "Return the first node on the line at POS.
-Take virtual ampersand nodes into account, these are not returned by
-`treesit-node-at' and require extra work.  If the line is empty, return nil."
+"Return the first node on the line at POS, or nil if the line is empty.
+If the line is part of a continued line, it starts with a real or a virtual
+zero-width ampersand.  Return this ampersand as first node if present.
+
+`treesit-node-on' for (point) (point) usually returns the virtual
+ampersand directly.  Walking back over previous siblings starting at the
+same position is still necessary in one situation:
+Several zero-width nodes start at the same position, for example after a
+trailing comma in a call, with an incomplete argument list, like:
+
+      call foo(x, &
+               y, &
+               )
+
+Error recovery inserts a zero-width `assumed_size' node (with a MISSING
+\"*\") between the virtual ampersand and the closing parenthesis.
+`treesit-node-on' then returns the parenthesis, and the ampersand is
+reached only by walking back via `assumed_size'."
   (save-excursion
     (goto-char pos)
     (back-to-indentation)
@@ -862,15 +877,17 @@ Take virtual ampersand nodes into account, these are not returned by
       (cond
        ((and on-node
              (= (point) (treesit-node-start on-node)))
-        ;; in some cases, there might be other virtual nodes,
-        ;; or treesit-node-on returns a proper node starting at (point),
-        ;; walk back as long as start of node does not change
-        (cl-loop for node = on-node
-                 then (treesit-node-prev-sibling node)
-                 while (and node
-                            (= (treesit-node-start node) (point)))
-                 for last = node ; updates only if while condition is true
-                 finally return last))
+        ;; usually, (treesit-node-on (point) (point)) already returns the
+        ;; virtual ampersand if present, but in some cases, there might be
+        ;; other virtual nodes, or treesit-node-on returns a proper node
+        ;; starting at (point), walk back as long as start of node is at point
+        (cl-loop
+         for node = on-node
+         then (treesit-node-prev-sibling node)
+         while (and node
+                    (= (treesit-node-start node) (point)))
+         for last = node ; updates only if while condition is true
+         finally return last))
 
        ((and at-node
              (= line (f90-ts--node-line at-node)))
