@@ -365,17 +365,18 @@ then it is bounded by zero.
 
 Lookup the cache for the line anchor is placed on.  If current and cached
 indentation are equal, then apply cached delta to current column,
-otherwise return column as is."
+otherwise return column as is.  The bound by zero is applied only after the
+cached delta has been added, as the delta of the anchor line may be positive
+and compensate a negative offset."
   (let* ((anchor (car anoff))
          (offset (cdr anoff))
          (pos (if (treesit-node-p anchor)
                   (treesit-node-start anchor)
                 anchor))
-         (col (max 0 (+ (f90-ts--column-number-at-pos pos)
-                        offset))))
+         (col (+ (f90-ts--column-number-at-pos pos) offset)))
     (if f90-ts--align-continued-variant-tab
         ;; line based indentation, no caching
-        col
+        (max 0 col)
       (let* ((entry (f90-ts--continued-line-cache-lookup pos))
              (delta (cadr entry))
              (col-cached (car entry))
@@ -386,10 +387,10 @@ otherwise return column as is."
                    nil
                    "no entry for line in cache, line=%s, cache=%s"
                    (line-number-at-pos pos) f90-ts--continued-line-cache)
-        (if (= col-cached col-current)
-            ;; not yet flushed
-            (+ col delta)
-          col)))))
+        (max 0 (if (= col-cached col-current)
+                   ;; not yet flushed
+                   (+ col delta)
+                 col))))))
 
 
 (defun f90-ts--continued-line-cache-get-orig (col pos)
