@@ -225,6 +225,15 @@ and ends at the last non-blank character of NODE."
       (f90-ts--line-empty-comment-p (point)))))
 
 
+(defun f90-ts--same-line-p (pos1 pos2)
+  "Return non-nil if POS1 and POS2 are on the same line.
+The implementation using line numbers, which might be expensive
+to determine."
+  (save-excursion
+    (goto-char (min pos1 pos2))
+    (<= (max pos1 pos2) (pos-eol))))
+
+
 (defun f90-ts--region-trimmed ()
   "Return (BEG . END) of trimmed active region.
 The trimming removes leading and trailing whitespace."
@@ -815,22 +824,34 @@ If NAMED is non-nil, return only named nodes."
              collect sib)))
 
 
-(defun f90-ts--prev-sibling-predicate (node predicate)
-  "Find previous sibling of NODE satisfying PREDICATE.
-Repeat `treesit-node-prev-sibling' until a suitable sibling is found,
+(defun f90-ts--sibling-predicate (node sibling-fn predicate)
+  "Find sibling of NODE satisfying PREDICATE using SIBLING-FN to walk siblings.
+Repeat SIBLING-FN until a suitable sibling is found,
 or return nil."
   (cl-loop
-   for sibling = (treesit-node-prev-sibling node)
-            then (treesit-node-prev-sibling sibling)
+   for sibling = (funcall sibling-fn node)
+            then (funcall sibling-fn sibling)
    while sibling
-   when (funcall predicate sibling) return sibling))
+   when (funcall predicate sibling)
+   return sibling))
 
 
 (defun f90-ts--prev-sibling-proper (node)
   "Determine previous \"proper\" sibling of NODE.
 Nodes of type comments and ampersand are not considered \"proper\"."
-  (f90-ts--prev-sibling-predicate
+  (f90-ts--sibling-predicate
    node
+   #'treesit-node-prev-sibling
+   (lambda (n)
+     (not (f90-ts--node-type-p n '("comment" "&"))))))
+
+
+(defun f90-ts--next-sibling-proper (node)
+  "Determine next \"proper\" sibling of NODE.
+Nodes of type comments and ampersand are not considered \"proper\"."
+  (f90-ts--sibling-predicate
+   node
+   #'treesit-node-next-sibling
    (lambda (n)
      (not (f90-ts--node-type-p n '("comment" "&"))))))
 
