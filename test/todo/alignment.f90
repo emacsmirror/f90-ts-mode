@@ -1,26 +1,3 @@
-! primary should be different not, this one (RADDOM_...+cont_off)
-! and: second choice (aligne with ::) should not be there
-! and: align with = is missing
-subroutine array
-     integer, dimension(1:10), parameter, public :: &
-            lebedev_N = &
-            [6, 14, 26, 38, 50, 74, 86, 110, 146, 170]
-end subroutine array
-
-! we need to include init_declarator context to indent
-! "[ & ..." after "=" relative to "rgb =" ...
-subroutine arr3()
-     character(len=5), dimension(1:3) :: & ! comment
-                                         ! comment
-        &   rgb = &
-        &   [ &
-        &    'red  ', &
-        &    'green', &
-        &    'blue ' ], &
-        &   alpha = 'trnsp'
-end subroutine arr3
-
-
 ! there is no proper context node for "! comment 2", but "! comment 1"
 ! would be a proper primary or secondary choice, besides default indentation shown below
 ! in both cases: add assignment_statement as list context and extract part after "="
@@ -30,21 +7,6 @@ subroutine math()
             ! comment 2
             5 + 6
 end subroutine math
-
-! y is not a math-expression, just an identifier,
-! should identifier be added?
-! (in order to get column after = as suggestion,
-! especially if a comment is present, this makes sense)
-subroutine math()
-     x1234567890 = &
-            (x+y)
-     x1234567890 = & ! commen
-            (x+y)
-     z = &
-            y
-end subroutine math
-
-
 
 ! list context for case range
 subroutine select_case()
@@ -81,13 +43,7 @@ end subroutine sub
 module foo
  use mod1
  use mod2, only: sub1, &
-        sub2
- use mod3, &
-        mod4
- ! another
- mod5, only: baz1,&
-           baz2
-
+       sub2
 contains
  subroutine sub_bar()
       use mod3, only: fun1 => mod3_fun1, &

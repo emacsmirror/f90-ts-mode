@@ -33,6 +33,8 @@
 ;;
 ;; Changelog (recent):
 ;; [10-2026]
+;;   - Alignment rules for improved indentation of variable declarations with
+;;     initialisation added.
 ;;   - Infinite loop caused by `f90-ts-indent-delete-trailing-whitespace' fixed.
 ;;     This happened if region ended at last line without a trailing newline.
 ;;   - Right-align-at-comma options for array literals added,
@@ -189,6 +191,8 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog (recent):
 
 [10-2026]
+- Alignment rules for improved indentation of variable declarations with
+  initialisation added.
 - Infinite loop caused by `f90-ts-indent-delete-trailing-whitespace' fixed.
   This happened if region ended at last line without a trailing newline.
 - Right-align-at-comma options for array literals added,

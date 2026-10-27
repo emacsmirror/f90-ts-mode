@@ -1019,11 +1019,13 @@ before and after \"::\")."
         (if (or (null first-decl)
                 (< pos (treesit-node-start first-decl)))
             attr-children
-          ;; for init declarator children, add assignment nodes as well
+          ;; for init declarator children, add assignment nodes as well:
+          ;; "=" for init_declarator, "=>" for pointer_init_declarator
           (cl-mapcan (lambda (n)
-                       (cons n (when (f90-ts--node-type-p n "init_declarator")
+                       (cons n (when (f90-ts--node-type-p n '("init_declarator"
+                                                              "pointer_init_declarator"))
                                  (cl-remove-if-not
-                                  (lambda (c) (f90-ts--node-type-p c "="))
+                                  (lambda (c) (f90-ts--node-type-p c '("=" "=>")))
                                   (treesit-node-children n)))))
                      decl-children))))))
 
@@ -1084,6 +1086,24 @@ Both occur in the contains part of a derived type definition."
     (when-let* ((children (treesit-node-children list-context)))
       ;; drop the (binding_name ...) part, and the => binding symbol
       (seq-drop children 2))))
+
+
+;;++++++++++++++
+;; list context: init_declarator, pointer_init_declarator
+
+(defun f90-ts--align-items-init-decl (context _loc)
+  "Determine relevant children of CONTEXT by dropping the declared variable.
+This is used for nodes of type \"init_declarator\" and
+\"pointer_init_declarator\", like \"a = 1\" or \"p => null()\".  The remaining
+children are the \"=\" or \"=>\" symbol and the initialisation expression."
+  (let ((list-context (car context)))
+    (cl-assert (f90-ts--node-type-p list-context '("init_declarator"
+                                                   "pointer_init_declarator"))
+               nil
+               "expected list context: init_declarator, got '%s'" list-context)
+    (when-let* ((children (treesit-node-children list-context)))
+      ;; drop the declared variable (the left field)
+      (seq-drop children 1))))
 
 
 ;;++++++++++++++
@@ -1334,6 +1354,98 @@ align-list-other family."
                   ('parenthesis f90-ts-indent-paren-close)   ; indents ")"
                   (_            f90-ts-indent-paren-default) ; all other kind of nodes
                   )))))
+
+
+(defun f90-ts--align-init-decl-prev-symbols (init nsym line)
+  "Return anoffs of earlier \"=\" or \"=>\" symbols of init declarators.
+INIT is an init declarator (or pointer init declarator) node.  Collect the
+assignment symbol of NSYM (`assignment': \"=\", `associate': \"=>\") of all init
+declarators in the same variable_declaration which precede INIT, and which are
+on a line before LINE.  Return a list of pairs (node . 0), or nil for other
+values of NSYM."
+  (let ((decl (treesit-node-parent init))
+        (sym-type (pcase nsym
+                    ('assignment "=")
+                    ('associate  "=>"))))
+    (when (and sym-type
+               (f90-ts--node-type-p decl "variable_declaration"))
+      (cl-loop
+       for n in (f90-ts--children-by-fields decl '("declarator"))
+       when (and (< (treesit-node-start n) (treesit-node-start init))
+                 (f90-ts--node-type-p n '("init_declarator"
+                                          "pointer_init_declarator")))
+       append (cl-loop
+               for c in (treesit-node-children n)
+               when (and (f90-ts--node-type-p c sym-type)
+                         (f90-ts--node-before-line-p c line))
+               collect (cons c 0))))))
+
+
+(defun f90-ts--align-other-init-decl (context loc _items-plist)
+  "Return the other plist for init declarator nodes.
+An init declarator is \"left = value\" or \"left => value\" in a variable
+declaration, spread over several lines.  Examples:
+
+  integer, dimension(1:6) :: &
+       lebedev_N = &          ! start of the init declarator
+            [6, 14, 26, &     ! value: hanging relative to the declarator
+             38, 50, 74]
+  integer, dimension(1:2), parameter :: &
+       lebedev_N &
+            = [6, 14]         ! \"=\": hanging as well
+
+There is no alignment with earlier rhs items, as there is only one value on the
+right hand side.  However, `f90-ts-indent-continued' relative to the indentation
+of the line holding the declared variable and the declared variable itself are
+further candidates.
+
+If the current node is the symbol \"=\" or \"=>\", the primary position is the
+standard continued line position, unless an earlier init declarator in the
+variable declaration has the same symbol on an earlier line and this symbol is
+itself preceded by an ampersand, like the current one.  Then align with the one
+with the smallest column:
+
+    real, target :: x = 1, &
+                    y &
+                      = 1, &    ! aligned und previous \"=\", but not primary
+                    z &
+                      = 2       ! aligned with \"=\" in \"y = 1\", primary
+
+The :primary position has :forced t.  Positions relative to the whole variable
+declaration, like the one after \"::\", are not appropriate here.
+
+CONTEXT and LOC are as described in the calling convention of the
+align-list-other family."
+  (let* ((list-context (car context))
+         (nsym (alist-get 'nsym loc))
+         (symbol-p (memq nsym '(assignment associate)))
+         (left (or (treesit-node-child-by-field-name list-context "left")
+                   (treesit-node-child list-context 0 nil)))
+         (anoff-hang (cons (f90-ts--indent-pos-at-node left)
+                           f90-ts-indent-continued))
+         (anoffs-sym (f90-ts--align-init-decl-prev-symbols
+                      list-context nsym (alist-get 'line loc)))
+         ;; only symbols which start a continued line are primary candidates
+         (anoffs-amp (seq-filter
+                      (lambda (anoff)
+                        (let ((n (car anoff)))
+                          (f90-ts--node-type-p (treesit-node-prev-sibling n)
+                                               "&")))
+                      anoffs-sym))
+         (anoff-amp  (and anoffs-amp
+                          (f90-ts--align-smallest-anoff anoffs-amp))))
+    (cl-assert (f90-ts--node-type-p list-context '("init_declarator"
+                                                   "pointer_init_declarator"))
+               nil "wrong context, got '%s'" list-context)
+    (list :primary (cond
+                    (anoff-amp anoff-amp)
+                    ;; nil: forced primary becomes the continued line position
+                    (symbol-p nil)
+                    (t anoff-hang))
+          :force   t
+          :others  (append (and symbol-p (list anoff-hang))
+                           anoffs-sym
+                           (list (cons (treesit-node-start left) 0))))))
 
 
 (defun f90-ts--align-other-string (context loc items-plist)
@@ -1991,6 +2103,12 @@ Finally use VARIANT to select one pair to align with."
       (cons "variable_declaration"
             '(:get-items-fn f90-ts--align-items-var-decl
               :get-other-fn f90-ts--align-other-var-decl))
+      (cons "init_declarator"
+            '(:get-items-fn f90-ts--align-items-init-decl
+              :get-other-fn f90-ts--align-other-init-decl))
+      (cons "pointer_init_declarator"
+            '(:get-items-fn f90-ts--align-items-init-decl
+              :get-other-fn f90-ts--align-other-init-decl))
       (cons "import_statement"
             '(:get-items-fn f90-ts--align-items-children1)))))
   "List of tree-sitter node types presenting some kind of list context.
