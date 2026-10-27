@@ -2940,18 +2940,24 @@ If INDENT-STRUCT is true, then indent the whole block with `indent-region'."
 Uses the same line-boundary convention as
 `f90-ts--indent-whitespace-leading-amp-or-label-region': if END is at the
 beginning of a line, that line is excluded.
-Does nothing unless `f90-ts-indent-delete-trailing-whitespace' is non-nil."
+The function does nothing unless `f90-ts-indent-delete-trailing-whitespace'
+is non-nil."
   (save-excursion
-    (goto-char beg)
-    (beginning-of-line)
-    (let ((line-end (save-excursion
-                      (goto-char end)
-                      (if (bolp)
-                          (1- (line-number-at-pos))
-                        (line-number-at-pos)))))
-      (while (<= (line-number-at-pos) line-end)
-        (f90-ts--delete-trailing-whitespace-line (point))
-        (forward-line 1)))))
+    (let ((beg-bol (progn (goto-char beg) (line-beginning-position))))
+      ;; start at end and work backwards, so deleting whitespace on a line
+      ;; does not shift the positions of the lines still to be processed
+      (goto-char end)
+      ;; if END is at the beginning of a line, that line is excluded;
+      ;; if at the beginning of the buffer, then there is no previous line
+      ;; and nothing to do
+      (when (if (bolp)
+                (zerop (forward-line -1))
+              (beginning-of-line)
+              t)
+        (cl-loop
+         while (>= (point) beg-bol)
+         do (f90-ts--delete-trailing-whitespace-line (point))
+         while (zerop (forward-line -1)))))))
 
 
 (defmacro f90-ts--with-check-modified-line (&rest body)

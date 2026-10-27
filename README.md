@@ -14,6 +14,8 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Infinite loop caused by `f90-ts-indent-delete-trailing-whitespace` fixed.
+  This happened if region ended at last line without a trailing newline.
 - Right-align-at-comma options for array literals added,
   see `f90-ts-indent-array-align`.
 - Changes required by updates to the proposed string_literal branch added.
