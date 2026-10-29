@@ -14,6 +14,8 @@ For a comprehensive overview see [MANUAL.md](MANUAL.md).
 ### Changelog (recent)
 
 **10-2026**
+- Extend/reduce variants for mark region operations based on siblings
+  (first, last, previous, next) added.
 - Replace f90-ts-nav by improved f90-ts-toc providing a side panel with a
   table of content of a f90 buffer, see `MANUAL.md' for details.  This
   optional package requires its own use-package statement.

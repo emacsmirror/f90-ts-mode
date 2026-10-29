@@ -43,7 +43,8 @@ for implementation.
     - [Shifting line break](#Shifting-line-break)
   - [Filling lines and regions](#filling-lines-and-regions)
   - [Comment region](#comment-region)
-  - [Mark regions based on tree-sitter nodes](#mark-regions-based-on-tree-sitter-nodes)
+  - [Mark region based on tree-sitter nodes](#mark-region-based-on-tree-sitter-nodes)
+    - [Extending and reducing a region by siblings](#extending-and-reducing-a-region-by-siblings)
   - [Folding](#folding)
 - [Development and Testing](#development-and-testing)
   - [Logging](#logging)
@@ -199,7 +200,14 @@ Example setups provided below should be adjusted to ones requirements.
          ("A-{"           . #'f90-ts-mark-region-first-sibling)
          ("A-["           . #'f90-ts-mark-region-prev-sibling)
          ("A-]"           . #'f90-ts-mark-region-next-sibling)
-         ("A-}"           . #'f90-ts-mark-region-last-sibling)))
+         ("A-}"           . #'f90-ts-mark-region-last-sibling)
+
+         ;; extend or reduce the active region by siblings
+         ;; (no default bindings outside of the transient popup)
+         ("A-M-{"         . #'f90-ts-mark-region-extend-first-sibling)
+         ("A-M-["         . #'f90-ts-mark-region-extend-prev-sibling)
+         ("A-M-]"         . #'f90-ts-mark-region-extend-next-sibling)
+         ("A-M-}"         . #'f90-ts-mark-region-extend-last-sibling)))
 ```
 
 #### Optional packages
@@ -296,23 +304,24 @@ Pressing `C-c C-f` opens a transient popup with the most frequently used command
 Less frequently used commands are grouped in sub-menus (`C-g` returns to the parent menu).
 Each sub-menu is also an ordinary command and can be bound directly.
 
-| Section                | Keys                  | Commands                                                |
-|------------------------|-----------------------|---------------------------------------------------------|
-| **Indentation**        | `TAB` `s` `I`         | Indent and complete line / statement / region           |
-|                        | `C-TAB` `C-I`         | Indent line / region                                    |
-| **Line editing**       | `b` `j` `J` `C-s`     | Break line, join with prev/next, shift line break       |
-| **Filling**            | `C-f` `C-b`           | Set fill column and fill method                         |
-|                        | `f` `M-f` `M-j` `M-J` | Fill region, line, with prev/next line                  |
-| **Mark region**        | `r` `0` `9`           | Enlarge, shrink to first / last child                   |
-|                        | `{` `[` `]` `}`       | First, prev, next and last sibling                      |
-|                        | `X`                   | Exchange mark and point                                 |
-| **Comment region**     | `c` `C`               | Default and custom prefix                               |
-| **Procedure**          | `a` `e` `p` `n`       | Beginning, end, previous, next                          |
-| **Xref**               | `.` `,` `/` `<` `>`   | Definitions, references, apropos, back, forward         |
-| **More...**            | `t`                   | Sub-menu: derived types (`a e p n`), interfaces (`A E P N`) |
-|                        | `h`                   | Sub-menu: hideshow (only if `hs-minor-mode` is active)  |
-|                        | `o`                   | Sub-menu: outline (only if `outline-minor-mode` is active) |
-|                        | `m`                   | Sub-menu: About, README, MANUAL (`a r m`), TOC side panel (`B F`, if `f90-ts-toc` is loaded) |
+| Section                | Keys                    | Commands                                                |
+|------------------------|-------------------------|---------------------------------------------------------|
+| **Indentation**        | `TAB` `s` `I`           | Indent and complete line / statement / region           |
+|                        | `C-TAB` `C-I`           | Indent line / region                                    |
+| **Line editing**       | `b` `j` `J` `C-s`       | Break line, join with prev/next, shift line break       |
+| **Filling**            | `C-f` `C-b`             | Set fill column and fill method                         |
+|                        | `f` `M-f` `M-j` `M-J`   | Fill region, line, with prev/next line                  |
+| **Mark region**        | `r` `0` `9`             | Enlarge, shrink to first / last child                   |
+|                        | `{` `[` `]` `}`         | First, prev, next and last sibling                      |
+|                        | `M-{` `M-[` `M-]` `M-}` | Extend/reduce region to first, prev, next, last sibling |
+|                        | `X`                     | Exchange mark and point                                 |
+| **Comment region**     | `c` `C`                 | Default and custom prefix                               |
+| **Procedure**          | `a` `e` `p` `n`         | Beginning, end, previous, next                          |
+| **Xref**               | `.` `,` `/` `<` `>`     | Definitions, references, apropos, back, forward         |
+| **More...**            | `t`                     | Sub-menu: derived types (`a e p n`), interfaces (`A E P N`) |
+|                        | `h`                     | Sub-menu: hideshow (only if `hs-minor-mode` is active)  |
+|                        | `o`                     | Sub-menu: outline (only if `outline-minor-mode` is active) |
+|                        | `m`                     | Sub-menu: About, README, MANUAL (`a r m`), TOC side panel (`B F`, if `f90-ts-toc` is loaded) |
 
 
 The entire transient popup can be bound to a different prefix with a use-package statement
@@ -849,7 +858,7 @@ any blanks to keep original indentation of commented code.
 
 ### Mark region based on tree-sitter nodes
 
-Marked regions can be selected, enlarged, shrunk or moved based on the tree-sitter node structure.
+Marked regions can be selected, enlarged, shrunk, moved, extended or reduced based on the tree-sitter node structure.
 Defcustom variable `f90-ts-mark-region-order' can be used to configure whether the point after
 a marked region operation should be placed at start, at end or if order of active region should
 be preserved (defaulting to end position if no active region is present).
@@ -864,15 +873,44 @@ is particularly useful in conjunction with comment region operations.
 
 Key bindings are provided in the transient popup (`C-c C-f`) under the Region section:
 
-| Function                                | Popup key | Description                                                              |
-|-----------------------------------------|-----------|--------------------------------------------------------------------------|
-| `f90-ts-mark-region-enlarge`            | `r`       | Find smallest parent node of existing region which is strictly larger    |
-| `f90-ts-mark-region-shrink-child-first` | `0`       | Shrink region to a first (grand)child which is strictly smaller          |
-| `f90-ts-mark-region-shrink-child-last`  | `9`       | Shrink region to a last (grand)child which is strictly smaller           |
-| `f90-ts-mark-region-first-sibling`      | `{`       | Move selected region to first sibling                                    |
-| `f90-ts-mark-region-prev-sibling`       | `[`       | Move selected region to previous sibling                                 |
-| `f90-ts-mark-region-next-sibling`       | `]`       | Move selected region to next sibling                                     |
-| `f90-ts-mark-region-last-sibling`       | `}`       | Move selected region to last sibling                                     |
+| Function                                  | Popup key | Description                                                               |
+|-------------------------------------------|-----------|---------------------------------------------------------------------------|
+| `f90-ts-mark-region-enlarge`              | `r`       | Find smallest parent node of existing region which is strictly larger     |
+| `f90-ts-mark-region-shrink-child-first`   | `0`       | Shrink region to a first (grand)child which is strictly smaller           |
+| `f90-ts-mark-region-shrink-child-last`    | `9`       | Shrink region to a last (grand)child which is strictly smaller            |
+| `f90-ts-mark-region-first-sibling`        | `{`       | Move selected region to first sibling                                     |
+| `f90-ts-mark-region-prev-sibling`         | `[`       | Move selected region to previous sibling                                  |
+| `f90-ts-mark-region-next-sibling`         | `]`       | Move selected region to next sibling                                      |
+| `f90-ts-mark-region-last-sibling`         | `}`       | Move selected region to last sibling                                      |
+| `f90-ts-mark-region-extend-first-sibling` | `M-{`     | Extend region to first sibling, or reduce it to its first node (or group) |
+| `f90-ts-mark-region-extend-prev-sibling`  | `M-[`     | Extend region by previous sibling, or drop its last node (or group)       |
+| `f90-ts-mark-region-extend-next-sibling`  | `M-]`     | Extend region by next sibling, or drop its first node (or group)          |
+| `f90-ts-mark-region-extend-last-sibling`  | `M-}`     | Extend region to last sibling, or reduce it to its last node (or group)   |
+
+The last four operations are described in
+[Extending and reducing a region by siblings](#extending-and-reducing-a-region-by-siblings).
+
+
+#### Extending and reducing a region by siblings
+
+The sibling operations `{` `[` `]` `}` *move* the region to another node. The extend/reduce operations
+`M-{` `M-[` `M-]` `M-}` instead change the region by whole siblings, similar to growing or shrinking a selection
+of statements. They require an active region and are available in the transient popup (section
+*Mark sibling region*) and in the *Mark region* sub-menu of the Fortran menu. There are no default
+keybindings outside of the popup, see [Setup](#standard-installation-via-package-manager) for example bindings.
+
+Only the end of the region where point is located (the *active end*) is moved, the other end stays fixed.
+Whether the region grows or shrinks depends on the direction of the command and on which end point is at.
+The direction is the direction in which the active end travels through the siblings:
+
+| Point at | `M-[` (previous)   | `M-]` (next)        | `M-{` (first)                  | `M-}` (last)                   |
+|----------|--------------------|---------------------|--------------------------------|--------------------------------|
+| start    | extend by prev     | reduce (drop first) | extend start to first sibling  | reduce to last node or group   |
+| end      | reduce (drop last) | extend by next      | reduce to first node or group  | extend end to last sibling     |
+
+After the operation, point is at the same end of the region as before. Note that
+`f90-ts-mark-region-order` is not used here, as it would otherwise move the active end.
+Use `X` (`exchange-point-and-mark`) in the popup to switch the active end.
 
 
 ### Folding
