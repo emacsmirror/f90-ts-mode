@@ -365,17 +365,18 @@ then it is bounded by zero.
 
 Lookup the cache for the line anchor is placed on.  If current and cached
 indentation are equal, then apply cached delta to current column,
-otherwise return column as is."
+otherwise return column as is.  The bound by zero is applied only after the
+cached delta has been added, as the delta of the anchor line may be positive
+and compensate a negative offset."
   (let* ((anchor (car anoff))
          (offset (cdr anoff))
          (pos (if (treesit-node-p anchor)
                   (treesit-node-start anchor)
                 anchor))
-         (col (max 0 (+ (f90-ts--column-number-at-pos pos)
-                        offset))))
+         (col (+ (f90-ts--column-number-at-pos pos) offset)))
     (if f90-ts--align-continued-variant-tab
         ;; line based indentation, no caching
-        col
+        (max 0 col)
       (let* ((entry (f90-ts--continued-line-cache-lookup pos))
              (delta (cadr entry))
              (col-cached (car entry))
@@ -386,10 +387,10 @@ otherwise return column as is."
                    nil
                    "no entry for line in cache, line=%s, cache=%s"
                    (line-number-at-pos pos) f90-ts--continued-line-cache)
-        (if (= col-cached col-current)
-            ;; not yet flushed
-            (+ col delta)
-          col)))))
+        (max 0 (if (= col-cached col-current)
+                   ;; not yet flushed
+                   (+ col delta)
+                 col))))))
 
 
 (defun f90-ts--continued-line-cache-get-orig (col pos)
@@ -1018,11 +1019,13 @@ before and after \"::\")."
         (if (or (null first-decl)
                 (< pos (treesit-node-start first-decl)))
             attr-children
-          ;; for init declarator children, add assignment nodes as well
+          ;; for init declarator children, add assignment nodes as well:
+          ;; "=" for init_declarator, "=>" for pointer_init_declarator
           (cl-mapcan (lambda (n)
-                       (cons n (when (f90-ts--node-type-p n "init_declarator")
+                       (cons n (when (f90-ts--node-type-p n '("init_declarator"
+                                                              "pointer_init_declarator"))
                                  (cl-remove-if-not
-                                  (lambda (c) (f90-ts--node-type-p c "="))
+                                  (lambda (c) (f90-ts--node-type-p c '("=" "=>")))
                                   (treesit-node-children n)))))
                      decl-children))))))
 
@@ -1086,6 +1089,24 @@ Both occur in the contains part of a derived type definition."
 
 
 ;;++++++++++++++
+;; list context: init_declarator, pointer_init_declarator
+
+(defun f90-ts--align-items-init-decl (context _loc)
+  "Determine relevant children of CONTEXT by dropping the declared variable.
+This is used for nodes of type \"init_declarator\" and
+\"pointer_init_declarator\", like \"a = 1\" or \"p => null()\".  The remaining
+children are the \"=\" or \"=>\" symbol and the initialisation expression."
+  (let ((list-context (car context)))
+    (cl-assert (f90-ts--node-type-p list-context '("init_declarator"
+                                                   "pointer_init_declarator"))
+               nil
+               "expected list context: init_declarator, got '%s'" list-context)
+    (when-let* ((children (treesit-node-children list-context)))
+      ;; drop the declared variable (the left field)
+      (seq-drop children 1))))
+
+
+;;++++++++++++++
 ;; additional anchor for aligned lists:
 
 ;; The :get-other-fn functions of a list context are called as
@@ -1094,16 +1115,19 @@ Both occur in the contains part of a derived type definition."
 ;;
 ;; and return nil or a plist with the keys
 ;;
-;;   :primary ANOFF   context specific default for the primary position
-;;   :force   BOOL    non-nil: :primary (or the standard continued line
-;;                    position if :primary is nil) is the primary position,
-;;                    even if there are earlier items compatible with the
-;;                    current node (see `f90-ts--align-other-var-decl'
-;;                    for an example)
-;;   :others  ANOFFS  further candidate positions
+;;   :primary ANOFF      context specific default for the primary position
+;;   :force   BOOL       non-nil: :primary (or the standard continued line
+;;                       position if :primary is nil) is the primary position,
+;;                       even if there are earlier items compatible with the
+;;                       current node (see `f90-ts--align-other-var-decl'
+;;                       for an example)
+;;   :others  ANOFFS     further candidate positions
+;;   :no-items-sym BOOL  non-nil: the earlier items compatible with the current
+;;                       node are not candidate positions (see
+;;                       `f90-ts--align-other-array-commas' for an example)
 ;;
 ;; An ANOFF is a cons (ANCHOR . OFFSET) with ANCHOR a node or a buffer
-;; position.  :primary is always a candidate position as well, it does not
+;; position.  :primary is the primary candidate position, it does not
 ;; need to be repeated in :others.  The standard continued line position
 ;; (pstmt-1 plus `f90-ts-indent-continued') is always a candidate, too.
 ;;
@@ -1332,6 +1356,98 @@ align-list-other family."
                   )))))
 
 
+(defun f90-ts--align-init-decl-prev-symbols (init nsym line)
+  "Return anoffs of earlier \"=\" or \"=>\" symbols of init declarators.
+INIT is an init declarator (or pointer init declarator) node.  Collect the
+assignment symbol of NSYM (`assignment': \"=\", `associate': \"=>\") of all init
+declarators in the same variable_declaration which precede INIT, and which are
+on a line before LINE.  Return a list of pairs (node . 0), or nil for other
+values of NSYM."
+  (let ((decl (treesit-node-parent init))
+        (sym-type (pcase nsym
+                    ('assignment "=")
+                    ('associate  "=>"))))
+    (when (and sym-type
+               (f90-ts--node-type-p decl "variable_declaration"))
+      (cl-loop
+       for n in (f90-ts--children-by-fields decl '("declarator"))
+       when (and (< (treesit-node-start n) (treesit-node-start init))
+                 (f90-ts--node-type-p n '("init_declarator"
+                                          "pointer_init_declarator")))
+       append (cl-loop
+               for c in (treesit-node-children n)
+               when (and (f90-ts--node-type-p c sym-type)
+                         (f90-ts--node-before-line-p c line))
+               collect (cons c 0))))))
+
+
+(defun f90-ts--align-other-init-decl (context loc _items-plist)
+  "Return the other plist for init declarator nodes.
+An init declarator is \"left = value\" or \"left => value\" in a variable
+declaration, spread over several lines.  Examples:
+
+  integer, dimension(1:6) :: &
+       lebedev_N = &          ! start of the init declarator
+            [6, 14, 26, &     ! value: hanging relative to the declarator
+             38, 50, 74]
+  integer, dimension(1:2), parameter :: &
+       lebedev_N &
+            = [6, 14]         ! \"=\": hanging as well
+
+There is no alignment with earlier rhs items, as there is only one value on the
+right hand side.  However, `f90-ts-indent-continued' relative to the indentation
+of the line holding the declared variable and the declared variable itself are
+further candidates.
+
+If the current node is the symbol \"=\" or \"=>\", the primary position is the
+standard continued line position, unless an earlier init declarator in the
+variable declaration has the same symbol on an earlier line and this symbol is
+itself preceded by an ampersand, like the current one.  Then align with the one
+with the smallest column:
+
+    real, target :: x = 1, &
+                    y &
+                      = 1, &    ! aligned und previous \"=\", but not primary
+                    z &
+                      = 2       ! aligned with \"=\" in \"y = 1\", primary
+
+The :primary position has :forced t.  Positions relative to the whole variable
+declaration, like the one after \"::\", are not appropriate here.
+
+CONTEXT and LOC are as described in the calling convention of the
+align-list-other family."
+  (let* ((list-context (car context))
+         (nsym (alist-get 'nsym loc))
+         (symbol-p (memq nsym '(assignment associate)))
+         (left (or (treesit-node-child-by-field-name list-context "left")
+                   (treesit-node-child list-context 0 nil)))
+         (anoff-hang (cons (f90-ts--indent-pos-at-node left)
+                           f90-ts-indent-continued))
+         (anoffs-sym (f90-ts--align-init-decl-prev-symbols
+                      list-context nsym (alist-get 'line loc)))
+         ;; only symbols which start a continued line are primary candidates
+         (anoffs-amp (seq-filter
+                      (lambda (anoff)
+                        (let ((n (car anoff)))
+                          (f90-ts--node-type-p (treesit-node-prev-sibling n)
+                                               "&")))
+                      anoffs-sym))
+         (anoff-amp  (and anoffs-amp
+                          (f90-ts--align-smallest-anoff anoffs-amp))))
+    (cl-assert (f90-ts--node-type-p list-context '("init_declarator"
+                                                   "pointer_init_declarator"))
+               nil "wrong context, got '%s'" list-context)
+    (list :primary (cond
+                    (anoff-amp anoff-amp)
+                    ;; nil: forced primary becomes the continued line position
+                    (symbol-p nil)
+                    (t anoff-hang))
+          :force   t
+          :others  (append (and symbol-p (list anoff-hang))
+                           anoffs-sym
+                           (list (cons (treesit-node-start left) 0))))))
+
+
 (defun f90-ts--align-other-string (context loc items-plist)
   "Return the other plist for string nodes.
 A string_literal consists of opening and closing quoting symbol,
@@ -1434,6 +1550,129 @@ the align-list-other family."
           :force   assignment-p
           :others  (and anoff-decl (list anoff-decl)))))
 
+
+
+;;++++++++++++++
+;; list context: array literals, alignment at commata
+
+(defun f90-ts--align-comma-delta (node)
+  "Return the distance in columns from the start of NODE to its comma, or nil.
+If the next sibling of NODE is a comma on the same line, it is its comma.
+If NODE is not followed by a comma on its line, but by the closing bracket
+\"]\" or \"/)\" of the array literal, an ampersand or a comment, a virtual
+comma right after NODE is assumed.  Return nil for other siblings or if NODE
+spans several lines."
+  (when-let* ((next (treesit-node-next-sibling node))
+              ((f90-ts--node-type-p next '("," "]" "/)" "&" "comment")))
+              ;; if node spans more than one line, right alignment makes no sense
+              ((f90-ts--same-line-p (treesit-node-start node)
+                                    (treesit-node-end node)))
+              (pos-comma (if (and (f90-ts--node-type-p next ",")
+                                  (f90-ts--same-line-p (treesit-node-start node)
+                                                       (treesit-node-start next)))
+                             (treesit-node-start next)
+                           (treesit-node-end node))))
+    (- (f90-ts--column-number-at-pos pos-comma)
+       (f90-ts--node-column node))))
+
+
+(defun f90-ts--align-comma-anoff-less-p (anoff1 anoff2)
+  "Return non-nil if ANOFF1 is before ANOFF2 columnwise.
+Compare the final columns for the two anoffs, see
+`f90-ts--continued-line-cache-get-col'.  For equal columns compare the start
+positions of the anchors, which must be nodes."
+  (let ((col1 (f90-ts--continued-line-cache-get-col anoff1))
+        (col2 (f90-ts--continued-line-cache-get-col anoff2)))
+    (or (< col1 col2)
+        (and (= col1 col2)
+             (> (treesit-node-start (car anoff1))
+                (treesit-node-start (car anoff2)))))))
+
+
+(defun f90-ts--align-other-array-commas (context loc items-plist other)
+  "Return the other plist for alignment at commata, or nil if not applicable.
+This is used for array literals, if `f90-ts-indent-array-align' is `right',
+`both-left-primary' or `both-right-primary', the node at LOC is a direct child
+of the array literal in CONTEXT, and it is followed by a comma or a closing
+bracket on its line.
+
+Every comma on a previous line of the array literal yields a candidate
+represented as \(COMMA . -DELTA), with DELTA the distance of the current node
+to its (virtual) comma, see `f90-ts--align-comma-delta'.  This right-aligns
+the current node at that comma.  Candidates placing the node left of the
+position of the first element after the opening bracket are dropped.  Among the
+candidates, the one with the smallest column is the right-aligned primary
+position (if several have the same column, the one with the smaller anchor
+position).
+
+The value of `f90-ts-indent-array-align' selects:
+`right'               the right-aligned primary is forced, earlier items are
+                      no candidates (:no-items-sym),
+`both-right-primary'  the right-aligned primary is forced, earlier items
+                      remain candidates,
+`both-left-primary'   the primary of OTHER and the usual selection among
+                      earlier items stay in charge, the commata are further
+                      candidates.
+For `left' there is nothing to do and nil is returned.
+
+OTHER is the plist returned by `f90-ts--align-other-paren'; its :others (the
+positions relative to the opening bracket) are always kept as candidates.
+CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
+the align-list-other family."
+  (when (memq f90-ts-indent-array-align '(right
+                                          both-left-primary
+                                          both-right-primary))
+    (when-let* ((list-context (car context))
+                (node         (alist-get 'node loc))
+                ((f90-ts--align-nsym-compatible-p (alist-get 'nsym loc) 'named))
+                ((treesit-node-eq (treesit-node-parent node) list-context))
+                (delta        (f90-ts--align-comma-delta node))
+                (open         (treesit-node-child list-context 0))
+                ((f90-ts--node-type-p open '("[" "(/")))
+                (col-min      (f90-ts--continued-line-cache-get-col
+                               (cons open
+                                     (+ (1- (length (treesit-node-text open)))
+                                        f90-ts-indent-paren-default))))
+                (anoffs       (cl-loop
+                               for (n . s) in (plist-get items-plist :prev)
+                               for anoff = (cons n (- delta))
+                               when (and (eq s 'comma)
+                                         (>= (f90-ts--continued-line-cache-get-col anoff)
+                                             col-min))
+                               collect anoff))
+                (sorted       (seq-sort #'f90-ts--align-comma-anoff-less-p
+                                        anoffs)))
+      (let ((others (append sorted (plist-get other :others))))
+        (pcase f90-ts-indent-array-align
+          ;; right-aligned only: forced primary, no left-aligned candidates
+          ('right
+           (list :primary (car sorted)
+                 :force t
+                 :no-items-sym t
+                 :others others))
+          ;; both: right-aligned is primary
+          ('both-right-primary
+           (list :primary (car sorted)
+                 :force t
+                 :others others))
+          ;; both: left-aligned is primary, the commata are further candidates
+          (_
+           (list :primary (plist-get other :primary)
+                 :force   (plist-get other :force)
+                 :others  others)))))))
+
+
+(defun f90-ts--align-other-array (context loc items-plist)
+  "Return the other plist for array literals.
+Use alignment at commata, if enabled and applicable, see
+`f90-ts--align-other-array-commas'.  Otherwise this is the same as for other
+parenthesized lists, see `f90-ts--align-other-paren'.
+
+CONTEXT, LOC and ITEMS-PLIST are as described in the calling convention of
+the align-list-other family."
+  (let ((other (f90-ts--align-other-paren context loc items-plist)))
+    (or (f90-ts--align-other-array-commas context loc items-plist other)
+        other)))
 
 
 ;;++++++++++++++
@@ -1808,7 +2047,8 @@ Finally use VARIANT to select one pair to align with."
          (anoff-final (append (list anoff-continued)
                               (and anoff-default (list anoff-default))
                               (plist-get anoff-other :others)
-                              anoff-items-sym)))
+                              (unless (plist-get anoff-other :no-items-sym)
+                                anoff-items-sym))))
     ;;(f90-ts-log-msg :anoff "items-other = %s" anoff-other)
     ;;(f90-ts-log-msg :anoff "items-final = %s" anoff-final)
     ;;(f90-ts-log-msg :anoff "item-primary = %s" anoff-primary)
@@ -1849,7 +2089,9 @@ Finally use VARIANT to select one pair to align with."
       (cons "final_statement"          bind-prop)
       (cons "parenthesized_expression" paren-prop)
       (cons "argument_list"            paren-prop)
-      (cons "array_literal"            paren-prop)
+      (cons "array_literal"
+            '(:get-items-fn f90-ts--align-items-children-no-paren
+              :get-other-fn f90-ts--align-other-array))
       (when (f90-ts--grammar-string-literal-decomposed-p)
         (cons "string_literal"
               '(:get-items-fn f90-ts--align-items-string
@@ -1861,6 +2103,12 @@ Finally use VARIANT to select one pair to align with."
       (cons "variable_declaration"
             '(:get-items-fn f90-ts--align-items-var-decl
               :get-other-fn f90-ts--align-other-var-decl))
+      (cons "init_declarator"
+            '(:get-items-fn f90-ts--align-items-init-decl
+              :get-other-fn f90-ts--align-other-init-decl))
+      (cons "pointer_init_declarator"
+            '(:get-items-fn f90-ts--align-items-init-decl
+              :get-other-fn f90-ts--align-other-init-decl))
       (cons "import_statement"
             '(:get-items-fn f90-ts--align-items-children1)))))
   "List of tree-sitter node types presenting some kind of list context.
@@ -2810,18 +3058,24 @@ If INDENT-STRUCT is true, then indent the whole block with `indent-region'."
 Uses the same line-boundary convention as
 `f90-ts--indent-whitespace-leading-amp-or-label-region': if END is at the
 beginning of a line, that line is excluded.
-Does nothing unless `f90-ts-indent-delete-trailing-whitespace' is non-nil."
+The function does nothing unless `f90-ts-indent-delete-trailing-whitespace'
+is non-nil."
   (save-excursion
-    (goto-char beg)
-    (beginning-of-line)
-    (let ((line-end (save-excursion
-                      (goto-char end)
-                      (if (bolp)
-                          (1- (line-number-at-pos))
-                        (line-number-at-pos)))))
-      (while (<= (line-number-at-pos) line-end)
-        (f90-ts--delete-trailing-whitespace-line (point))
-        (forward-line 1)))))
+    (let ((beg-bol (progn (goto-char beg) (line-beginning-position))))
+      ;; start at end and work backwards, so deleting whitespace on a line
+      ;; does not shift the positions of the lines still to be processed
+      (goto-char end)
+      ;; if END is at the beginning of a line, that line is excluded;
+      ;; if at the beginning of the buffer, then there is no previous line
+      ;; and nothing to do
+      (when (if (bolp)
+                (zerop (forward-line -1))
+              (beginning-of-line)
+              t)
+        (cl-loop
+         while (>= (point) beg-bol)
+         do (f90-ts--delete-trailing-whitespace-line (point))
+         while (zerop (forward-line -1)))))))
 
 
 (defmacro f90-ts--with-check-modified-line (&rest body)

@@ -148,6 +148,7 @@ without final newline."
     (f90-ts-indent-expr-assign-assoc-op . 1)
     (f90-ts-indent-declaration . 3)
     (f90-ts-indent-delete-trailing-whitespace . nil)
+    (f90-ts-indent-array-align . left)
     (f90-ts-smart-end . no-message)
     (f90-ts-leading-ampersand . nil)
     (f90-ts-leading-ampersand-style . (indent . 3))
@@ -1077,6 +1078,7 @@ Point is placed after the first \"[...]\" replacement."
    "indent_line_leading_amp.erts"
    "indent_stmt_misc.erts"
    "indent_keep_align.erts"
+   "indent_region_align_array_literal.erts"
    "indent_trailing_whitespace.erts"
    "break_line.erts"
    "join_line.erts"
