@@ -6,7 +6,7 @@
 ;; Maintainer: Martin Stein <mscfd@gmx.net>
 ;; URL: https://github.com/mscfd/emacs-f90-ts-mode
 ;; Keywords: languages, treesitter, fortran
-;; Version: 0.6.0
+;; Version: 0.6.1-snapshot
 ;; Package-Requires: ((emacs "29.1"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -33,6 +33,8 @@
 ;;
 ;; Changelog (recent):
 ;; [10-2026]
+;;   - Extend/reduce variants for mark region operations based on siblings
+;;     (first, last, previous, next) added.
 ;;   - Replace f90-ts-nav by improved f90-ts-toc providing a side panel with a
 ;;     table of content of a f90 buffer, see `MANUAL.md' for details.  This
 ;;     optional package requires its own use-package statement.
@@ -195,6 +197,8 @@ source files, based on Emacs's built-in tree-sitter support
 Changelog (recent):
 
 [10-2026]
+- Extend/reduce variants for mark region operations based on siblings
+  (first, last, previous, next) added.
 - Replace f90-ts-nav by improved f90-ts-toc providing a side panel with a
   table of content of a f90 buffer, see `MANUAL.md' for details.  This
   optional package requires its own use-package statement.
@@ -571,14 +575,22 @@ package `markdown-mode' are available, then use these."
     ("r"   "Enlarge"                    f90-ts-mark-region-enlarge)
     ("0"   "Shrink to first child"      f90-ts-mark-region-shrink-child-first)
     ("9"   "Shrink to last child"       f90-ts-mark-region-shrink-child-last)
+    ("X"   "Exchange point and mark"    exchange-point-and-mark)
+    ("c"   "Comment region (default)"   f90-ts-comment-region-default)
+    ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]
+   ["Mark sibling region"
     ("{"   "First sibling"              f90-ts-mark-region-first-sibling)
     ("["   "Previous sibling"           f90-ts-mark-region-prev-sibling)
     ("]"   "Next sibling"               f90-ts-mark-region-next-sibling)
     ("}"   "Last sibling"               f90-ts-mark-region-last-sibling)
-    ("X"   "Exchange point and mark"    exchange-point-and-mark)
-    ("c"   "Comment region (default)"   f90-ts-comment-region-default)
-    ("C"   "Comment region (custom)"    f90-ts-comment-region-custom)]
-   ["Fill/Rebalance"
+    ("M-{" "Extend/reduce to first"     f90-ts-mark-region-extend-first-sibling)
+    ("M-[" "Extend/reduce to previous"  f90-ts-mark-region-extend-prev-sibling)
+    ("M-]" "Extend/reduce to next"      f90-ts-mark-region-extend-next-sibling)
+    ("M-}" "Extend/reduce to last"      f90-ts-mark-region-extend-last-sibling)
+    ("X"   "Exchange point and mark"    exchange-point-and-mark)]]
+
+  ;; Navigate and sub-menus
+  [["Fill/Rebalance"
     ("C-f" "Fill column:"               f90-ts-transient--fill-column)
     ;; description text for "C-b" is in description slot
     ;; of `f90-ts-transient--fill-select-breakpoint-by'
@@ -586,10 +598,8 @@ package `markdown-mode' are available, then use these."
     ("f"   "Fill region/buffer"         f90-ts-fill-region)
     ("M-f" "Fill at line"               f90-ts-fill-at-line)
     ("M-j" "Fill with prev line"        f90-ts-fill-prev-line)
-    ("M-J" "Fill with next line"        f90-ts-fill-next-line)]]
-
-  ;; Navigate and sub-menus
-  [["Procedure"
+    ("M-J" "Fill with next line"        f90-ts-fill-next-line)]
+   ["Procedure"
     ("a"   "Beginning"                  f90-ts-thing-beginning-of-procedure)
     ("e"   "End"                        f90-ts-thing-end-of-procedure)
     ("p"   "Previous"                   f90-ts-thing-prev-procedure)
@@ -600,11 +610,11 @@ package `markdown-mode' are available, then use these."
     ("/"   "Find apropos"               xref-find-apropos)
     ("<"   "Go back"                    xref-go-back)
     (">"   "Go forward"                 xref-go-forward)]
-   ["TOC side panel"
-    :if (lambda () (featurep 'f90-ts-toc))
-    ("B" "Open TOC side panel"          f90-ts-toc-buffer-open)
-    ("F" "Focus TOC side panel"         f90-ts-toc-buffer-focus)]
    ["More"
+    ("B" "Open TOC side panel"          f90-ts-toc-buffer-open
+     :if (lambda () (featurep 'f90-ts-toc)))
+    ("F" "Focus TOC side panel"         f90-ts-toc-buffer-focus
+     :if (lambda () (featurep 'f90-ts-toc)))
     ("t"   "Types & interfaces..."      f90-ts-transient-things)
     ("@"   "Hideshow..."                f90-ts-transient-hideshow
      :if (lambda () (bound-and-true-p hs-minor-mode)))
@@ -643,7 +653,12 @@ package `markdown-mode' are available, then use these."
      ["First sibling"         f90-ts-mark-region-first-sibling      :active (region-active-p)]
      ["Previous sibling"      f90-ts-mark-region-prev-sibling       :active (region-active-p)]
      ["Next sibling"          f90-ts-mark-region-next-sibling       :active (region-active-p)]
-     ["Last sibling"          f90-ts-mark-region-last-sibling       :active (region-active-p)])
+     ["Last sibling"          f90-ts-mark-region-last-sibling       :active (region-active-p)]
+     "---"
+     ["Extend/reduce to first sibling"    f90-ts-mark-region-extend-first-sibling :active (region-active-p)]
+     ["Extend/reduce to previous sibling" f90-ts-mark-region-extend-prev-sibling  :active (region-active-p)]
+     ["Extend/reduce to next sibling"     f90-ts-mark-region-extend-next-sibling  :active (region-active-p)]
+     ["Extend/reduce to last sibling"     f90-ts-mark-region-extend-last-sibling  :active (region-active-p)])
     "---"
     ("Defun & Thing"
      ["Beginning of defun" beginning-of-defun :active t]
