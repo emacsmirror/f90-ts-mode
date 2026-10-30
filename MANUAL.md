@@ -35,8 +35,7 @@ for implementation.
   - [Indentation of statement labels](#indentation-of-statement-labels)
   - [Xref](#xref)
   - [Imenu](#imenu)
-  - [Navigation menu](#navigation-menu)
-  - [Navigation buffer](#navigation-buffer)
+  - [TOC buffer](#toc-buffer)
   - [Comment prefix](#comment-prefix)
   - [Breaking and joining lines](#breaking-and-joining-lines)
     - [Breaking lines](#breaking-lines)
@@ -205,14 +204,15 @@ Example setups provided below should be adjusted to ones requirements.
 
 #### Optional packages
 
-A navigation tree in the fortran menu and a side panel with the tree
-can be enabled by loading optional package `f90-ts-nav`:
+A table-of-content (TOC) side panel showing the structure of the source buffer
+can be enabled by loading the optional package `f90-ts-toc`
+(see [TOC buffer](#toc-buffer)):
 
 ```elisp
-(use-package f90-ts-nav
+(use-package f90-ts-toc
   :after f90-ts-mode
-  ;; demand loading after f90-ts-mode, otherwise entries for nav-tree functions
-  ;; do not show up in menus
+  ;; demand loading after f90-ts-mode, otherwise entries for TOC functions
+  ;; do not show up in the fortran menu and the transient popup
   :demand t)
 ```
 
@@ -312,7 +312,7 @@ Each sub-menu is also an ordinary command and can be bound directly.
 | **More...**            | `t`                   | Sub-menu: derived types (`a e p n`), interfaces (`A E P N`) |
 |                        | `h`                   | Sub-menu: hideshow (only if `hs-minor-mode` is active)  |
 |                        | `o`                   | Sub-menu: outline (only if `outline-minor-mode` is active) |
-|                        | `m`                   | Sub-menu: About, README, MANUAL (`a r m`), nav side panel (`B F`, if `f90-ts-nav` is loaded) |
+|                        | `m`                   | Sub-menu: About, README, MANUAL (`a r m`), TOC side panel (`B F`, if `f90-ts-toc` is loaded) |
 
 
 The entire transient popup can be bound to a different prefix with a use-package statement
@@ -345,7 +345,9 @@ in the `:bind` section as shown above, or simply by:
 - OpenMP and preprocessor directives
 - Coarray keywords and statements
 - Imenu and a Fortran menu in the menu bar
-- Navigation (defun, things, Xref, side panel tree)
+- Navigation (defun, things, Xref)
+- TOC side panel to show interactive table of content for a f90-ts buffer (optional package)
+- Hideshow, outline and treesit-fold support
 
 
 
@@ -561,52 +563,147 @@ Entries are grouped by `module`, `submodule`, `subroutine`, `function`, `module 
 `derived type`, `interface` and `variable`.
 
 
-### Navigation menu
+### TOC buffer
 
-Additionally to the Imenu grouping, the optional `Fortran` menu offers a submenu where the
-same imenu items are structured as a tree reflecting the hierarchical structure of the source file,
-with submenus for structures that contain other items.
-This requires and extra use-package statement to load the optional package,
-see [Optional packages](#ptional-packages).
+The optional package `f90-ts-toc` provides a TOC buffer: a persistent side panel showing the
+structure of the current Fortran source buffer as a table of content tree. The tree is based on a
+sparse version of the tree-sitter tree, restricted to relevant nodes, and reflects the nesting of
+program units. The panel is used to get an overview, to jump to entries, and to mark, comment or
+narrow to whole structures.
 
-### Navigation buffer
+The package must be loaded explicitly, see [Optional packages](#optional-packages).
+It can be opened with `f90-ts-toc-buffer-open` (`B` in the transient popup, also in the fortran
+menu) and focused with `f90-ts-toc-buffer-focus` (`F` in the transient popup). Opening the panel
+never changes the source buffer. Pressing `q` (or `C-g`) in the panel closes it, kills the TOC
+buffer and stops all background activity.
 
-The optional navigation buffer provides a persistent side panel showing the structure of the current
-Fortran source buffer. It is based on the same tree as offered in
-the [Navigation menu](#navigation-menu) and a sparse version of the tree-sitter tree.
+#### Entries
 
-It can be opened with `f90-ts-nav-buffer-open` (`b` in the transient popup) and focused with
-`f90-ts-nav-buffer-focus` (`f` in the transient popup).
+The following entries are shown, each with a short label (see `f90-ts-toc-short-labels`) and the
+name of the entity:
 
-The panel prints the tree, reflecting the nesting of program units.
-Entries are colour-coded by kind using customizable faces:
+| Entry                                              | Label (short) | Face                        |
+|----------------------------------------------------|---------------|-----------------------------|
+| `program`, `module`, `submodule`                   | `prog` `mod` `smod` | `f90-ts-toc-module-face`    |
+| `subroutine`, `function`, `module procedure`      | `sub` `fun` `proc`  | `f90-ts-toc-procedure-face` |
+| `interface` blocks (also without a generic name)   | `ifc`         | `f90-ts-toc-procedure-face` |
+| procedure statements inside interface blocks       | `proc`        | `f90-ts-toc-procedure-face` |
+| derived type definitions                           | `type`        | `f90-ts-toc-type-face`      |
+| variable declarations                              | `var`         | `f90-ts-toc-variable-face`  |
+| `contains` separator                               |               | `f90-ts-toc-separator-face` |
 
-| Face                        | Used for                                      |
-|-----------------------------|-----------------------------------------------|
-| `f90-ts-nav-module-face`    | `program`, `module`, `submodule`              |
-| `f90-ts-nav-procedure-face` | `subroutine`, `function`, `interface`         |
-| `f90-ts-nav-type-face`      | derived type definitions                      |
-| `f90-ts-nav-variable-face`  | variable declarations                         |
+Procedure statements are only listed inside interface blocks, type-bound procedures are not shown.
+Entries are indented according to their nesting depth. If a module, submodule, program, procedure or
+type has entries after its `contains` keyword, a separator line with the text of
+`f90-ts-toc-contains-label` (default `---contains---`) is inserted. Set it to `nil` to omit the separator.
 
-Automatic synchronisation of the highlighted entry in the side panel with active source buffer is
-controlled by `f90-ts-nav-buffer-auto-sync`. The sync is debounced via an idle timer
-(see `f90-ts-nav-buffer-idle-delay`), so that rapid cursor movement does not cause
-excessive updates.
+#### Synchronisation with the source buffer
 
-The nav buffer is automatically refreshed after edits, also after the idle delay.
+The panel follows the selected window. A single idle timer (delay `f90-ts-toc-buffer-idle-delay`,
+default 0.5 s) takes care of
 
-Keybindings in the navigation buffer:
+- switching the panel to the current `f90-ts-mode` buffer, if another source buffer is selected,
+- refreshing the tree after edits in the source buffer,
+- moving point in the panel to the entry belonging to point in the source buffer, if
+  `f90-ts-toc-buffer-auto-sync` is non-nil.
 
-| Key     | Function                        |
-|---------|---------------------------------|
-| `RET`   | Jump to entry in source buffer  |
-| `SPC`   | Preview entry without leaving   |
-| `n`/`p` | Move to next/previous entry     |
-| `g`     | Refresh the navigation buffer   |
-| `q`/`C-g` | Quit the navigation buffer    |
+The timer only runs while the TOC buffer exists and does nothing unless the panel is visible,
+so the panel is never opened automatically. Because everything is debounced by the idle timer,
+rapid cursor movement does not cause excessive updates. A changed idle delay takes effect when
+the panel is opened again. The tree can also be rebuilt explicitly with `g`.
 
+The entry belonging to a position is the closest entry whose start is on or before the position.
+Variable entries and procedure statements in interfaces are only associated with positions on
+their own source line.
 
-Note: the navigation buffer is still missing some features to be really useful.
+#### Keybindings in the TOC buffer
+
+Pressing `?` in the panel opens a transient menu which lists all commands. Every key also works
+without opening the menu first.
+
+| Key              | Function                                                                  |
+|------------------|---------------------------------------------------------------------------|
+| `RET`            | Jump to entry in source buffer                                            |
+| `SPC`            | Preview entry: show it in the source window and flash its line, stay in panel |
+| `n` / `p`        | Next / previous line                                                      |
+| `m`              | Mark / unmark the node of the entry in the source buffer                  |
+| `M`              | Mark / unmark the node including preceding doc comments                   |
+| `c`              | Comment / uncomment the node with the default prefix                      |
+| `C`              | Comment / uncomment the node with a prefix chosen from a list             |
+| `w`              | Narrow the source buffer to the node / widen again                        |
+| `v`              | Toggle display of variable entries                                        |
+| `i`              | Toggle display of interface entries                                       |
+| `d`              | Toggle doc comments belonging to an entry                                 |
+| `a`              | Toggle abbreviated labels                                                 |
+| `t`              | Cycle shortening of long names (`truncate`, `left`, `right`)              |
+| `s`              | Toggle panel between left and right side of the frame                     |
+| `g`              | Rebuild the TOC buffer                                                    |
+| `?`              | Open the transient menu                                                   |
+| `q` / `C-g`      | Quit the panel                                                            |
+
+Mouse: a click previews the entry, a double click or middle click jumps to it, and a right click
+opens a context menu with the same commands.
+
+#### Node operations
+
+The operations `m`, `M`, `c`, `C` and `w` act on the tree-sitter node of the entry at point,
+trimmed in the same way as in the [mark region](#mark-regions-based-on-tree-sitter-nodes) operations.
+They signal an error if the source buffer was modified since the TOC buffer was last rendered
+(refresh with `g`) or if the node is outside of the accessible (narrowed) part of the source buffer.
+
+- *Mark* selects the node in the source buffer and, as a toggle, deactivates the mark again.
+  `M` extends the region to the start of the doc comments in front of the node.
+- *Comment* (un)comments the node using the [comment region](#comment-region) rules.
+  `c` uses the default prefix `f90-ts-comment-region-prefix`. `C` prompts for a prefix from
+  `f90-ts-extra-comment-prefixes` and the default prefix, like `f90-ts-comment-region-custom`.
+- *Narrow* narrows the source buffer to the node and puts point at its start. If the source buffer is
+  already narrowed to exactly this node, it is widened. On a variable entry the structure the variable
+  is declared in is used. Narrowing to a structure inside the narrowed region narrows further.
+
+While the source buffer is narrowed, all entries stay visible, but entries outside of the narrowed
+region are dimmed with `f90-ts-toc-dimmed-face`. Moving point (or clicking) to a dimmed line
+*walks* in the tree: the source buffer is widened and narrowed to the structure of that line.
+This allows to drill down or step up through modules, procedures and types by just moving in the panel.
+
+#### Doc comments
+
+If `f90-ts-toc-include-doc-comments` is non-nil (default), comments directly in front of a structure
+(subroutine, function, type, interface, ...) belong to its entry. This aims at documentation comments
+such as `!>` used by doxygen or FORD. The comment immediately preceding the structure always counts,
+even if separated by an empty line; further comments before it only count if there is no empty line
+between them. Point in such a comment is then synchronised to the entry, and narrowing includes the
+doc comments. Variable entries have no doc comments. Marking with (`M`) and without (`m`) doc comments
+is always available. Toggle with `d`.
+
+#### Customization
+
+All options are in the customization group `f90-ts-toc` (`M-x customize-group RET f90-ts-toc`).
+
+| Option                                 | Default          | Description                                                                          |
+|----------------------------------------|------------------|--------------------------------------------------------------------------------------|
+| `f90-ts-toc-buffer-side`               | `left`           | Side of the frame (`left` or `right`); toggle with `s`                               |
+| `f90-ts-toc-buffer-width`              | `40`             | Width of the panel                                                                   |
+| `f90-ts-toc-buffer-auto-sync`          | `t`              | Point in the panel follows point in the source buffer                                |
+| `f90-ts-toc-buffer-idle-delay`         | `0.5`            | Idle time in seconds before the panel is updated                                     |
+| `f90-ts-toc-show-variables`            | `t`              | Show variable declarations; toggle with `v`                                          |
+| `f90-ts-toc-show-interface-procedures` | `t`              | Show interface blocks; toggle with `i`                                               |
+| `f90-ts-toc-include-doc-comments`      | `t`              | Preceding doc comments belong to an entry; toggle with `d`                           |
+| `f90-ts-toc-abbreviate-labels`         | `t`              | Use short labels; toggle with `a`                                                    |
+| `f90-ts-toc-short-labels`              | see above        | Alist from entry kind to short label                                                 |
+| `f90-ts-toc-name-shortening`           | `truncate`       | How names not fitting into the panel are shown: `truncate`, `left`, `right`; cycle with `t` |
+| `f90-ts-toc-ellipsis`                  | `"…"`            | Single character marking a cut name for `left` and `right`                           |
+| `f90-ts-toc-contains-label`            | `---contains---` | Text of the `contains` separator, `nil` for none                                     |
+
+With `left` or `right`, long names are shortened from that side and the cut is marked by
+`f90-ts-toc-ellipsis`, so that the interesting end of a name stays visible
+(e.g. `…me_which_does_not_fit` or `very_long_name_which_…`). The panel is re-rendered if its
+window width changes. The full name is shown as tooltip.
+
+Changes of `f90-ts-toc-buffer-side` and `f90-ts-toc-buffer-idle-delay` take effect when the panel is
+opened again, the toggle command `s` moves a visible panel immediately.
+The faces `f90-ts-toc-module-face`, `f90-ts-toc-procedure-face`, `f90-ts-toc-type-face`,
+`f90-ts-toc-variable-face`, `f90-ts-toc-separator-face` and `f90-ts-toc-dimmed-face` can be customized
+as usual.
 
 
 ### Comment prefix
