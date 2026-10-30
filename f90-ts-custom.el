@@ -90,13 +90,13 @@ associate ...) etc."
 
 
 (defconst f90-ts--indent-options-alist
-  '(("indent to first line of statement with offset `f90-ts-indent-continued'" . continued-line)
-    ("keep if aligned or indent to first line of statement with offset `f90-ts-indent-continued'" . keep-or-continued-line)
-    ("align with primary column" . primary)
-    ("keep if aligned or align to primary column" . keep-or-primary)
-    ("rotate columns" . rotate)
-    ("keep if aligned or rotate to next column" . keep-or-rotate))
-  "Options for indentation of list like structures on continued lines.")
+  '(("continued-line: indent relative to the first line of the statement" . continued-line)
+    ("keep-or-continued-line: preserve alignment or indent relative to the first line" . keep-or-continued-line)
+    ("primary: align with the primary column" . primary)
+    ("keep-or-primary: preserve alignment or align with the primary column" . keep-or-primary)
+    ("rotate: cycle through indentation columns" . rotate)
+    ("keep-or-rotate: preserve alignment or cycle to the next indentation column" . keep-or-rotate))
+  "Available indentation options for continued lines in list-like structures.")
 
 
 (defconst f90-ts--indent-region-options-alist
